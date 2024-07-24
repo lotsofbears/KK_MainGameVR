@@ -8,6 +8,8 @@ using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Collections;
+using KoikatuVR.Interpreters;
+using System.Diagnostics;
 
 namespace KoikatuVR.Camera
 {
@@ -101,6 +103,57 @@ namespace KoikatuVR.Camera
         public static void SetIdealPositionAndRotation(Transform t, Vector3 position, Quaternion rotation)
         {
             GetIdealTransformFor(t).SetPositionAndRotation(position, rotation);
+        }
+        //public static void SetIdealPositionAndRotation(Transform t, Vector3 position, Quaternion rotation)
+        //{
+        //    if (position.Equals(Vector3.zero))
+        //    {
+        //        VRLog.Warn("position=0,0,0 in " + new StackTrace());
+        //        return;
+        //    }
+        //    var talkScene = GameObject.FindObjectOfType<TalkScene>();
+        //    if (talkScene == null)
+        //    {
+        //        VRLog.Warn("TalkScene object not found");
+        //        return;
+        //    }
+        //    if (talkScene != null)
+        //    {
+        //        // todo keep old height?
+        //        VRLog.Debug("NewTalkScene SetIdealPositionAndRotation Proc");
+        //        var heroine = talkScene.targetHeroine.transform;
+        //        var newPosition = heroine.TransformPoint(new Vector3(0, GetPlayerHeight(), TalkSceneInterpreter.TalkDistance));
+        //        if (HeadIsAwayFromPosition(newPosition))
+        //            GetIdealTransformFor(t).SetPositionAndRotation(newPosition, heroine.rotation * Quaternion.Euler(0, 180f, 0));
+        //    }
+        //    else
+        //    {
+        //        var add = rotation.eulerAngles.normalized * 1f;
+        //        add.y = 0;
+        //        var added = position + add;
+
+        //        // breaks position at talk scene start
+        //        //if (HeadIsAwayFromPosition(added))
+        //        GetIdealTransformFor(t).SetPositionAndRotation(added, rotation);
+        //    }
+        //}
+        public static float GetPlayerHeight()
+        {
+            //todo setting?
+            //var playerHeight = VR.Camera.Head.position.y - VR.Camera.Origin.position.y;
+            //Console.WriteLine("height: " + playerHeight);
+            //return playerHeight;
+            return 1.4f;
+        }
+        public static bool HeadIsAwayFromPosition(Vector3 targetPosition)
+        {
+            return GetDistanceFromCurrentHeadPos(targetPosition) > 0.35f;
+        }
+        public static float GetDistanceFromCurrentHeadPos(Vector3 targetPosition)
+        {
+            var dist = Vector3.Distance(targetPosition, VR.Camera.SteamCam.head.position);
+            VRLog.Debug("Distance of head from pos={0} is {1}", targetPosition, dist);
+            return dist;
         }
     }
 

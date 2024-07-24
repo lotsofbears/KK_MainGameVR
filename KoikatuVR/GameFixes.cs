@@ -9,6 +9,7 @@ using VRGIN.Core;
 using UnityEngine;
 using UnityStandardAssets.ImageEffects;
 using KoikatuVR.Interpreters;
+using KoikatuVR.Settings;
 
 // Fixes issues that are in the base game but are only relevant in VR.
 

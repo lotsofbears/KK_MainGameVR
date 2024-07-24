@@ -8,6 +8,7 @@ using UnityEngine;
 using HarmonyLib;
 using System.Runtime.InteropServices;
 using WindowsInput;
+using KoikatuVR.Settings;
 
 namespace KoikatuVR
 {
@@ -29,6 +30,7 @@ namespace KoikatuVR
 
             bool enabled = vrActivated || (!vrDeactivated && SteamVRDetector.IsRunning);
             StartCoroutine(LoadDevice(enabled, settings));
+            CrossFader.Initialize(Config, vrActivated);
         }
 
         private const string DeviceOpenVR = "OpenVR";

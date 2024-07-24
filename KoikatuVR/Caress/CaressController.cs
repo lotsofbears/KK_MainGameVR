@@ -9,6 +9,7 @@ using VRGIN.Helpers;
 using HarmonyLib;
 using UnityEngine;
 using KoikatuVR.Interpreters;
+using KoikatuVR.Settings;
 
 namespace KoikatuVR.Caress
 {
@@ -48,16 +49,14 @@ namespace KoikatuVR.Caress
                 VRLog.Warn("HSceneProc not found");
                 return;
             }
+            VRLog.Debug($"Controller[{_controller}]");
             _aibuTracker = new AibuColliderTracker(proc, referencePoint: transform);
             _undresser = new Undresser(proc);
         }
 
         private void OnDestroy()
         {
-            if (_lock != null)
-            {
-                ReleaseLock();
-            }
+            if (_lock != null) ReleaseLock();
         }
 
         protected override void OnUpdate()
@@ -82,24 +81,29 @@ namespace KoikatuVR.Caress
                 bool wasIntersecting = _aibuTracker.IsIntersecting();
                 if (_aibuTracker.AddIfRelevant(other))
                 {
-                    if (!wasIntersecting && _aibuTracker.IsIntersecting())
+
+                    if (_aibuTracker.AddIfRelevant(other))
                     {
-                        _controller.StartRumble(new RumbleImpulse(1000));
-                        if (_settings.AutomaticTouching)
+                        if (!wasIntersecting && _aibuTracker.IsIntersecting())
                         {
-                            var colliderKind = _aibuTracker.GetCurrentColliderKind(out int femaleIndex);
-                            if (HandCtrl.AibuColliderKind.reac_head <= colliderKind &&
-                                !CaressUtil.IsSpeaking(_aibuTracker.Proc, femaleIndex))
+                            _controller.StartRumble(new RumbleImpulse(1000));
+                            if (_settings.AutomaticTouching)
                             {
-                                CaressUtil.SetSelectKindTouch(_aibuTracker.Proc, femaleIndex, colliderKind);
-                                StartCoroutine(CaressUtil.ClickCo());
+                                var colliderKind = _aibuTracker.GetCurrentColliderKind(out int femaleIndex);
+                                if (HandCtrl.AibuColliderKind.reac_head <= colliderKind &&
+                                    !CaressUtil.IsSpeaking(_aibuTracker.Proc, femaleIndex))
+                                {
+                                    CaressUtil.SetSelectKindTouch(_aibuTracker.Proc, femaleIndex, colliderKind);
+                                    StartCoroutine(CaressUtil.ClickCo());
+                                }
                             }
                         }
                     }
-                }
 
-                _undresser.Enter(other);
-                UpdateLock();
+                    _undresser.Enter(other);
+                    UpdateLock();
+                    _undresser.Enter(other);
+                }
             }
             catch (Exception e)
             {
@@ -137,9 +141,10 @@ namespace KoikatuVR.Caress
 
         private void HandleTrigger()
         {
-            var device = SteamVR_Controller.Input((int)_controller.Tracking.index);
+            var device = _controller.Input; //SteamVR_Controller.Input((int)_controller.Tracking.index);
             if (!_triggerPressed && device.GetPressDown(Valve.VR.EVRButtonId.k_EButton_SteamVR_Trigger))
             {
+                VRLog.Debug("Press");
                 UpdateSelectKindTouch();
                 HandCtrlHooks.InjectMouseButtonDown(0);
                 _controller.StartRumble(new RumbleImpulse(1000));
@@ -147,15 +152,16 @@ namespace KoikatuVR.Caress
             }
             else if (_triggerPressed && device.GetPressUp(Valve.VR.EVRButtonId.k_EButton_SteamVR_Trigger))
             {
+                VRLog.Debug("Release");
                 HandCtrlHooks.InjectMouseButtonUp(0);
                 _triggerPressed = false;
-                UpdateLock();
+                if (!_aibuTracker.IsIntersecting()) ReleaseLock();
             }
         }
 
         private void HandleToolChange()
         {
-            var device = SteamVR_Controller.Input((int)_controller.Tracking.index);
+            var device = _controller.Input; // SteamVR_Controller.Input((int)_controller.Tracking.index);
             if (device.GetPressUp(Valve.VR.EVRButtonId.k_EButton_ApplicationMenu))
             {
                 UpdateSelectKindTouch();

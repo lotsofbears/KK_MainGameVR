@@ -7,6 +7,7 @@ using KoikatuVR.Interpreters;
 using VRGIN.Core;
 using VRGIN.Controls;
 using UnityEngine;
+using KoikatuVR.Settings;
 
 namespace KoikatuVR.Controls
 {

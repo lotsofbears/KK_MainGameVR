@@ -13,7 +13,7 @@ namespace KoikatuVR.Interpreters
     class TalkSceneInterpreter : SceneInterpreter
     {
         Canvas _canvasBack;
-
+        public static float TalkDistance = 0.55f; // 0.65f;
         public override void OnDisable()
         {
             DestroyControllerComponent<Controls.TalkSceneHandler>();

@@ -23,6 +23,7 @@ namespace KoikatuVR
 
         protected override void OnLateUpdate()
         {
+
             // Hide the head iff the VR camera is inside it.
             // This also essentially negates the effect of scenairo-controlled
             // head hiding, which is found in some ADV scenes.
@@ -34,6 +35,7 @@ namespace KoikatuVR
                 var headCenter = head.TransformPoint(0, 0.12f, -0.04f);
                 var sqrDistance = (vrEye.position - headCenter).sqrMagnitude;
                 bool visible = !ForceHideHead && 0.0361f < sqrDistance; // 19 centimeters
+                //bool visible = !ForceHideHead && 0.0361f < sqrDistance; // 19 centimeters
                 _control.fileStatus.visibleHeadAlways = visible;
                 if (wasVisible && !visible)
                 {
@@ -63,6 +65,10 @@ namespace KoikatuVR
         {
             if (__instance.sex == 0)
             {
+                var proc = UnityEngine.Object.FindObjectOfType<HSceneProc>();
+                // We handle head in POV in H scenes.
+                if (proc != null)
+                    return;
                 __instance.GetOrAddComponent<VRMale>();
             }
         }

@@ -10,6 +10,7 @@ using static SteamVR_Controller;
 using WindowsInput.Native;
 using KoikatuVR.Interpreters;
 using System.ComponentModel;
+using KoikatuVR.Settings;
 
 namespace KoikatuVR.Controls
 {
@@ -275,6 +276,7 @@ namespace KoikatuVR.Controls
                 case AssignableFunction.SCROLLUP:
                 case AssignableFunction.LROTATION:
                 case AssignableFunction.RROTATION:
+                case AssignableFunction.F4:
                     return false;
                 default:
                     return true;

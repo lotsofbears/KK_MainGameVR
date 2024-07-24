@@ -16,16 +16,12 @@ namespace KoikatuVR.Caress
     /// </summary>
     public class LongDistanceKissMachine
     {
-        float? _startTime; // null iff not kissing
+        float? _startTime; // null if not kissing
         bool _prevEntryConditionMet = true;
 
-        public bool Step(
-            float currentTime,
-            Vector3 femaleFromHmd,
-            Vector3 hmdFromFemale,
-            float femaleFaceAngleY)
+        public bool Step(float currentTime, Vector3 femaleFromHmd, Vector3 hmdFromFemale)//, float femaleFaceAngleY)
         {
-            bool entryConditionMet = EntryScore(femaleFromHmd, hmdFromFemale, femaleFaceAngleY) < 0;
+            bool entryConditionMet = EntryScore(femaleFromHmd, hmdFromFemale) < 0;
             bool result;
             if (_startTime is float startTime)
             {
@@ -57,9 +53,9 @@ namespace KoikatuVR.Caress
             _prevEntryConditionMet = true;
         }
 
-        private static float EntryScore(Vector3 femaleFromHmd, Vector3 hmdFromFemale, float femaleFaceAngle)
+        private static float EntryScore(Vector3 femaleFromHmd, Vector3 hmdFromFemale)
         {
-            var total = OneSidedScore(femaleFromHmd) + OneSidedScore(hmdFromFemale) + 0.1f * Mathf.Abs(femaleFaceAngle);
+            var total = OneSidedScore(femaleFromHmd) + OneSidedScore(hmdFromFemale) + 0.1f;
             return total - 2.0f;
         }
 

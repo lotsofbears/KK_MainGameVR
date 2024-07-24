@@ -73,10 +73,12 @@ namespace KoikatuVR.Caress
             var targets = _itemsForPart[(int)part];
             if (part == InteractionBodyPart.Crotch && IsWearingSkirt(female))
             {
+                //VRLog.Debug($"WearingSkirt");
                 // Special case: if the character is wearing a skirt, allow
                 // directly removing the underwear.
                 targets = _skirtCrotchTargets;
             }
+            //VRLog.Debug($"part = {part}");
             foreach (var target in targets)
             {
                 if (!female.IsClothesStateKind((int)target.kind))
@@ -86,7 +88,7 @@ namespace KoikatuVR.Caress
                 var state = female.fileStatus.clothesState[(int)target.kind];
                 if (target.min_state <= state && state <= target.max_state)
                 {
-                    VRLog.Info($"toUndress: {target.kind}");
+                    //VRLog.Info($"toUndress: {target.kind} {state}");
                     return target.kind;
                 }
             }
@@ -115,22 +117,25 @@ namespace KoikatuVR.Caress
             Thigh,
             Torso,
         }
-
         private static readonly UndressTarget[][] _itemsForPart = new[]
         {
-            new[] { Target(ClothesKind.bot), Target(ClothesKind.panst), Target(ClothesKind.shorts) },
-            new[] { Target(ClothesKind.bot, 0), Target(ClothesKind.panst), Target(ClothesKind.shorts) },
-            new[] { Target(ClothesKind.top, 0), Target(ClothesKind.bra) },
-            new[] { Target(ClothesKind.socks), Target(ClothesKind.shorts, 2, 2) },
-            new[] { Target(ClothesKind.socks) },
+            new[] { Target(ClothesKind.bot, 0), Target(ClothesKind.panst, 0), Target(ClothesKind.shorts, 0),
+                Target(ClothesKind.panst), Target(ClothesKind.shorts), Target(ClothesKind.bot)},
+
+            new[] { Target(ClothesKind.bot), Target(ClothesKind.panst, 0), Target(ClothesKind.shorts, 0),
+                Target(ClothesKind.panst), Target(ClothesKind.shorts), Target(ClothesKind.bot)},
+
+            new[] { Target(ClothesKind.top, 0), Target(ClothesKind.bra, 0), Target(ClothesKind.top), Target(ClothesKind.bra)},
+            new[] { Target(ClothesKind.socks), Target(ClothesKind.panst), Target(ClothesKind.shorts, 2, 2) },
+            new[] { Target(ClothesKind.socks), Target(ClothesKind.panst) },
             new UndressTarget[] { },
             new[] { Target(ClothesKind.top) },
-            new[] { Target(ClothesKind.panst), Target(ClothesKind.bot), Target(ClothesKind.socks) },
+            new[] { Target(ClothesKind.bot, 0), Target(ClothesKind.panst, 0), Target(ClothesKind.panst), Target(ClothesKind.bot), Target(ClothesKind.socks) },
             new[] { Target(ClothesKind.top) },
         };
 
         private static readonly UndressTarget[] _skirtCrotchTargets =
-            new[] { Target(ClothesKind.panst), Target(ClothesKind.shorts), Target(ClothesKind.bot) };
+            new[] { Target(ClothesKind.panst, 0), Target(ClothesKind.shorts, 0), Target(ClothesKind.bot, 0), Target(ClothesKind.shorts, 1) };
 
         private static UndressTarget Target(ClothesKind kind, int max_state = 2, int min_state = 0)
         {
@@ -140,27 +145,27 @@ namespace KoikatuVR.Caress
         private static InteractionBodyPart? ColliderBodyPart(Collider collider)
         {
             var name = collider.name;
-            if (name == "aibu_hit_kokan" ||
-                name == "aibu_hit_ana")
+            if (name.Equals("aibu_hit_kokan") ||
+                name.Equals("aibu_hit_ana"))
                 return InteractionBodyPart.Crotch;
-            if (name.StartsWith("aibu_hit_siri") ||
-                name.StartsWith("aibu_reaction_waist"))
+            if (name.StartsWith("aibu_hit_siri", StringComparison.Ordinal) ||
+                name.StartsWith("aibu_reaction_waist", StringComparison.Ordinal))
                 return InteractionBodyPart.Groin;
-            if (name.StartsWith("cf_hit_bust"))
+            if (name.StartsWith("cf_hit_bust", StringComparison.Ordinal))
                 return InteractionBodyPart.Breast;
-            if (name == "aibu_reaction_legL")
+            if(name.Equals("aibu_reaction_legL"))
                 return InteractionBodyPart.LegL;
-            if (name == "aibu_reaction_legR")
+            if(name.Equals("aibu_reaction_legR"))
                 return InteractionBodyPart.LegR;
-            if (name.StartsWith("cf_hit_wrist"))
+            if(name.StartsWith("cf_hit_wrist", StringComparison.Ordinal))
                 return InteractionBodyPart.Forearm;
-            if (name.StartsWith("cf_hit_arm"))
+            if(name.StartsWith("cf_hit_arm", StringComparison.Ordinal))
                 return InteractionBodyPart.UpperArm;
-            if (name.StartsWith("aibu_reaction_thigh"))
+            if(name.StartsWith("aibu_reaction_thigh", StringComparison.Ordinal))
                 return InteractionBodyPart.Thigh;
-            if (name == "cf_hit_spine01" ||
-                name == "cf_hit_spine03" ||
-                name == "cf_hit_berry")
+            if(name.Equals("cf_hit_spine01") ||
+                name.Equals("cf_hit_spine03") ||
+                name.Equals("cf_hit_berry"))
                 return InteractionBodyPart.Torso;
             return null;
         }

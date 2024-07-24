@@ -5,6 +5,7 @@ using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
 using VRGIN.Core;
+using KoikatuVR.Settings;
 
 namespace KoikatuVR
 {
