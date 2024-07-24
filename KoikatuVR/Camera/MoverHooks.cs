@@ -98,10 +98,16 @@ namespace KoikatuVR.Camera
         [HarmonyPostfix]
         public static void PostChangeAnimator(HSceneProc __instance, bool _isForceCameraReset, List<ChaControl> ___lstFemale)
         {
-            if (_isForceCameraReset)
+            if (POV.Instance != null && POV.Instance.Active)
             {
-                UpdateVRCamera(__instance, ___lstFemale, null);
+                POV.Instance.OnPoseChange();
             }
+            if (VRMoverH.Instance != null)
+            {
+                VRMoverH.Instance.MoveToInH();
+            }
+            else if (_isForceCameraReset)
+                UpdateVRCamera(__instance, ___lstFemale, null);
         }
 
         [HarmonyPatch("ChangeCategory")]
@@ -115,7 +121,16 @@ namespace KoikatuVR.Camera
         [HarmonyPostfix]
         public static void PostChangeCategory(HSceneProc __instance, List<ChaControl> ___lstFemale, float __state)
         {
-            UpdateVRCamera(__instance, ___lstFemale, __state);
+            if (POV.Instance != null && POV.Instance.Active)
+            {
+                POV.Instance.OnSpotChange();
+            }
+            if (VRMoverH.Instance != null)
+            {
+                VRMoverH.Instance.MoveToInH();
+            }
+            else
+                UpdateVRCamera(__instance, ___lstFemale, __state);
         }
 
 

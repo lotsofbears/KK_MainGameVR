@@ -2,6 +2,7 @@
 using VRGIN.Core;
 using WindowsInput.Native;
 using StrayTech;
+using KoikatuVR.Settings;
 
 namespace KoikatuVR.Interpreters
 {

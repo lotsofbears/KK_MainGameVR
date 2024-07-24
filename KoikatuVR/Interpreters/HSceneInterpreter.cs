@@ -2,6 +2,7 @@
 using VRGIN.Core;
 using HarmonyLib;
 using System.Collections.Generic;
+using KoikatuVR.Camera;
 
 namespace KoikatuVR.Interpreters
 {
@@ -10,6 +11,8 @@ namespace KoikatuVR.Interpreters
         bool _active;
         HSceneProc _proc;
         Caress.VRMouth _vrMouth;
+        POV _pov;
+        VRMoverH _vrMoverH;
 
         public override void OnStart()
         {
@@ -32,7 +35,11 @@ namespace KoikatuVR.Interpreters
                 Manager.Scene.GetRootComponent<HSceneProc>("HProc") is HSceneProc proc &&
                 proc.enabled)
             {
+                _pov = VR.Camera.gameObject.AddComponent<POV>();
+                _pov.Initialize(proc);
                 _vrMouth = VR.Camera.gameObject.AddComponent<Caress.VRMouth>();
+                _vrMoverH = VR.Camera.gameObject.AddComponent<VRMoverH>();
+                _vrMoverH.Initialize(proc);
                 AddControllerComponent<Caress.CaressController>();
                 _proc = proc;
                 _active = true;
@@ -43,7 +50,9 @@ namespace KoikatuVR.Interpreters
         {
             if (_active)
             {
+                GameObject.Destroy(_pov);
                 GameObject.Destroy(_vrMouth);
+                GameObject.Destroy(_vrMoverH);
                 DestroyControllerComponent<Caress.CaressController>();
                 _proc = null;
                 _active = false;

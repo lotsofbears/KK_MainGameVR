@@ -6,6 +6,7 @@ using WindowsInput.Native;
 using VRGIN.Core;
 using KoikatuVR.Interpreters;
 using UnityEngine;
+using KoikatuVR.Settings;
 
 namespace KoikatuVR.Controls
 {

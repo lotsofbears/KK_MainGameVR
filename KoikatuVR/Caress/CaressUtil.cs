@@ -19,7 +19,8 @@ namespace KoikatuVR.Caress
             for (int i = 0; i < hands.Count; i++)
             {
                 var kind = i == femaleIndex ? colliderKind : HandCtrl.AibuColliderKind.none;
-                new Traverse(hands[i]).Field("selectKindTouch").SetValue(kind);
+                hands[i].selectKindTouch = kind;
+                //new Traverse(hands[i]).Field("selectKindTouch").SetValue(kind);
             }
         }
 
@@ -29,6 +30,7 @@ namespace KoikatuVR.Caress
             for (int i = 0; i < proc.flags.lstHeroine.Count; i++)
             {
                 ret.Add(i == 0 ? proc.hand : Compat.HSceenProc_hand1(proc));
+                ret.Add(i == 0 ? proc.hand : proc.hand1);
             }
             return ret;
         }

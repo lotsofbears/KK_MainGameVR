@@ -35,13 +35,19 @@ namespace KoikatuVR
 
         protected override Controller CreateLeftController()
         {
-            return AddComponents(base.CreateLeftController());
+            //return AddComponents(base.CreateLeftController());
+
+            var controller = AddComponents(base.CreateLeftController());
+            controller.ToolIndex = 2;
+            VRBoop.Initialize(controller, 0);
+            return controller;
         }
 
         protected override Controller CreateRightController()
         {
             var controller = AddComponents(base.CreateRightController());
-            controller.ToolIndex = 1;
+            controller.ToolIndex = 0;
+            VRBoop.Initialize(controller, 1);
             return controller;
         }
 

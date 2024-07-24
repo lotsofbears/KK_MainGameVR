@@ -15,7 +15,7 @@ namespace KoikatuVR.Caress
     /// faking mouse clicks using VR.Input, but is safer because it doesn't
     /// accidentally interact with the game UI.
     /// </summary>
-    class HandCtrlHooks
+    public class HandCtrlHooks
     {
         static HandCtrlHooks _instance;
 
@@ -32,6 +32,7 @@ namespace KoikatuVR.Caress
         /// <param name="action"></param>
         public static void InjectMouseButtonDown(int button, Action action = null)
         {
+            VRLog.Debug($"InjectMouseButtonDown");
             GetInstance().GetButtonHandler(button)._queues[0].Enqueue(action);
         }
 
@@ -44,6 +45,7 @@ namespace KoikatuVR.Caress
         /// <param name="action"></param>
         public static void InjectMouseButtonUp(int button, Action action = null)
         {
+            VRLog.Debug($"InjectMouseButtonUp");
             GetInstance().GetButtonHandler(button)._queues[1].Enqueue(action);
         }
 
