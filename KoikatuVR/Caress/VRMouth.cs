@@ -167,9 +167,8 @@ namespace KoikatuVR.Caress
         {
             if (NoKissingAllowed)
                 return;
-            if (_hFlag.finish != HFlag.FinishKind.none)//(_hFlag.nowAnimStateName.EndsWith("OLoop", StringComparison.Ordinal))
+            if (_hFlag.nowAnimStateName.EndsWith("OLoop", StringComparison.Ordinal))
             {
-                // Finish flag is being reset by SensibleH. 
                 FinishKiss();
                 FinishLicking();
             }
@@ -280,8 +279,9 @@ namespace KoikatuVR.Caress
         }
         private void StartLicking(HandCtrl.AibuColliderKind colliderKind, int layerNum)
         {
-            if (_hand.isKiss || _lickCoShouldEnd != null)
+            if (_kissCoShouldEnd != null || _lickCoShouldEnd != null)
             {
+                // With unbound
                 // Already licking.
                 return;
             }
@@ -318,11 +318,14 @@ namespace KoikatuVR.Caress
                     yield return CaressUtil.ClickCo();
                 yield return new WaitForSeconds(0.5f);
             }
-            if (_moMiActive)
-            {
-                // If we do this while SensibleH spams "JudgeProc()", we'll break HandCtrl, thus we wait (should be up to 0.6 seconds) for drag to start.
-                yield return new WaitUntil(() => _hand.ctrl != HandCtrl.Ctrl.click);
-            }
+            _lickCoShouldEnd = null;
+
+            // Until the next fiasco.
+            //if (_moMiActive)
+            //{
+            //    // If we do this while SensibleH spams "JudgeProc()", we'll break HandCtrl, thus we wait (should be up to 0.6 seconds) for drag to start.
+            //    yield return new WaitUntil(() => _hand.ctrl != HandCtrl.Ctrl.click);
+            //}
             _hand.selectKindTouch = oldKindTouch;
             _hand.DetachItemByUseItem(2);
             if (_hand.areaItem[bodyPartId] == layerNum)
@@ -330,7 +333,6 @@ namespace KoikatuVR.Caress
                 _hand.areaItem[bodyPartId] = oldLayerNum;
             }
 
-            _lickCoShouldEnd = null;
             VRLog.Debug($"LickCo[End]");
         }
         private void FinishLicking()

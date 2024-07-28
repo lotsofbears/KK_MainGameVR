@@ -65,7 +65,7 @@ namespace KoikatuVR.Camera
             }
             _lastPosition = position;
             _lastRotation = rotation;
-            if (_interpreter.CurrentScene == KoikatuInterpreter.SceneType.HScene && VRMoverH.Instance != null)
+            if (_interpreter.CurrentScene == KoikatuInterpreter.SceneType.HScene && VRMoverH.Instance != null && _settings.FlyInH)
                 VRMoverH.Instance.MoveToInH(position);
             else
                 VR.Mode.MoveToPosition(position, rotation, ignoreHeight: keepHeight);

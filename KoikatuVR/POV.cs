@@ -73,7 +73,7 @@ namespace KoikatuVR
         {
             Instance = this;
             settings = VR.Context.Settings as KoikatuSettings;
-            _hand = Traverse.Create(proc).Field("hand").GetValue<HandCtrl>();
+            _hand = Traverse.Create(proc).Field("hand").GetValue<HandCtrl>(); 
             _chaControls = Traverse.Create(proc).Field("lstFemale").GetValue<List<ChaControl>>();
             _scene = Scene.Instance;
             UpdateDevices();
@@ -110,8 +110,13 @@ namespace KoikatuVR
             NextChara(keepChara: true);
             UpdateDevices();
         }
+        public void CameraFar()
+        {
+            _wasAway = true;
+        }
         private void MoveToDesignatedHead()
         {
+            VRLog.Debug($"MoveToDesignatedHead");
             var head = VR.Camera.Head;
             var origin = VR.Camera.Origin;
             var curTarPos = GetEyesPosition();
@@ -119,7 +124,7 @@ namespace KoikatuVR
             if (_moveSpeed == 0f)
             {
                 VRMouth.NoKissingAllowed = true;
-                _moveSpeed = 0.5f + distance;// 3f;
+                _moveSpeed = 0.5f + distance * 0.5f * settings.FlightSpeed;// 3f;
             }
             var angleDelta = Quaternion.Angle(origin.rotation, _targetEyes.rotation);
             var rotSpeed = angleDelta / (distance / (Time.deltaTime * _moveSpeed));
@@ -127,13 +132,13 @@ namespace KoikatuVR
             {
                 if (_target.sex == 1)
                 {
-                    //VRLog.Debug("Finish setting FemalePov");
+                    VRLog.Debug("Finish setting FemalePov");
                     GirlPOV = true;
                     //NoKissing = true;
                 }
                 else
                 {
-                    //VRLog.Debug("Finish setting MalePov");
+                    VRLog.Debug("Finish setting MalePov");
                     GirlPOV = false;
                     VRMouth.NoKissingAllowed = false;
                 }
@@ -146,15 +151,21 @@ namespace KoikatuVR
         }
         public void OnSpotChange()
         {
-            if (settings.FlyInPov)
-                _wasAway = true;
+            //if (settings.FlyInPov)
+            //{ 
+            //    _wasAway = true;
+            //}
         }
         public void OnPoseChange()
         {
-            if (!_target.visibleAll)
+            if (_target != null && !_target.visibleAll)
+            {
                 Active = false;
-            if (settings.FlyInPov)
-                _wasAway = true;
+            }
+           //else if (settings.FlyInPov)
+           // {
+           //     _wasAway = true;
+           // }
         }
         private void ResetRotation()
         {
@@ -567,10 +578,9 @@ namespace KoikatuVR
         
         private void SetPOV()
         {
-            if (VRMouth._kissCoShouldEnd != null || VRMouth._lickCoShouldEnd != null)
+            if (VRMouth._kissCoShouldEnd == false || VRMouth._lickCoShouldEnd == false)
             {
-                if (!_wasAway)
-                    _wasAway = true;
+                _wasAway = true;
             }
             else if (_wasAway)
             {
@@ -655,7 +665,9 @@ namespace KoikatuVR
             if (!_scene.AddSceneName.Equals("HProc"))
             {
                 if (settings.FlyInPov)
+                {
                     _wasAway = true;
+                }
             }
             else if (Active) //!_scene.AddSceneName.StartsWith("Con", System.StringComparison.Ordinal) && !_scene.AddSceneName.StartsWith("HPo", System.StringComparison.Ordinal))
             {
