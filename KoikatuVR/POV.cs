@@ -51,9 +51,9 @@ namespace KoikatuVR
             Head,     // Mode2: Only Tracking Eye Position (Default)
             Disable // Mode3: Teleport(Jump) to next character when trigger controller
         }
-        private ChaControl _target;
+        private ChaControl currentTarget;
         private HandCtrl _hand;
-        private Transform _targetEyes;
+        private Transform currentTargetEyes;
         private POV_Mode povMode;
         private KoikatuSettings settings;
         private bool buttonA;
@@ -146,12 +146,15 @@ namespace KoikatuVR
         }
         public void OnSpotChange()
         {
-            _wasAway = true;
+            if (settings.FlyInPov)
+                _wasAway = true;
         }
         public void OnPoseChange()
         {
             if (!_target.visibleAll)
                 Active = false;
+            if (settings.FlyInPov)
+                _wasAway = true;
         }
         private void ResetRotation()
         {
@@ -481,6 +484,14 @@ namespace KoikatuVR
             VR.Camera.Origin.rotation = Quaternion.LookRotation(lookAtPosition - teleportVector);
             VR.Camera.Origin.position += teleportVector - VR.Camera.Head.position;
         }
+        //private static Quaternion MakeUpright(Quaternion _rotation)
+        //{
+        //    return Quaternion.Euler(0f, _rotation.eulerAngles.y, 0f);
+        //}
+        //private static Quaternion ResetRotationZ(Quaternion _rotation)
+        //{
+        //    return Quaternion.Euler(_rotation.eulerAngles.x, _rotation.eulerAngles.y, 0f);
+        //}
         private int GetCurrentCharaIndex(List<ChaControl> _chaControls)
         {
             if(_target)
@@ -534,8 +545,8 @@ namespace KoikatuVR
 
             if(_target.sex == 1)
             {
-                if (settings.HideHeadInPOV)
-                    SetSettingsFalse();
+                //if (settings.HideHeadInPOV)
+                //    SetSettingsFalse();
                 GirlPOV = true;
             }
             else
@@ -618,10 +629,10 @@ namespace KoikatuVR
 
         public void DisablePov()
         {
-                        Active = false;
-                        SetSettingsTrue();
-                        povMode = POV_Mode.Eyes;
-                        NewLookAtPoI();
+            Active = false;
+            SetSettingsTrue();
+            povMode = POV_Mode.Eyes;
+            NewLookAtPoI();
             VRMouth.NoKissingAllowed = false;
             _wasAway = true;
         }
@@ -641,27 +652,15 @@ namespace KoikatuVR
                 else
                     StartCoroutine(GetButtonA());
             }
-            //else if (!buttonA && VR.Mode.Left.ToolIndex == 2 && !_device1.GetPress(ButtonMask.Grip) && _device1.GetPressDown(128))
-            //{
-            //    if (_iHaveDifferentKink)
-            //        _iHaveDifferentKink = false;
-            //    else
-            //        StartCoroutine(GetButtonA());
-            //}
-            //if (POVConfig.TestPOVKey2.Value.IsDown())
-            //{
-
-            //}
             if (!_scene.AddSceneName.Equals("HProc"))
             {
-                _wasAway = true;
+                if (settings.FlyInPov)
+                    _wasAway = true;
             }
             else if (Active) //!_scene.AddSceneName.StartsWith("Con", System.StringComparison.Ordinal) && !_scene.AddSceneName.StartsWith("HPo", System.StringComparison.Ordinal))
             {
                 SetPOV();
             }
-            //if (test)
-            //    VRLog.Debug($"{DevicePos()}");
         }
         protected override void OnLateUpdate()
         {

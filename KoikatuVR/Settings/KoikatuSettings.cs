@@ -166,6 +166,12 @@ namespace KoikatuVR.Settings
             set => _HideHeadInPOV = value;
         }
         private bool _HideHeadInPOV = true;
+        public bool FlyInPov
+        {
+            get => _flyInPov;
+            set => _flyInPov = value;
+        }
+        private bool _flyInPov = true;
     }
 
     public class KeySet

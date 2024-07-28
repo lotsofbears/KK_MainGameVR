@@ -30,23 +30,6 @@ namespace KoikatuVR.Camera
             _hFlag = Traverse.Create(proc).Field("flags").GetValue<HFlag>();
             _poi = chaControl.objBodyBone.transform.Find("cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_backsk_00");
             _eyes = chaControl.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz/cf_J_Eye_tz");
-
-            /*
-             * AutomaticTouching = v);
-
-            var automaticKissing = config.Bind(sectionCaress, "Automatic kissing", true,
-                "Initiate kissing by moving your head");
-            Tie(automaticKissing, v => settings.AutomaticKissing = v);
-
-            var automaticLicking = config.Bind(sectionCaress, "Automatic licking", true,
-                "Initiate licking by moving your head");
-            Tie(automaticLicking, v => settings.AutomaticLicking = v);
-
-            var automaticTouchingByHmd = config.Bind(sectionCaress, "Kiss body", true,
-                "Touch the female's body by moving your head");
-            Tie(automaticTouchingByHmd, v => settings.AutomaticTouchingByHmd
-             * 
-             */
         }
         public void MoveToInH(Vector3 position = new Vector3())
         {
@@ -135,6 +118,10 @@ namespace KoikatuVR.Camera
         private IEnumerator FlyTowardPoi()
         {
             //VRLog.Debug($"StartOfFlight");
+            // My machine stutters on animation change, this is a way to wait for lag.
+            // After that we don't want to be in windows after update and before animation routine.
+            // My machine stutters on animation change, this is a way to wait for lag.
+            // After that we don't want to be in windows after update and before animation routine.
             yield return null;
             yield return new WaitUntil(() => Time.deltaTime < 0.05f);
             yield return new WaitForEndOfFrame();

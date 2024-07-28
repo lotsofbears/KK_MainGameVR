@@ -331,8 +331,12 @@ namespace KoikatuVR.Settings
             Tie(HeadPosPoVZ, v => settings.PositionOffsetZ = v);
 
             var hideHeadInPOV = config.Bind(sectionPOV, "HideHead", true,
-                "Hide a corresponding head when the camera is in it.");
+                "Hide the corresponding head when the camera is in it.");
             Tie(hideHeadInPOV, v => settings.HideHeadInPOV = v);
+
+            var flyInPov = config.Bind(sectionPOV, "FlyInPov", true,
+                "On position (or location) change, instead of teleporting, fly toward new position.");
+            Tie(hideHeadInPOV, v => settings.FlyInPov = v);
 
 
         }
