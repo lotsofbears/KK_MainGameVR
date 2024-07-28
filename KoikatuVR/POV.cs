@@ -51,9 +51,9 @@ namespace KoikatuVR
             Head,     // Mode2: Only Tracking Eye Position (Default)
             Disable // Mode3: Teleport(Jump) to next character when trigger controller
         }
-        private ChaControl currentTarget;
+        private ChaControl _target;
         private HandCtrl _hand;
-        private Transform currentTargetEyes;
+        private Transform _targetEyes;
         private POV_Mode povMode;
         private KoikatuSettings settings;
         private bool buttonA;
