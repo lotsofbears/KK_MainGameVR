@@ -30,6 +30,7 @@ namespace KoikatuVR.Settings
         public const string sectionRoaming = "1. Roaming";
         public const string sectionCaress = "1. Caress";
         public const string sectionEventScenes = "1. Event scenes";
+        public const string sectionPOV = "4. POV";
         /// <summary>
         /// Create config entries under the given ConfigFile. Also create a fresh
         /// KoikatuSettings object and arrange that it be synced with the config
@@ -164,8 +165,46 @@ namespace KoikatuVR.Settings
                 "Prefer first person view in event scenes");
             Tie(firstPersonADV, v => settings.FirstPersonADV = v);
 
+            var enablePOV = config.Bind(sectionPOV, "EnablePOV", true,
+                "Switch POV between characters in free H scenes (only works in Hand Tool)");
+            Tie(enablePOV, v => settings.EnablePOV = v);
+
+            var HeadPosPoVY = config.Bind(sectionPOV, "Y Offset", 0f,
+                new ConfigDescription(
+                    "Offset from the head on Y axis.",
+                    new AcceptableValueRange<float>(-1f, 1f)));
+            Tie(HeadPosPoVY, v => settings.PositionOffsetY = v);
+
+            var HeadPosPoVZ = config.Bind(sectionPOV, "Z Offset", 0f,
+                new ConfigDescription(
+                    "Z Offset",
+                    new AcceptableValueRange<float>(-1f, 1f)));
+            Tie(HeadPosPoVZ, v => settings.PositionOffsetZ = v);
+
+            var hideHeadInPOV = config.Bind(sectionPOV, "HideHead", true,
+                "Hide the corresponding head when the camera is in it.");
+            Tie(hideHeadInPOV, v => settings.HideHeadInPOV = v);
+
+            var flyInPov = config.Bind(sectionPOV, "FlyInPov", true,
+                "On position (or location) change, instead of teleporting, fly toward new position.");
+            Tie(flyInPov, v => settings.FlyInPov = v);
+
+            var autoEnter = config.Bind(sectionPOV, "AutoEnterPov", true,
+                "If disabled, on position change will be automatically activated when there is a dude.");
+            Tie(autoEnter, v => settings.AutoEnterPov = v);
+
+            var flyInH = config.Bind(sectionCaress, "CameraInH", true,
+                "Instead of teleporting to the new position, progressively moves camera to it.");
+            Tie(flyInH, v => settings.FlyInH = v);
+
+            var flightSpeed = config.Bind(sectionCaress, "CameraInH Speed", 1f,
+                new ConfigDescription(
+                    "Speed of progressive movement of the camera.",
+                    new AcceptableValueRange<float>(0.1f, 2f)));
+            Tie(flightSpeed, v => settings.FlightSpeed = v);
 
             KeySetsConfig keySetsConfig = null;
+
             void updateKeySets()
             {
                 keySetsConfig.CurrentKeySets(out var keySets, out var hKeySets);
@@ -176,7 +215,7 @@ namespace KoikatuVR.Settings
             keySetsConfig = new KeySetsConfig(config, updateKeySets);
             updateKeySets();
 
-            POVConfig pOVConfig = new POVConfig(config, settings);
+            //POVConfig pOVConfig = new POVConfig(config, settings);
 
             // Fixed settings
             settings.ApplyEffects = false; // We manage effects ourselves.
@@ -296,55 +335,45 @@ namespace KoikatuVR.Settings
 
     }
 
-    public class POVConfig
-    {
-        private const string sectionPOV = "4. POV between characters (Hand Tool in free H)";
-        public static ConfigEntry<KeyboardShortcut> TestPOVKey { get; private set; }
-        public static ConfigEntry<KeyboardShortcut> TestPOVKey2 { get; private set; }
-        public POVConfig(ConfigFile config, KoikatuSettings settings)
-        {
-            var enablePOV = config.Bind(sectionPOV, "POV", true,
-                "Switch POV between characters in free H scenes (only works in Hand Tool)");
-            Tie(enablePOV, v => settings.EnablePOV = v);
+    //public class POVConfig
+    //{
+    //    public POVConfig(ConfigFile config, KoikatuSettings settings)
+    //    {
+    //        var enablePOV = config.Bind(sectionPOV, "EnablePOV", true,
+    //            "Switch POV between characters in free H scenes (only works in Hand Tool)");
+    //        Tie(enablePOV, v => settings.EnablePOV = v);
 
-            TestPOVKey = config.Bind(sectionPOV, "TestPOVKey", new KeyboardShortcut(KeyCode.U),
-                new ConfigDescription(
-                    "TestPOVKey",
-                    null,
-                    new ConfigurationManagerAttributes { Order = -1 }));
+    //        var HeadPosPoVY = config.Bind(sectionPOV, "Y Offset", 0f,
+    //            new ConfigDescription(
+    //                "Offset from the head on Y axis.",
+    //                new AcceptableValueRange<float>(-1f, 1f)));
+    //        Tie(HeadPosPoVY, v => settings.PositionOffsetY = v);
 
-            TestPOVKey2 = config.Bind(sectionPOV, "TestPOVKey2", new KeyboardShortcut(KeyCode.G),
-                new ConfigDescription(
-                    "TestPOVKey2",
-                    null,
-                    new ConfigurationManagerAttributes { Order = -1 }));
-            var HeadPosPoVY = config.Bind(sectionPOV, "Y Offset", 0f,
-                new ConfigDescription(
-                    "Offset from the head on Y axis.",
-                    new AcceptableValueRange<float>(-1f, 1f)));
-            Tie(HeadPosPoVY, v => settings.PositionOffsetY = v);
+    //        var HeadPosPoVZ = config.Bind(sectionPOV, "Z Offset", 0f,
+    //            new ConfigDescription(
+    //                "Z Offset",
+    //                new AcceptableValueRange<float>(-1f, 1f)));
+    //        Tie(HeadPosPoVZ, v => settings.PositionOffsetZ = v);
 
-            var HeadPosPoVZ = config.Bind(sectionPOV, "Z Offset", 0f,
-                new ConfigDescription(
-                    "Z Offset",
-                    new AcceptableValueRange<float>(-1f, 1f)));
-            Tie(HeadPosPoVZ, v => settings.PositionOffsetZ = v);
+    //        var hideHeadInPOV = config.Bind(sectionPOV, "HideHead", true,
+    //            "Hide the corresponding head when the camera is in it.");
+    //        Tie(hideHeadInPOV, v => settings.HideHeadInPOV = v);
 
-            var hideHeadInPOV = config.Bind(sectionPOV, "HideHead", true,
-                "Hide the corresponding head when the camera is in it.");
-            Tie(hideHeadInPOV, v => settings.HideHeadInPOV = v);
+    //        var flyInPov = config.Bind(sectionPOV, "FlyInPov", true,
+    //            "On position (or location) change, instead of teleporting, fly toward new position.");
+    //        Tie(hideHeadInPOV, v => settings.FlyInPov = v);
 
-            var flyInPov = config.Bind(sectionPOV, "FlyInPov", true,
-                "On position (or location) change, instead of teleporting, fly toward new position.");
-            Tie(hideHeadInPOV, v => settings.FlyInPov = v);
+    //        var autoEnter = config.Bind(sectionPOV, "AutoEnterPov", true,
+    //            "If disabled, on position change will be automatically activated when there is a dude.");
+    //        Tie(hideHeadInPOV, v => settings.AutoEnterPov = v);
 
 
-        }
-        private static void Tie<T>(ConfigEntry<T> entry, Action<T> set)
-        {
-            set(entry.Value);
-            entry.SettingChanged += (_, _1) => set(entry.Value);
-        }
+    //    }
+    //    private static void Tie<T>(ConfigEntry<T> entry, Action<T> set)
+    //    {
+    //        set(entry.Value);
+    //        entry.SettingChanged += (_, _1) => set(entry.Value);
+    //    }
 
-    }
+    //}
 }

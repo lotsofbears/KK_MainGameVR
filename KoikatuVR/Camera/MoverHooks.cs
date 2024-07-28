@@ -7,6 +7,7 @@ using UnityEngine;
 using HarmonyLib;
 using System.Collections;
 using System.Reflection;
+using KoikatuVR.Settings;
 
 // This file is a collection of hooks to move the VR camera at appropriate
 // points of the game.
@@ -16,6 +17,7 @@ namespace KoikatuVR.Camera
     [HarmonyPatch(typeof(ADV.TextScenario))]
     class TextScenarioPatches1
     {
+
         [HarmonyPatch("ADVCameraSetting")]
         [HarmonyPostfix]
         static void PostADVCameraSetting(ADV.TextScenario __instance)
@@ -98,11 +100,11 @@ namespace KoikatuVR.Camera
         [HarmonyPostfix]
         public static void PostChangeAnimator(HSceneProc __instance, bool _isForceCameraReset, List<ChaControl> ___lstFemale)
         {
-            if (POV.Instance != null && POV.Active)
+            if (POV.Instance != null)
             {
                 POV.Instance.OnPoseChange();
             }
-            if (VRMoverH.Instance != null)
+            if (VRMoverH.Instance != null && VRMoverH.Instance._settings.FlyInH)
             {
                 VRMoverH.Instance.MoveToInH();
             }
@@ -121,11 +123,11 @@ namespace KoikatuVR.Camera
         [HarmonyPostfix]
         public static void PostChangeCategory(HSceneProc __instance, List<ChaControl> ___lstFemale, float __state)
         {
-            if (POV.Instance != null && POV.Active)
+            if (POV.Instance != null)
             {
                 POV.Instance.OnSpotChange();
             }
-            if (VRMoverH.Instance != null)
+            if (VRMoverH.Instance != null && VRMoverH.Instance._settings.FlyInH)
             {
                 VRMoverH.Instance.MoveToInH();
             }

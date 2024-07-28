@@ -22,6 +22,7 @@ namespace KoikatuVR.Camera
         private Transform _poi;
         private Transform _eyes;
         private HFlag _hFlag;
+        internal KoikatuSettings _settings;
 
         public void Initialize(HSceneProc proc)
         {
@@ -30,37 +31,55 @@ namespace KoikatuVR.Camera
             _hFlag = Traverse.Create(proc).Field("flags").GetValue<HFlag>();
             _poi = chaControl.objBodyBone.transform.Find("cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_backsk_00");
             _eyes = chaControl.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz/cf_J_Eye_tz");
+            _settings = VR.Context.Settings as KoikatuSettings;
         }
         public void MoveToInH(Vector3 position = new Vector3())
         {
+            VRLog.Debug($"MoveToInH {_settings.FlyInPov} {_settings.AutoEnterPov}");
             if (POV.Active)
-                return;
-            else
             {
-                switch (_hFlag.mode)
+                if (_settings.FlyInPov)
                 {
-                    case HFlag.EMode.houshi:
-                    case HFlag.EMode.sonyu:
-                    case HFlag.EMode.houshi3P:
-                    case HFlag.EMode.sonyu3P:
-                    case HFlag.EMode.houshi3PMMF:
-                    case HFlag.EMode.sonyu3PMMF:
-                        StartCoroutine(FlyToPov());
-                        return;
+                    POV.Active = false;
+                    StartCoroutine(FlyToPov());
                 }
             }
-            if (position == Vector3.zero)
-            {
-                StartCoroutine(FlyTowardPoi());
-            }
             else
             {
-                StartCoroutine(FlyTowardPosition(position));
+                if (_settings.AutoEnterPov)
+                {
+                    var poseWithMale = false;
+                    switch (_hFlag.mode)
+                    {
+                        case HFlag.EMode.houshi:
+                        case HFlag.EMode.sonyu:
+                        case HFlag.EMode.houshi3P:
+                        case HFlag.EMode.sonyu3P:
+                        case HFlag.EMode.houshi3PMMF:
+                        case HFlag.EMode.sonyu3PMMF:
+                            poseWithMale = true;
+                            break;
+                    }
+                    if (poseWithMale)
+                    {
+                        StartCoroutine(FlyToPov());
+                        return;
+                    }
+                }
+                if (position == Vector3.zero)
+                {
+                    StartCoroutine(FlyTowardPoi());
+                }
+                else
+                {
+                    StartCoroutine(FlyTowardPosition(position));
+                }
             }
         }
 
         private IEnumerator FlyToPov()
         {
+            VRLog.Debug($"FlyToPov");
             // We wait for the lag of position change.
             yield return null;
             yield return new WaitUntil(() => Time.deltaTime < 0.05f);
@@ -71,7 +90,7 @@ namespace KoikatuVR.Camera
             yield return null;
             yield return new WaitUntil(() => Time.deltaTime < 0.05f);
             yield return new WaitForEndOfFrame();
-            //VRLog.Debug($"MoveToInH {_hFlag.mode} {Time.deltaTime}");
+            VRLog.Debug($"FlyTowardPosition");
             var origin = VR.Camera.Origin;
             var head = VR.Camera.Head;
             var poi = _poi;
@@ -98,7 +117,7 @@ namespace KoikatuVR.Camera
                 position.y = poi.position.y + 0.15f;
 
             }
-            var moveSpeed = 0.5f + Vector3.Distance(head.position, position);
+            var moveSpeed = 0.5f + Vector3.Distance(head.position, position) * _settings.FlightSpeed;
             var lookRotation = Quaternion.LookRotation(_eyes.position - position);
             while (true)
             {
@@ -113,15 +132,11 @@ namespace KoikatuVR.Camera
                 yield return new WaitForEndOfFrame();
             }
             VRMouth.NoKissingAllowed = false;
-            //VRLog.Debug($"EndOfFlight");
+            VRLog.Debug($"EndOfFlight");
         }
         private IEnumerator FlyTowardPoi()
         {
-            //VRLog.Debug($"StartOfFlight");
-            // My machine stutters on animation change, this is a way to wait for lag.
-            // After that we don't want to be in windows after update and before animation routine.
-            // My machine stutters on animation change, this is a way to wait for lag.
-            // After that we don't want to be in windows after update and before animation routine.
+            VRLog.Debug($"FlyTowardPoi");
             yield return null;
             yield return new WaitUntil(() => Time.deltaTime < 0.05f);
             yield return new WaitForEndOfFrame();
@@ -143,12 +158,12 @@ namespace KoikatuVR.Camera
             }
             else
             {
-                // Looks close enough on Pico4, most likely a tad different for other headsets.
+                // Looks close enough on Pico4, most likely a tad different on others.
                 position = poi.position + poi.forward * 0.35f;
                 position.y += 0.15f;
 
             }
-            var moveSpeed = 0.5f + Vector3.Distance(head.position, position);
+            var moveSpeed = 0.5f + Vector3.Distance(head.position, position) * _settings.FlightSpeed;
             var lookRotation = Quaternion.LookRotation(_eyes.position - position);
             while (true)
             {
@@ -163,7 +178,7 @@ namespace KoikatuVR.Camera
                 yield return new WaitForEndOfFrame();
             }
             VRMouth.NoKissingAllowed = false;
-            //VRLog.Debug($"EndOfFlight");
+            VRLog.Debug($"EndOfFlight");
         }
     }
 }

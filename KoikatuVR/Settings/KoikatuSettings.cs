@@ -142,36 +142,14 @@ namespace KoikatuVR.Settings
         }
         private bool _UseLegacyInputSimulator;
 
-        public bool EnablePOV
-        {
-            get => _EnablePOV;
-            set => _EnablePOV = value;
-        }
-        private bool _EnablePOV = true;
-        public float PositionOffsetY
-        {
-            get => _positionOffsetY;
-            set => _positionOffsetY = value;
-        }
-        private float _positionOffsetY = 0f;
-        public float PositionOffsetZ
-        {
-            get => _positionOffsetZ;
-            set => _positionOffsetZ = value;
-        }
-        private float _positionOffsetZ = 0f;
-        public bool HideHeadInPOV
-        {
-            get => _HideHeadInPOV;
-            set => _HideHeadInPOV = value;
-        }
-        private bool _HideHeadInPOV = true;
-        public bool FlyInPov
-        {
-            get => _flyInPov;
-            set => _flyInPov = value;
-        }
-        private bool _flyInPov = true;
+        public bool FlyInH;
+        public float FlightSpeed;
+        public bool EnablePOV { get; set; }
+        public float PositionOffsetY { get; set; }
+        public float PositionOffsetZ { get; set; }
+        public bool HideHeadInPOV { get; set; }
+        public bool FlyInPov { get; set; }
+        public bool AutoEnterPov { get; set; }
     }
 
     public class KeySet
