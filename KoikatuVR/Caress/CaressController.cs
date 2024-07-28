@@ -10,6 +10,7 @@ using HarmonyLib;
 using UnityEngine;
 using KoikatuVR.Interpreters;
 using KoikatuVR.Settings;
+using static SteamVR_Controller;
 
 namespace KoikatuVR.Caress
 {
@@ -37,6 +38,7 @@ namespace KoikatuVR.Caress
         Controller.Lock _lock; // may be null but never invalid
         bool _triggerPressed; // Whether the trigger is currently pressed. false if _lock is null.
         Util.ValueTuple<ChaControl, ChaFileDefine.ClothesKind, Vector3>? _undressing;
+        private HandCtrl _hand;
 
         protected override void OnAwake()
         {
@@ -49,6 +51,7 @@ namespace KoikatuVR.Caress
                 VRLog.Warn("HSceneProc not found");
                 return;
             }
+            _hand = Traverse.Create(proc).Field("hand").GetValue<HandCtrl>();   
             VRLog.Debug($"Controller[{_controller}]");
             _aibuTracker = new AibuColliderTracker(proc, referencePoint: transform);
             _undresser = new Undresser(proc);
@@ -72,30 +75,32 @@ namespace KoikatuVR.Caress
 
         protected void OnTriggerEnter(Collider other)
         {
+            //if (VRMouth._lickCoShouldEnd != null)
+            //{
+            //    return;
+            //}
             try
             {
-                if (Manager.Scene.Instance.NowSceneNames[0] == "HPointMove")
+                if (Manager.Scene.Instance.NowSceneNames[0].Equals("HPointMove"))
                 {
                     return;
                 }
                 bool wasIntersecting = _aibuTracker.IsIntersecting();
                 if (_aibuTracker.AddIfRelevant(other))
                 {
-
-                    if (_aibuTracker.AddIfRelevant(other))
+                    if (!wasIntersecting && _aibuTracker.IsIntersecting())
                     {
-                        if (!wasIntersecting && _aibuTracker.IsIntersecting())
+                        _controller.StartRumble(new RumbleImpulse(1000));
+                        if (_settings.AutomaticTouching)
                         {
-                            _controller.StartRumble(new RumbleImpulse(1000));
-                            if (_settings.AutomaticTouching)
+                            var colliderKind = _aibuTracker.GetCurrentColliderKind(out int femaleIndex);
+                            if (HandCtrl.AibuColliderKind.reac_head <= colliderKind &&
+                                !CaressUtil.IsSpeaking(_aibuTracker.Proc, femaleIndex))
                             {
-                                var colliderKind = _aibuTracker.GetCurrentColliderKind(out int femaleIndex);
-                                if (HandCtrl.AibuColliderKind.reac_head <= colliderKind &&
-                                    !CaressUtil.IsSpeaking(_aibuTracker.Proc, femaleIndex))
-                                {
-                                    CaressUtil.SetSelectKindTouch(_aibuTracker.Proc, femaleIndex, colliderKind);
-                                    StartCoroutine(CaressUtil.ClickCo());
-                                }
+                                VRLog.Debug($"OnTriggerEnter[{other}]{colliderKind}");
+                                //CaressUtil.SetSelectKindTouch(_aibuTracker.Proc, femaleIndex, colliderKind);
+                                //StartCoroutine(CaressUtil.ClickCo());
+                                _hand.Reaction(colliderKind);
                             }
                         }
                     }
@@ -142,17 +147,17 @@ namespace KoikatuVR.Caress
         private void HandleTrigger()
         {
             var device = _controller.Input; //SteamVR_Controller.Input((int)_controller.Tracking.index);
-            if (!_triggerPressed && device.GetPressDown(Valve.VR.EVRButtonId.k_EButton_SteamVR_Trigger))
+            if (!_triggerPressed && device.GetPressDown(ButtonMask.Trigger))
             {
-                VRLog.Debug("Press");
                 UpdateSelectKindTouch();
+                //VRLog.Debug($"HandleTrigger[Press] {_hand.selectKindTouch}");
                 HandCtrlHooks.InjectMouseButtonDown(0);
                 _controller.StartRumble(new RumbleImpulse(1000));
                 _triggerPressed = true;
             }
-            else if (_triggerPressed && device.GetPressUp(Valve.VR.EVRButtonId.k_EButton_SteamVR_Trigger))
+            else if (_triggerPressed && device.GetPressUp(ButtonMask.Trigger))
             {
-                VRLog.Debug("Release");
+                //VRLog.Debug($"HandleTrigger[Release] {_hand.selectKindTouch}");
                 HandCtrlHooks.InjectMouseButtonUp(0);
                 _triggerPressed = false;
                 if (!_aibuTracker.IsIntersecting()) ReleaseLock();
@@ -162,7 +167,7 @@ namespace KoikatuVR.Caress
         private void HandleToolChange()
         {
             var device = _controller.Input; // SteamVR_Controller.Input((int)_controller.Tracking.index);
-            if (device.GetPressUp(Valve.VR.EVRButtonId.k_EButton_ApplicationMenu))
+            if (device.GetPressUp(ButtonMask.ApplicationMenu))
             {
                 UpdateSelectKindTouch();
                 HandCtrlHooks.InjectMouseScroll(1f);
@@ -174,7 +179,7 @@ namespace KoikatuVR.Caress
         {
             var device = SteamVR_Controller.Input((int)_controller.Tracking.index);
             var proc = _aibuTracker.Proc;
-            if (_undressing == null && device.GetPressDown(SteamVR_Controller.ButtonMask.Touchpad))
+            if (_undressing == null && device.GetPressDown(ButtonMask.Touchpad))
             {
                 var females = new Traverse(proc).Field<List<ChaControl>>("lstFemale").Value;
                 var toUndress = _undresser.ComputeUndressTarget(females, out int femaleIndex);
@@ -184,7 +189,7 @@ namespace KoikatuVR.Caress
                 }
             }
             if (_undressing is Util.ValueTuple<ChaControl, ChaFileDefine.ClothesKind, Vector3> undressing
-                && device.GetPressUp(SteamVR_Controller.ButtonMask.Touchpad))
+                && device.GetPressUp(ButtonMask.Touchpad))
             {
                 if (0.3f * 0.3f < (transform.position - undressing.Field3).sqrMagnitude)
                 {
@@ -200,6 +205,7 @@ namespace KoikatuVR.Caress
 
         private void ReleaseLock()
         {
+            //VRLog.Debug("ReleaseLock");
             CaressUtil.SetSelectKindTouch(_aibuTracker.Proc, 0, HandCtrl.AibuColliderKind.none);
             if (_triggerPressed)
                 HandCtrlHooks.InjectMouseButtonUp(0);
@@ -212,6 +218,7 @@ namespace KoikatuVR.Caress
         private void UpdateSelectKindTouch()
         {
             var colliderKind = _aibuTracker.GetCurrentColliderKind(out int femaleIndex);
+            //VRLog.Debug($"UpdateSelectKindTouch[{colliderKind}]");
             CaressUtil.SetSelectKindTouch(_aibuTracker.Proc, femaleIndex, colliderKind);
         }
     }

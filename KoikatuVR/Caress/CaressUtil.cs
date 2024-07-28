@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using HarmonyLib;
+using VRGIN.Core;
 
 namespace KoikatuVR.Caress
 {
@@ -21,6 +22,7 @@ namespace KoikatuVR.Caress
                 var kind = i == femaleIndex ? colliderKind : HandCtrl.AibuColliderKind.none;
                 hands[i].selectKindTouch = kind;
                 //new Traverse(hands[i]).Field("selectKindTouch").SetValue(kind);
+                //VRLog.Debug($"SetSelectKindTouch[{i}][{kind}] - {hands[i].selectKindTouch}");
             }
         }
 
@@ -30,7 +32,7 @@ namespace KoikatuVR.Caress
             for (int i = 0; i < proc.flags.lstHeroine.Count; i++)
             {
                 ret.Add(i == 0 ? proc.hand : Compat.HSceenProc_hand1(proc));
-                ret.Add(i == 0 ? proc.hand : proc.hand1);
+                //ret.Add(i == 0 ? proc.hand : proc.hand1);
             }
             return ret;
         }
@@ -41,6 +43,7 @@ namespace KoikatuVR.Caress
         /// <returns></returns>
         public static IEnumerator ClickCo()
         {
+            //VRLog.Debug($"ClickCo");
             bool consumed = false;
             HandCtrlHooks.InjectMouseButtonDown(0, () => consumed = true);
             while (!consumed)

@@ -1,21 +1,28 @@
 ﻿using HarmonyLib;
+using KoikatuVR.Caress;
+using KoikatuVR.Settings;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Security.Policy;
 using System.Text;
 using UnityEngine;
 using VRGIN.Core;
 
 namespace KoikatuVR.Camera
 {
+    /// <summary>
+    /// We fly towards adjusted positions. By flying rather then teleporting the sense of actual scene is created. No avoidance system (yet). 
+    /// </summary>
     class VRMoverH : MonoBehaviour
     {
         public static VRMoverH Instance;
         private Transform _poi;
         private Transform _eyes;
         private HFlag _hFlag;
+
         public void Initialize(HSceneProc proc)
         {
             Instance = this;
@@ -23,6 +30,23 @@ namespace KoikatuVR.Camera
             _hFlag = Traverse.Create(proc).Field("flags").GetValue<HFlag>();
             _poi = chaControl.objBodyBone.transform.Find("cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_backsk_00");
             _eyes = chaControl.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz/cf_J_Eye_tz");
+
+            /*
+             * AutomaticTouching = v);
+
+            var automaticKissing = config.Bind(sectionCaress, "Automatic kissing", true,
+                "Initiate kissing by moving your head");
+            Tie(automaticKissing, v => settings.AutomaticKissing = v);
+
+            var automaticLicking = config.Bind(sectionCaress, "Automatic licking", true,
+                "Initiate licking by moving your head");
+            Tie(automaticLicking, v => settings.AutomaticLicking = v);
+
+            var automaticTouchingByHmd = config.Bind(sectionCaress, "Kiss body", true,
+                "Touch the female's body by moving your head");
+            Tie(automaticTouchingByHmd, v => settings.AutomaticTouchingByHmd
+             * 
+             */
         }
         public void MoveToInH(Vector3 position = new Vector3())
         {
@@ -51,8 +75,10 @@ namespace KoikatuVR.Camera
                 StartCoroutine(FlyTowardPosition(position));
             }
         }
+
         private IEnumerator FlyToPov()
         {
+            // We wait for the lag of position change.
             yield return null;
             yield return new WaitUntil(() => Time.deltaTime < 0.05f);
             POV.Instance.StartPov();
@@ -62,10 +88,11 @@ namespace KoikatuVR.Camera
             yield return null;
             yield return new WaitUntil(() => Time.deltaTime < 0.05f);
             yield return new WaitForEndOfFrame();
-            VRLog.Debug($"MoveToInH {_hFlag.mode} {Time.deltaTime}");
+            //VRLog.Debug($"MoveToInH {_hFlag.mode} {Time.deltaTime}");
             var origin = VR.Camera.Origin;
             var head = VR.Camera.Head;
             var poi = _poi;
+            VRMouth.NoKissingAllowed = true;
             if (poi.position.y < 1f)
             {
                 // Not standing position(probably). For now we simply fly to the side.
@@ -102,11 +129,12 @@ namespace KoikatuVR.Camera
                     break;
                 yield return new WaitForEndOfFrame();
             }
-            VRLog.Debug($"EndOfFlight");
+            VRMouth.NoKissingAllowed = false;
+            //VRLog.Debug($"EndOfFlight");
         }
         private IEnumerator FlyTowardPoi()
         {
-            VRLog.Debug($"StartOfFlight");
+            //VRLog.Debug($"StartOfFlight");
             yield return null;
             yield return new WaitUntil(() => Time.deltaTime < 0.05f);
             yield return new WaitForEndOfFrame();
@@ -114,6 +142,7 @@ namespace KoikatuVR.Camera
             var origin = VR.Camera.Origin;
             var head = VR.Camera.Head;
             var poi = _poi;
+            VRMouth.NoKissingAllowed = true;
             if (poi.position.y < 1f)
             {
                 // Not standing position(probably). For now we simply fly to the side.
@@ -146,8 +175,8 @@ namespace KoikatuVR.Camera
                     break;
                 yield return new WaitForEndOfFrame();
             }
-
-            VRLog.Debug($"EndOfFlight");
+            VRMouth.NoKissingAllowed = false;
+            //VRLog.Debug($"EndOfFlight");
         }
     }
 }

@@ -8,6 +8,7 @@ using VRGIN.Core;
 using HarmonyLib;
 using KoikatuVR.Interpreters;
 using KoikatuVR.Settings;
+using KoikatuVR.Camera;
 
 namespace KoikatuVR.Caress
 {
@@ -17,6 +18,17 @@ namespace KoikatuVR.Caress
     /// </summary>
     public class VRMouth : ProtectedBehaviour
     {
+        public static bool NoKissingAllowed;
+        /// <summary>
+        /// Indicates whether the currently running LickCo should end.
+        /// null if LickCo is not running.
+        /// </summary>
+        public static bool? _lickCoShouldEnd;
+        /// <summary>
+        /// Indicates whether the currently running KissCo should end.
+        /// null if KissCo is not running.
+        /// </summary>
+        public static bool? _kissCoShouldEnd;
         private KoikatuSettings _settings;
         private AibuColliderTracker _aibuTracker;
         private Transform _firstFemale;
@@ -29,16 +41,6 @@ namespace KoikatuVR.Caress
         private readonly LongDistanceKissMachine _machine = new LongDistanceKissMachine();
         private bool _moMiActive;
         private Action<HandCtrl.AibuColliderKind> _callMoMi;
-        /// <summary>
-        /// Indicates whether the currently running KissCo should end.
-        /// null if KissCo is not running.
-        /// </summary>
-        public static bool? _kissCoShouldEnd;
-        /// <summary>
-        /// Indicates whether the currently running KissCo should end.
-        /// null if LickCo is not running.
-        /// </summary>
-        public static bool? _lickCoShouldEnd;
         protected override void OnAwake()
         {
             base.OnAwake();
@@ -46,10 +48,10 @@ namespace KoikatuVR.Caress
 
             // Create 2 colliders, a small one for entering and a large one for exiting.
             _small = VRMouthColliderObject
-                .Create("VRMouthSmall", new Vector3(0, 0, 0), new Vector3(0.15f, 0.1f, 0.1f)); // (0.05f, 0.05f, 0.07f));
+                .Create("VRMouthSmall", new Vector3(0, 0, 0), new Vector3(0.05f, 0.05f, 0.07f));//new Vector3(0.15f, 0.1f, 0.1f)); // (0.05f, 0.05f, 0.07f));
             _small.TriggerEnter += HandleTriggerEnter;
             _large = VRMouthColliderObject
-                .Create("VRMouthLarge", new Vector3(0, 0, 0.05f), new Vector3(0.15f, 0.15f, 0.2f));
+                .Create("VRMouthLarge", new Vector3(0, 0, 0.05f), new Vector3(0.1f, 0.1f, 0.15f));
             _large.TriggerExit += HandleTriggerExit;
 
             var hProc = GameObject.FindObjectOfType<HSceneProc>();
@@ -91,6 +93,8 @@ namespace KoikatuVR.Caress
 
         private void HandleScoreBasedKissing()
         {
+            if (NoKissingAllowed)
+                return;
             var inCaressMode = _hFlag.mode == HFlag.EMode.aibu;
             if (inCaressMode)
             {
@@ -129,13 +133,15 @@ namespace KoikatuVR.Caress
                     _settings.AutomaticTouchingByHmd) // &&
                     //!CaressUtil.IsSpeaking(_aibuTracker.Proc, femaleIndex))
                 {
-                    StartCoroutine(TriggerReactionCo(femaleIndex, colliderKind));
+                    _hand.Reaction(colliderKind);
+                    //StartCoroutine(TriggerReactionCo(femaleIndex, colliderKind));
                 }
             }
         }
 
         private IEnumerator TriggerReactionCo(int femaleIndex, HandCtrl.AibuColliderKind colliderKind)
         {
+            VRLog.Debug("TriggerReactionCo[ClickCo]");
             var kindFields = CaressUtil.GetHands(_aibuTracker.Proc)
                 .Select(h => new Traverse(h).Field<HandCtrl.AibuColliderKind>("selectKindTouch"))
                 .ToList();
@@ -159,8 +165,11 @@ namespace KoikatuVR.Caress
 
         private void UpdateKissLick(HandCtrl.AibuColliderKind colliderKind)
         {
-            if (_hFlag.nowAnimStateName.EndsWith("OLoop", StringComparison.Ordinal))
+            if (NoKissingAllowed)
+                return;
+            if (_hFlag.finish != HFlag.FinishKind.none)//(_hFlag.nowAnimStateName.EndsWith("OLoop", StringComparison.Ordinal))
             {
+                // Finish flag is being reset by SensibleH. 
                 FinishKiss();
                 FinishLicking();
             }
@@ -238,6 +247,7 @@ namespace KoikatuVR.Caress
 
         private IEnumerator KissCo()
         {
+            VRLog.Debug("KissCo[MainGameVR] start");
             StopAllLicking();
 
             var prevKindTouch = _hand.selectKindTouch;
