@@ -1,3 +1,4 @@
+**DISCLAIMER**: This is a version tailored specifically for [KK_SensibleH](https://github.com/lotsofbears/KK_SensibleH). Although it still works without it.
 # KK_MainGameVR
 
 This is a BepInEx plugin for Koikatsu that allows you to play the main game

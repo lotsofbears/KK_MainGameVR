@@ -59,7 +59,10 @@ namespace KoikatuVR.Caress
 
         private void OnDestroy()
         {
-            if (_lock != null) ReleaseLock();
+            if (_lock != null)
+            {
+                ReleaseLock();
+            }
         }
 
         protected override void OnUpdate()
@@ -160,7 +163,7 @@ namespace KoikatuVR.Caress
                 //VRLog.Debug($"HandleTrigger[Release] {_hand.selectKindTouch}");
                 HandCtrlHooks.InjectMouseButtonUp(0);
                 _triggerPressed = false;
-                if (!_aibuTracker.IsIntersecting()) ReleaseLock();
+                UpdateLock();
             }
         }
 

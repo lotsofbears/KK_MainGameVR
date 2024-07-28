@@ -1,6 +1,10 @@
-﻿using HarmonyLib;
+﻿using ADV.Commands.Object;
+using HarmonyLib;
 using Illusion.Game;
+using KKAPI.Utilities;
+using KoikatuVR.Camera;
 using KoikatuVR.Caress;
+using KoikatuVR.Mirror;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,8 +12,13 @@ using UnityEngine;
 using VRGIN.Controls;
 using VRGIN.Core;
 using VRGIN.Helpers;
+using WindowsInput;
+using WindowsInput.Native;
 using KoikatuVR.Settings;
+using static UnityEngine.UI.Image;
 using static SteamVR_Controller;
+using KKAPI;
+using UniRx;
 using Manager;
 
 
@@ -522,7 +531,21 @@ namespace KoikatuVR
             {
                 _target = chaControls[currentCharaIndex + 1];
             }
+
+            if(_target.sex == 1)
+            {
+                if (settings.HideHeadInPOV)
+                    SetSettingsFalse();
+                GirlPOV = true;
+            }
+            else
+            {
+                GirlPOV = false;
+
+            }
             _targetEyes = _target.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz");
+
+
         }
         private void NewPosition()
         {
@@ -535,7 +558,8 @@ namespace KoikatuVR
         {
             if (VRMouth._kissCoShouldEnd != null || VRMouth._lickCoShouldEnd != null)
             {
-                _wasAway = true;
+                if (!_wasAway)
+                    _wasAway = true;
             }
             else if (_wasAway)
             {
@@ -546,7 +570,7 @@ namespace KoikatuVR
                 else
                 {
                     MoveToDesignatedHead();
-                }
+            }
             }
             else if (_newAttachPoint && _device.GetPressUp(ButtonMask.Grip))
             {
@@ -566,8 +590,9 @@ namespace KoikatuVR
                     {
                         VRMouth.NoKissingAllowed = false;
                         _newAttachPoint = false;
-                    }
                 }
+                
+            }
             }
             else
             {
@@ -593,10 +618,10 @@ namespace KoikatuVR
 
         public void DisablePov()
         {
-            Active = false;
-            SetSettingsTrue();
-            povMode = POV_Mode.Eyes;
-            NewLookAtPoI();
+                        Active = false;
+                        SetSettingsTrue();
+                        povMode = POV_Mode.Eyes;
+                        NewLookAtPoI();
             VRMouth.NoKissingAllowed = false;
             _wasAway = true;
         }

@@ -34,9 +34,6 @@ namespace KoikatuVR.Caress
         private Transform _firstFemale;
         private Transform _firstFemaleMouth;
         private VRMouthColliderObject _small, _large;
-        private HandCtrl _hand;
-        private HandCtrl _hand1;
-        private HFlag _hFlag;
         private bool _inCaressMode = true;
         private readonly LongDistanceKissMachine _machine = new LongDistanceKissMachine();
         private bool _moMiActive;
@@ -61,20 +58,8 @@ namespace KoikatuVR.Caress
                 VRLog.Error("hProc is null");
                 return;
             }
-            var moMi = AccessTools.TypeByName("KK_SensibleH.MoMiController");
-            _moMiActive = moMi != null;
-            if (_moMiActive)
-            {
-                // True argument for kiss, False for lick.
-                var methodInfo = AccessTools.FirstMethod(moMi, m => m.Name.Equals("StartVrAction"));
-                _callMoMi = AccessTools.MethodDelegate<Action<HandCtrl.AibuColliderKind>>(methodInfo);
-                VRLog.Debug($"[delegate = {_callMoMi}]");
-            }
             _aibuTracker = new AibuColliderTracker(hProc, referencePoint: transform);
             var lstFemale = new Traverse(hProc).Field("lstFemale").GetValue<List<ChaControl>>();
-            _hand = Traverse.Create(hProc).Field("hand").GetValue<HandCtrl>();
-            _hand1 = Traverse.Create(hProc).Field("hand1").GetValue<HandCtrl>();
-            _hFlag = Traverse.Create(hProc).Field("flags").GetValue<HFlag>();
             _firstFemale = lstFemale[0].objTop.transform;
             _firstFemaleMouth = lstFemale[0].objHeadBone.transform.Find(
                 "cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceLow_tz/a_n_mouth");
@@ -102,7 +87,8 @@ namespace KoikatuVR.Caress
                     _machine.Step(
                         Time.time,
                         _small.transform.InverseTransformPoint(_firstFemaleMouth.position),
-                        _firstFemaleMouth.InverseTransformPoint(_small.transform.position));
+                        _firstFemaleMouth.InverseTransformPoint(_small.transform.position),
+                        Mathf.DeltaAngle(_firstFemale.eulerAngles.y, _firstFemaleMouth.transform.eulerAngles.y));
                 if (decision)
                 {
                     StartKiss();
@@ -130,8 +116,8 @@ namespace KoikatuVR.Caress
 
                 if (_kissCoShouldEnd == null &&
                     HandCtrl.AibuColliderKind.reac_head <= colliderKind &&
-                    _settings.AutomaticTouchingByHmd) // &&
-                    //!CaressUtil.IsSpeaking(_aibuTracker.Proc, femaleIndex))
+                    _settings.AutomaticTouchingByHmd &&
+                    !CaressUtil.IsSpeaking(_aibuTracker.Proc, femaleIndex))
                 {
                     _hand.Reaction(colliderKind);
                     //StartCoroutine(TriggerReactionCo(femaleIndex, colliderKind));
@@ -177,7 +163,7 @@ namespace KoikatuVR.Caress
             {
                 StartKiss();
             }
-            else if (_settings.AutomaticLicking && IsLickingOk(colliderKind, out int layerNum))
+            else if(_settings.AutomaticLicking && IsLickingOk(colliderKind, out int layerNum))
             {
                 StartLicking(colliderKind, layerNum);
             }
@@ -200,12 +186,12 @@ namespace KoikatuVR.Caress
                 return false;
             }
 
-            int bodyPartId = (int)colliderKind - 2;
-            var layerInfos = _hand.dicAreaLayerInfos[bodyPartId];
-            int clothState = _hand.GetClothState(colliderKind);
-            var layerKv = layerInfos
-                .Where(kv => kv.Value.useArray == 2)
-                .FirstOrDefault();
+            int bodyPartId = colliderKind - HandCtrl.AibuColliderKind.muneL;
+            var hand = _aibuTracker.Proc.hand;
+            var handTrav = new Traverse(hand);
+            var layerInfos = handTrav.Field<Dictionary<int, HandCtrl.LayerInfo>[]>("dicAreaLayerInfos").Value[bodyPartId];
+            int clothState = handTrav.Method("GetClothState", new[] { typeof(HandCtrl.AibuColliderKind) }).GetValue<int>(colliderKind);
+            var layerKv = layerInfos.Where(kv => kv.Value.useArray == 2).FirstOrDefault();
             var layerInfo = layerKv.Value;
             layerNum = layerKv.Key;
             if (layerInfo == null)
@@ -217,8 +203,8 @@ namespace KoikatuVR.Caress
             {
                 return false;
             }
-            var heroine = _hand.flags.lstHeroine[0];
-            if (_hand.flags.mode != HFlag.EMode.aibu &&
+            var heroine = _aibuTracker.Proc.flags.lstHeroine[0];
+            if (_aibuTracker.Proc.flags.mode != HFlag.EMode.aibu &&
                 colliderKind == HandCtrl.AibuColliderKind.anal &&
                 !heroine.denial.anal &&
                 heroine.hAreaExps[3] == 0f)
@@ -234,15 +220,14 @@ namespace KoikatuVR.Caress
         /// </summary>
         private void StartKiss()
         {
-            if (_kissCoShouldEnd != null || _hand.isKiss)
+            if (_kissCoShouldEnd != null || new Traverse(_aibuTracker.Proc.hand).Field<bool>("isKiss").Value)
             {
                 // Already kissing.
                 return;
             }
+
             _kissCoShouldEnd = false;
             StartCoroutine(KissCo());
-            if (_moMiActive)
-                _callMoMi(HandCtrl.AibuColliderKind.mouth);
         }
 
         private IEnumerator KissCo()
@@ -250,9 +235,13 @@ namespace KoikatuVR.Caress
             VRLog.Debug("KissCo[MainGameVR] start");
             StopAllLicking();
 
-            var prevKindTouch = _hand.selectKindTouch;
-            _hand.selectKindTouch = HandCtrl.AibuColliderKind.mouth;
-            var messageDelivered = false;
+            var hand = _aibuTracker.Proc.hand;
+            var handTrav = new Traverse(hand);
+            var selectKindTouchTrav = handTrav.Field<HandCtrl.AibuColliderKind>("selectKindTouch");
+
+            var prevKindTouch = selectKindTouchTrav.Value;
+            selectKindTouchTrav.Value = HandCtrl.AibuColliderKind.mouth;
+            bool messageDelivered = false;
             HandCtrlHooks.InjectMouseButtonDown(0, () => messageDelivered = true);
             while (!messageDelivered)
             {
@@ -261,12 +250,13 @@ namespace KoikatuVR.Caress
             yield return new WaitForEndOfFrame();
 
             // Try to restore the old value of selectKindTouch.
-            if (_hand.selectKindTouch == HandCtrl.AibuColliderKind.mouth)
+            if (selectKindTouchTrav.Value == HandCtrl.AibuColliderKind.mouth)
             {
-                _hand.selectKindTouch = prevKindTouch;
+                selectKindTouchTrav.Value = prevKindTouch;
             }
 
-            while (_kissCoShouldEnd == false && _hand.isKiss)
+            var isKissTrav = handTrav.Field<bool>("isKiss");
+            while (_kissCoShouldEnd == false && isKissTrav.Value)
             {
                 yield return null;
             }
@@ -285,58 +275,56 @@ namespace KoikatuVR.Caress
 
         private void StartLicking(HandCtrl.AibuColliderKind colliderKind, int layerNum)
         {
-            if (_hand.isKiss || _lickCoShouldEnd != null)
+            if (_lickCoShouldEnd != null)
             {
                 // Already licking.
                 return;
             }
 
-            int bodyPartId = (int)colliderKind - 2;
-            var usedItem = _hand.useAreaItems[bodyPartId];
+            var hand = _aibuTracker.Proc.hand;
+            var handTrav = new Traverse(hand);
+            int bodyPartId = colliderKind - HandCtrl.AibuColliderKind.muneL;
+            var usedItem = handTrav.Field<HandCtrl.AibuItem[]>("useAreaItems").Value[bodyPartId];
 
             // If another item is being used on the target body part, detach it.
             if (usedItem != null && usedItem.idUse != 2)
             {
-                _hand.DetachItemByUseItem(usedItem.idUse);
+                hand.DetachItemByUseItem(usedItem.idUse);
             }
 
-            StartCoroutine(LickCo(colliderKind, layerNum, bodyPartId));
+            StartCoroutine(LickCo(colliderKind, layerNum));
         }
 
-        private IEnumerator LickCo(HandCtrl.AibuColliderKind colliderKind, int layerNum, int bodyPartId)
+        private IEnumerator LickCo(HandCtrl.AibuColliderKind colliderKind, int layerNum)
         {
-            VRLog.Debug($"LickCo[Start]");
             _lickCoShouldEnd = false;
 
-            var oldLayerNum = _hand.areaItem[bodyPartId];
-            _hand.areaItem[bodyPartId] = layerNum;
+            var hand = _aibuTracker.Proc.hand;
+            var handTrav = new Traverse(hand);
+            var areaItem = handTrav.Field<int[]>("areaItem").Value;
+            int bodyPartId = colliderKind - HandCtrl.AibuColliderKind.muneL;
+            var selectKindTouchTrav = handTrav.Field<HandCtrl.AibuColliderKind>("selectKindTouch");
 
-            var oldKindTouch = _hand.selectKindTouch;
-            _hand.selectKindTouch = colliderKind;
-            while (_lickCoShouldEnd == false && _hand.areaItem[bodyPartId] == layerNum)
+
+            var oldLayerNum = areaItem[bodyPartId];
+            areaItem[bodyPartId] = layerNum;
+
+            while (_lickCoShouldEnd == false && areaItem[bodyPartId] == layerNum)
             {
-                if (_moMiActive)
-                {
-                    _callMoMi(colliderKind);
-                }
-                else
-                    yield return CaressUtil.ClickCo();
-                yield return new WaitForSeconds(0.5f);
+                var oldKindTouch = selectKindTouchTrav.Value;
+                selectKindTouchTrav.Value = colliderKind;
+                yield return CaressUtil.ClickCo();
+                selectKindTouchTrav.Value = oldKindTouch;
+                yield return new WaitForSeconds(0.2f);
             }
-            if (_moMiActive)
+
+            hand.DetachItemByUseItem(2);
+            if (areaItem[bodyPartId] == layerNum)
             {
-                // If we do this while SensibleH spams "JudgeProc()", we'll break HandCtrl, thus we wait (should be up to 0.6 seconds) for drag to start.
-                yield return new WaitUntil(() => _hand.ctrl != HandCtrl.Ctrl.click);
-            }
-            _hand.selectKindTouch = oldKindTouch;
-            _hand.DetachItemByUseItem(2);
-            if (_hand.areaItem[bodyPartId] == layerNum)
-            {
-                _hand.areaItem[bodyPartId] = oldLayerNum;
+                areaItem[bodyPartId] = oldLayerNum;
             }
 
             _lickCoShouldEnd = null;
-            VRLog.Debug($"LickCo[End]");
         }
 
         private void FinishLicking()
@@ -350,7 +338,7 @@ namespace KoikatuVR.Caress
         private void StopAllLicking()
         {
             FinishLicking();
-            _hand.DetachItemByUseItem(2);
+            _aibuTracker.Proc.hand.DetachItemByUseItem(2);
         }
 
         class VRMouthColliderObject : ProtectedBehaviour
@@ -362,7 +350,7 @@ namespace KoikatuVR.Caress
             public static VRMouthColliderObject Create(string name, Vector3 center, Vector3 size)
             {
                 var gameObj = new GameObject(name);
-                gameObj.transform.localPosition = new Vector3(0, -0.07f, 0.02f); // (0, -0.07f, 0.02f);
+                gameObj.transform.localPosition = new Vector3(0, -0.07f, 0.02f);
                 gameObj.transform.SetParent(VR.Camera.transform, false);
 
                 var collider = gameObj.AddComponent<BoxCollider>();

@@ -98,7 +98,6 @@ namespace VRGIN.Controls
         [Obsolete("Use TryAcquireFocus() or AcquireFocus()")]
         public bool AcquireFocus(out Lock lockObj)
         {
-            // Although it still works without it.
             return TryAcquireFocus(out lockObj);
         }
 
