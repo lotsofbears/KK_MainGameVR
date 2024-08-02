@@ -54,7 +54,8 @@ namespace VRGIN.Controls.Handlers
         {
             try
             {
-                if(!_Controller) _Controller = GetComponent<Controller>();
+                if(!_Controller) 
+                    _Controller = GetComponent<Controller>();
                 var attachPosition = _Controller.FindAttachPosition("tip");
 
                 if (!attachPosition)
@@ -127,7 +128,7 @@ namespace VRGIN.Controls.Handlers
                 _LaserLock.Release();
             }
         }
-
+        
         private void EnsureResizeHandler()
         {
             if (!_ResizeHandler)

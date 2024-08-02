@@ -56,19 +56,15 @@ namespace KoikatuVR
         }
     }
 
-    [HarmonyPatch(typeof(ChaControl))]
     class ChaControlPatches
     {
-        [HarmonyPatch(nameof(ChaControl.Initialize))]
         [HarmonyPostfix]
+        [HarmonyPatch(typeof(ChaControl), nameof(ChaControl.Initialize))]
         static void PostInitialize(ChaControl __instance)
         {
-            if (__instance.sex == 0)
+            if (__instance.sex == 0 && __instance.transform.parent.name.Equals("HScene"))
             {
-                var proc = UnityEngine.Object.FindObjectOfType<HSceneProc>();
-                // We handle head in POV in H scenes.
-                if (proc != null)
-                    return;
+                // In H we do this more lazily/appropriately through POV.
                 __instance.GetOrAddComponent<VRMale>();
             }
         }

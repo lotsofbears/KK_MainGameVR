@@ -18,6 +18,9 @@ namespace KoikatuVR.Caress
     /// </summary>
     public class VRMouth : ProtectedBehaviour
     {
+        /// <summary>
+        /// To prevent accidental trigger when we are moving across HScene or moving to/from PoV.
+        /// </summary>
         public static bool NoKissingAllowed;
         /// <summary>
         /// Indicates whether the currently running LickCo should end.
@@ -141,20 +144,20 @@ namespace KoikatuVR.Caress
 
 
 
-        private IEnumerator TriggerReactionCo(int femaleIndex, HandCtrl.AibuColliderKind colliderKind)
-        {
-            VRLog.Debug("TriggerReactionCo[ClickCo]");
-            var kindFields = CaressUtil.GetHands(_aibuTracker.Proc)
-                .Select(h => new Traverse(h).Field<HandCtrl.AibuColliderKind>("selectKindTouch"))
-                .ToList();
-            var oldKinds = kindFields.Select(f => f.Value).ToList();
-            CaressUtil.SetSelectKindTouch(_aibuTracker.Proc, femaleIndex, colliderKind);
-            yield return CaressUtil.ClickCo();
-            for (int i = 0; i < kindFields.Count(); i++)
-            {
-                kindFields[i].Value = oldKinds[i];
-            }
-        }
+        //private IEnumerator TriggerReactionCo(int femaleIndex, HandCtrl.AibuColliderKind colliderKind)
+        //{
+        //    VRLog.Debug("TriggerReactionCo[ClickCo]");
+        //    var kindFields = CaressUtil.GetHands(_aibuTracker.Proc)
+        //        .Select(h => new Traverse(h).Field<HandCtrl.AibuColliderKind>("selectKindTouch"))
+        //        .ToList();
+        //    var oldKinds = kindFields.Select(f => f.Value).ToList();
+        //    CaressUtil.SetSelectKindTouch(_aibuTracker.Proc, femaleIndex, colliderKind);
+        //    yield return CaressUtil.ClickCo();
+        //    for (int i = 0; i < kindFields.Count(); i++)
+        //    {
+        //        kindFields[i].Value = oldKinds[i];
+        //    }
+        //}
         private void HandleTriggerExit(Collider other)
         {
             if (_aibuTracker.RemoveIfRelevant(other))
@@ -243,7 +246,6 @@ namespace KoikatuVR.Caress
         }
         private IEnumerator KissCo()
         {
-            VRLog.Debug("KissCo[MainGameVR] start");
             StopAllLicking();
 
             var prevKindTouch = _hand.selectKindTouch;
@@ -300,7 +302,6 @@ namespace KoikatuVR.Caress
 
         private IEnumerator LickCo(HandCtrl.AibuColliderKind colliderKind, int layerNum, int bodyPartId)
         {
-            VRLog.Debug($"LickCo[Start]");
             _lickCoShouldEnd = false;
 
             var oldLayerNum = _hand.areaItem[bodyPartId];
@@ -332,8 +333,6 @@ namespace KoikatuVR.Caress
             {
                 _hand.areaItem[bodyPartId] = oldLayerNum;
             }
-
-            VRLog.Debug($"LickCo[End]");
         }
         private void FinishLicking()
         {

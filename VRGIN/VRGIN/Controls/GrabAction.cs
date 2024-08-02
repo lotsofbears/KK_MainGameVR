@@ -75,17 +75,18 @@ namespace VRGIN.Controls
 
         public Status HandleGrabbing()
         {
-            if (OtherController.IsTracking && !HasOtherLock())
+            var hasOtherLock = HasOtherLock();
+            if (OtherController.IsTracking && !hasOtherLock)
             {
                 OtherController.TryAcquireFocus(out _OtherLock);
             }
 
-            if (HasOtherLock() && OtherController.Input.GetPressDown(SECONDARY_SCALE_BUTTON))
+            if (hasOtherLock && OtherController.Input.GetPressDown(SECONDARY_SCALE_BUTTON))
             {
                 _ScaleInitialized = false;
             }
 
-            if (HasOtherLock() && OtherController.Input.GetPressDown(SECONDARY_ROTATE_BUTTON))
+            if (hasOtherLock && OtherController.Input.GetPressDown(SECONDARY_ROTATE_BUTTON))
             {
                 _RotationInitialized = false;
             }
@@ -99,17 +100,17 @@ namespace VRGIN.Controls
                 return Status.DoneSlow;
             }
 
-            if (HasOtherLock() && (OtherController.Input.GetPress(SECONDARY_ROTATE_BUTTON) || OtherController.Input.GetPress(SECONDARY_SCALE_BUTTON)))
+            if (hasOtherLock && (OtherController.Input.GetPress(SECONDARY_ROTATE_BUTTON) || OtherController.Input.GetPress(SECONDARY_SCALE_BUTTON)))
             {
                 var newFromTo = (OtherController.transform.position - transform.position).normalized;
 
-                if (OtherController.Input.GetPress(SECONDARY_SCALE_BUTTON))
-                {
-                    InitializeScaleIfNeeded();
-                    var controllerDistance = Vector3.Distance(OtherController.transform.position, transform.position) * (_InitialIPD / VR.Settings.IPDScale);
-                    float ratio = controllerDistance / _InitialControllerDistance;
-                    VR.Settings.IPDScale = ratio * _InitialIPD;
-                }
+                //if (OtherController.Input.GetPress(SECONDARY_SCALE_BUTTON))
+                //{
+                //    InitializeScaleIfNeeded();
+                //    var controllerDistance = Vector3.Distance(OtherController.transform.position, transform.position) * (_InitialIPD / VR.Settings.IPDScale);
+                //    float ratio = controllerDistance / _InitialControllerDistance;
+                //    VR.Settings.IPDScale = ratio * _InitialIPD;
+                //}
 
                 if (OtherController.Input.GetPress(SECONDARY_ROTATE_BUTTON))
                 {
@@ -159,13 +160,14 @@ namespace VRGIN.Controls
         {
             if (_DoubleClickPhase == 0)
             {
-                if (Controller.GetPressDown(ButtonMask.Touchpad))
+                if (Controller.GetPressDown(ButtonMask.Touchpad)
+                    || Controller.GetPressDown(ButtonMask.Trigger))
                 {
                     _DoubleClickPhase = 1;
                     _DoubleClickDeadline = Time.unscaledTime + 0.5f;
                 }
             }
-            else if(_DoubleClickDeadline < Time.unscaledTime)
+            else if (_DoubleClickDeadline < Time.unscaledTime)
             {
                 _DoubleClickPhase = 0;
             }
@@ -175,13 +177,15 @@ namespace VRGIN.Controls
                 {
                     case 1:
                     case 3:
-                        if (Controller.GetPressUp(ButtonMask.Touchpad))
+                        if (Controller.GetPressUp(ButtonMask.Touchpad)
+                            || Controller.GetPressUp(ButtonMask.Trigger))
                         {
                             _DoubleClickPhase++;
                         }
                         break;
                     case 2:
-                        if (Controller.GetPressDown(ButtonMask.Touchpad))
+                        if (Controller.GetPressDown(ButtonMask.Touchpad)
+                            || Controller.GetPressDown(ButtonMask.Trigger))
                         {
                             _DoubleClickPhase++;
                         }

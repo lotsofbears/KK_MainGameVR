@@ -57,24 +57,12 @@ namespace VRGIN.Controls.Tools
         /// <summary>
         /// Gets the attached controller input object.
         /// </summary>
-        protected SteamVR_Controller.Device Controller
-        {
-            get
-            {
-                return SteamVR_Controller.Input((int)Tracking.index);
-            }
-        }
+        protected SteamVR_Controller.Device Controller => SteamVR_Controller.Input((int)Tracking.index);
 
         /// <summary>
         /// Gets the attached controller input object.
         /// </summary>
-        protected Controller OtherController
-        {
-            get
-            {
-                return Neighbor;
-            }
-        }
+        protected Controller OtherController => Neighbor;
 
 
         protected virtual void OnEnable()

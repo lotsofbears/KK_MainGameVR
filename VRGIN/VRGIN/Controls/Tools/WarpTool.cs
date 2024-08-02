@@ -159,7 +159,7 @@ namespace VRGIN.Controls.Tools
 
         private void CheckRotationalPress()
         {
-            if (Controller.GetPressDown(EVRButtonId.k_EButton_SteamVR_Touchpad))
+            if (Controller.GetPressDown(ButtonMask.Touchpad))
             {
                 var v = Controller.GetAxis(EVRButtonId.k_EButton_SteamVR_Touchpad);
                 _ProspectedPlayArea.Reset();
@@ -193,7 +193,7 @@ namespace VRGIN.Controls.Tools
                     CheckRotationalPress();
                 }
 
-                if (Controller.GetPressDown(EVRButtonId.k_EButton_Grip))
+                if (Controller.GetPressDown(ButtonMask.Grip))
                 {
                     EnterState(WarpState.Grabbing);
                 }

@@ -89,11 +89,6 @@ namespace KoikatuVR.Controls
         private readonly Texture2D _hand1Texture = UnityHelper.LoadImage("icon_hand_1.png");
         private readonly Texture2D _hand2Texture = UnityHelper.LoadImage("icon_hand_2.png");
 
-        protected override void OnAwake()
-        {
-            base.OnAwake();
-        }
-
         protected override void OnStart()
         {
             base.OnStart();
@@ -102,11 +97,6 @@ namespace KoikatuVR.Controls
             SetScene(inHScene: false);
             _Settings.AddListener("KeySets", (_, _1) => ResetKeys());
             _Settings.AddListener("HKeySets", (_, _1) => ResetKeys());
-        }
-
-        protected override void OnDestroy()
-        {
-            // nothing to do.
         }
 
         protected override void OnDisable()
@@ -122,6 +112,10 @@ namespace KoikatuVR.Controls
             _touchDirection = null;
             _lastPressDirection = null;
             base.OnDisable();
+        }
+        protected override void OnDestroy()
+        {
+
         }
 
         protected override void OnEnable()

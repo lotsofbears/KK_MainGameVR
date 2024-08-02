@@ -215,8 +215,6 @@ namespace KoikatuVR.Settings
             keySetsConfig = new KeySetsConfig(config, updateKeySets);
             updateKeySets();
 
-            //POVConfig pOVConfig = new POVConfig(config, settings);
-
             // Fixed settings
             settings.ApplyEffects = false; // We manage effects ourselves.
 

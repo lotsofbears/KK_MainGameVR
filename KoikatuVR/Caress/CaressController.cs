@@ -67,13 +67,17 @@ namespace KoikatuVR.Caress
 
         protected override void OnUpdate()
         {
+            if (Manager.Scene.Instance.NowSceneNames[0].Equals("HPointMove"))
+            {
+                // UpdateLock();
+                ReleaseLock();
+            }
             if (_lock != null)
             {
                 HandleTrigger();
                 HandleToolChange();
                 HandleUndress();
             }
-            UpdateLock();
         }
 
         protected void OnTriggerEnter(Collider other)
@@ -84,10 +88,6 @@ namespace KoikatuVR.Caress
             //}
             try
             {
-                if (Manager.Scene.Instance.NowSceneNames[0].Equals("HPointMove"))
-                {
-                    return;
-                }
                 bool wasIntersecting = _aibuTracker.IsIntersecting();
                 if (_aibuTracker.AddIfRelevant(other))
                 {
@@ -110,7 +110,7 @@ namespace KoikatuVR.Caress
 
                     _undresser.Enter(other);
                     UpdateLock();
-                    _undresser.Enter(other);
+                    //_undresser.Enter(other);
                 }
             }
             catch (Exception e)

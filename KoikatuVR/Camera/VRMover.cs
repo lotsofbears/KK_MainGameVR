@@ -48,9 +48,6 @@ namespace KoikatuVR.Camera
         /// <summary>
         /// Move the camera to the specified pose.
         /// </summary>
-        /// <param name="position"></param>
-        /// <param name="rotation"></param>
-        /// <param name="keepHeight"></param>
         public void MoveTo(Vector3 position, Quaternion rotation, bool keepHeight, bool quiet = false)
         {
             if (position.Equals(Vector3.zero))
@@ -78,21 +75,14 @@ namespace KoikatuVR.Camera
         /// The position and rotation arguments should represent the pose
         /// the camera would take in the 2D version of the game.
         /// </summary>
-        /// <param name="position"></param>
-        /// <param name="rotation"></param>
-        /// <param name="keepHeight"></param>
         public void MaybeMoveTo(Vector3 position, Quaternion rotation, bool keepHeight)
         {
-            VRLog.Debug("MaybeMoveTo");
             MoveWithHeuristics(position, rotation, keepHeight, pretendFading: false);
         }
 
         /// <summary>
         /// Similar to MaybeMoveTo, but also considers the ADV fade state.
         /// </summary>
-        /// <param name="position"></param>
-        /// <param name="rotation"></param>
-        /// <param name="keepHeight"></param>
         //public void MaybeMoveADV(ADV.TextScenario textScenario, Vector3 position, Quaternion rotation, bool keepHeight)
         //{
         //    var advFade = new Traverse(textScenario).Field<ADVFade>("advFade").Value;
@@ -143,7 +133,6 @@ namespace KoikatuVR.Camera
         /// This should be called every time a set of ADV commands has been executed.
         /// Moves the camera appropriately.
         /// </summary>
-        /// <param name="textScenario"></param>
         public void HandleTextScenarioProgress(ADV.TextScenario textScenario)
         {
             bool isFadingOut = IsFadingOut(new Traverse(textScenario).Field<ADVFade>("advFade").Value);
@@ -240,7 +229,7 @@ namespace KoikatuVR.Camera
         private bool IsDestinationFar(Vector3 position, Quaternion rotation)
         {
             var distance = Vector3.Distance(position, _lastPosition);
-            var angleDistance = Math.Abs(Mathf.DeltaAngle(rotation.eulerAngles.y, VR.Camera.Origin.rotation.eulerAngles.y));
+            var angleDistance = Mathf.Abs(Mathf.DeltaAngle(rotation.eulerAngles.y, VR.Camera.Origin.rotation.eulerAngles.y));
             var result = 1f < distance / 2f + angleDistance / 90f;
             VRLog.Debug($"{result} dist[{distance}] ang[{angleDistance}]");
             return result;

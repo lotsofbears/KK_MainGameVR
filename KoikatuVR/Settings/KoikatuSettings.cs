@@ -202,6 +202,7 @@ namespace KoikatuVR.Settings
         [Description("Mouse wheel scroll down")] SCROLLDOWN,
         [Description("Switch button assignments")] NEXT,
         [Description("Grab space to move")] GRAB,
+        [Description("Grab space to move")] BUTTON_AX,
         [Description("Keyboard Tab")] TAB,
         [Description("Keyboard Enter")] RETURN,
         [Description("Keyboard Esc")] ESCAPE,
