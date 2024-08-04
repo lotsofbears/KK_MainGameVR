@@ -91,7 +91,7 @@ namespace KoikatuVR.Camera
         public void MaybeMoveADV(ADV.TextScenario textScenario, Vector3 position, Quaternion rotation, bool keepHeight)
         {
             VRLog.Debug("MaybeMoveADV");
-            var advFade = new Traverse(textScenario).Field<ADVFade>("advFade").Value;
+            var advFade = textScenario.advFade;// new Traverse(textScenario).Field<ADVFade>("advFade").Value;
 
             var closerPosition = AdjustAdvPosition(textScenario, position, rotation);
 
@@ -231,7 +231,7 @@ namespace KoikatuVR.Camera
             var distance = Vector3.Distance(position, _lastPosition);
             var angleDistance = Mathf.Abs(Mathf.DeltaAngle(rotation.eulerAngles.y, VR.Camera.Origin.rotation.eulerAngles.y));
             var result = 1f < distance / 2f + angleDistance / 90f;
-            VRLog.Debug($"{result} dist[{distance}] ang[{angleDistance}]");
+            //VRLog.Debug($"{result} dist[{distance}] ang[{angleDistance}]");
             return result;
         }
 

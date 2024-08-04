@@ -9,6 +9,10 @@ using HarmonyLib;
 using KoikatuVR.Interpreters;
 using KoikatuVR.Settings;
 using KoikatuVR.Camera;
+using Unity.Linq;
+using static Illusion.Component.ShortcutKey;
+using static SteamVR_Controller;
+using VRGIN.Controls;
 
 namespace KoikatuVR.Caress
 {
@@ -16,34 +20,41 @@ namespace KoikatuVR.Caress
     /// A component to be attached to the VR camera during an H scene.
     /// It allows the user to kiss in H scenes by moving their head.
     /// </summary>
-    public class VRMouth : ProtectedBehaviour
+    internal class VRMouth : ProtectedBehaviour
     {
         /// <summary>
         /// To prevent accidental trigger when we are moving across HScene or moving to/from PoV.
+        /// Or when CaressHelper takes care of process.
         /// </summary>
-        public static bool NoKissingAllowed;
+        internal static bool NoActionAllowed;
         /// <summary>
         /// Indicates whether the currently running LickCo should end.
         /// null if LickCo is not running.
         /// </summary>
-        public static bool? _lickCoShouldEnd;
+        internal static bool? _lickCoShouldEnd;
         /// <summary>
         /// Indicates whether the currently running KissCo should end.
         /// null if KissCo is not running.
         /// </summary>
-        public static bool? _kissCoShouldEnd;
+        internal static bool? _kissCoShouldEnd;
+        //internal static bool _moMiActive;
+
         private KoikatuSettings _settings;
         private AibuColliderTracker _aibuTracker;
         private Transform _firstFemale;
         private Transform _firstFemaleMouth;
+        private Transform _eyes;
         private VRMouthColliderObject _small, _large;
         private HandCtrl _hand;
         private HandCtrl _hand1;
         private HFlag _hFlag;
+        private ChaControl _chara;
+        private List<ChaControl> _charas;
         private bool _inCaressMode = true;
         private readonly LongDistanceKissMachine _machine = new LongDistanceKissMachine();
-        private bool _moMiActive;
-        private Action<HandCtrl.AibuColliderKind> _callMoMi;
+        //private Action<HandCtrl.AibuColliderKind> _callMoMi;
+        private CaressHelper _helper;
+        private bool _sensibleH;
 
 
         protected override void OnAwake()
@@ -64,23 +75,27 @@ namespace KoikatuVR.Caress
             {
                 VRLog.Error("hProc is null");
             }
-            var moMi = AccessTools.TypeByName("KK_SensibleH.MoMiController");
-            _moMiActive = moMi != null;
-            if (_moMiActive)
-            {
-                // True argument for kiss, False for lick.
-                var methodInfo = AccessTools.FirstMethod(moMi, m => m.Name.Equals("StartVrAction"));
-                _callMoMi = AccessTools.MethodDelegate<Action<HandCtrl.AibuColliderKind>>(methodInfo);
-                VRLog.Debug($"[delegate = {_callMoMi}]");
-            }
+
+            var type = AccessTools.TypeByName("KK_SensibleH.MoMiController");
+            _sensibleH = type != null;
+            _helper = this.gameObject.AddComponent<CaressHelper>();
+            _helper.Initialize(hProc, type);
+
             _hand = Traverse.Create(hProc).Field("hand").GetValue<HandCtrl>();
             _hand1 = Traverse.Create(hProc).Field("hand1").GetValue<HandCtrl>();
             _hFlag = Traverse.Create(hProc).Field("flags").GetValue<HFlag>();
 
             _aibuTracker = new AibuColliderTracker(hProc, referencePoint: transform);
-            var lstFemale = new Traverse(hProc).Field("lstFemale").GetValue<List<ChaControl>>();
-            _firstFemale = lstFemale[0].objTop.transform;
-            _firstFemaleMouth = lstFemale[0].objHeadBone.transform.Find(
+            _charas = new Traverse(hProc).Field("lstFemale").GetValue<List<ChaControl>>();
+            _chara = _charas[0];
+            if (_sensibleH)
+            {
+                // Not so sure about rotation and position of the mouth acc, while very familiar with eyes, so we go with them to check angle and distance.
+                _eyes = _chara.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz/cf_J_Eye_tz");
+            }
+
+            _firstFemale = _chara.objTop.transform;
+            _firstFemaleMouth = _chara.objHeadBone.transform.Find(
                 "cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceLow_tz/a_n_mouth");
         }
 
@@ -88,34 +103,60 @@ namespace KoikatuVR.Caress
         {
             GameObject.Destroy(_small.gameObject);
             GameObject.Destroy(_large.gameObject);
-        }
 
+            // Shouldn't need this.
+            //GameObject.Destroy(_kissHelper);
+        }
+        internal void OnPositionChange()
+        {
+
+        }
         protected override void OnUpdate()
         {
-            HandleScoreBasedKissing();
+            if (!NoActionAllowed)
+            {
+                HandleScoreBasedKissing();
+            }
+            else if (!_helper._endKissCo && _hFlag.nowAnimStateName.EndsWith("OLoop", StringComparison.Ordinal))
+            {
+                _helper.Halt();
+            }
         }
         private void HandleScoreBasedKissing()
         {
-            if (NoKissingAllowed)
-                return;
             var inCaressMode = _hFlag.mode == HFlag.EMode.aibu;
             if (inCaressMode)
             {
-                bool decision = _settings.AutomaticKissing &&
-                    _machine.Step(
-                        Time.time,
-                        _small.transform.InverseTransformPoint(_firstFemaleMouth.position),
-                        _firstFemaleMouth.InverseTransformPoint(_small.transform.position));
-                if (decision)
+                if (_sensibleH)
                 {
-                    StartKiss();
+                    var head = VR.Camera.Head;
+                    var dist = Vector3.Distance(_eyes.position, head.position);
+                    var angle = Vector3.Angle(_eyes.position - head.position, head.forward);
+                    if (dist < 0.2f
+                        && angle < 30f)
+                    {
+                        VRLog.Debug($"HandleScoreBasedKissing[SensibleH] dist[{dist}] [{angle}]");
+                        StartKiss();
+                    }
                 }
                 else
                 {
-                    FinishKiss();
+                    bool decision = _settings.AutomaticKissing &&
+                    _machine.Step(
+                        Time.time,
+                        _small.transform.InverseTransformPoint(_firstFemaleMouth.position),
+                        _firstFemaleMouth.InverseTransformPoint(_small.transform.position),
+                        Mathf.DeltaAngle(_firstFemale.eulerAngles.y, _firstFemaleMouth.transform.eulerAngles.y));
+                    if (decision)
+                    {
+                        StartKiss();
+                    }
+                    else
+                    {
+                        FinishKiss();
+                    }
                 }
             }
-
             if (_inCaressMode & !inCaressMode)
             {
                 FinishKiss();
@@ -126,7 +167,8 @@ namespace KoikatuVR.Caress
 
         private void HandleTriggerEnter(Collider other)
         {
-            if (_aibuTracker.AddIfRelevant(other))
+            VRLog.Debug($"HandleTriggerEnter");
+            if (_aibuTracker.AddIfRelevant(other) && !NoActionAllowed)
             {
                 var colliderKind = _aibuTracker.GetCurrentColliderKind(out int femaleIndex);
                 UpdateKissLick(colliderKind);
@@ -160,7 +202,8 @@ namespace KoikatuVR.Caress
         //}
         private void HandleTriggerExit(Collider other)
         {
-            if (_aibuTracker.RemoveIfRelevant(other))
+            VRLog.Debug($"HandleTriggerExit");
+            if (_aibuTracker.RemoveIfRelevant(other) && !NoActionAllowed)
             {
                 var colliderKind = _aibuTracker.GetCurrentColliderKind(out int _);
                 UpdateKissLick(colliderKind);
@@ -168,14 +211,8 @@ namespace KoikatuVR.Caress
         }
         private void UpdateKissLick(HandCtrl.AibuColliderKind colliderKind)
         {
-            if (NoKissingAllowed)
-                return;
-            if (_hFlag.nowAnimStateName.EndsWith("OLoop", StringComparison.Ordinal))
-            {
-                FinishKiss();
-                FinishLicking();
-            }
-            else if (_settings.AutomaticKissing && !_inCaressMode && colliderKind == HandCtrl.AibuColliderKind.mouth)
+            VRLog.Debug($"{colliderKind}");
+            if (_settings.AutomaticKissing && !_inCaressMode && colliderKind == HandCtrl.AibuColliderKind.mouth)
             {
                 StartKiss();
             }
@@ -195,8 +232,8 @@ namespace KoikatuVR.Caress
         private bool IsLickingOk(HandCtrl.AibuColliderKind colliderKind, out int layerNum)
         {
             layerNum = 0;
-            if (colliderKind <= HandCtrl.AibuColliderKind.mouth ||
-                HandCtrl.AibuColliderKind.reac_head <= colliderKind)
+            if (colliderKind <= HandCtrl.AibuColliderKind.mouth
+                || colliderKind >= HandCtrl.AibuColliderKind.reac_head)
             {
                 return false;
             }
@@ -214,10 +251,19 @@ namespace KoikatuVR.Caress
                 VRLog.Warn("Licking not ok: no layer found");
                 return false;
             }
-            if (layerInfo.plays[clothState] == -1)
+            if (colliderKind == HandCtrl.AibuColliderKind.muneL || colliderKind == HandCtrl.AibuColliderKind.muneR)
             {
-                return false;
+
+                if (_chara.fileStatus.clothesState[0] == 0 || _chara.fileStatus.clothesState[2] == 0)
+                {
+                    return false;
+                }
             }
+            // By default tongue is always good to go. Pointless.
+            //if (layerInfo.plays[clothState] == -1)
+            //{
+            //    return false;
+            //}
             var heroine = _hand.flags.lstHeroine[0];
             if (_hand.flags.mode != HFlag.EMode.aibu &&
                 colliderKind == HandCtrl.AibuColliderKind.anal &&
@@ -241,13 +287,12 @@ namespace KoikatuVR.Caress
             }
             _kissCoShouldEnd = false;
             StartCoroutine(KissCo());
-            if (_moMiActive)
-                _callMoMi(HandCtrl.AibuColliderKind.mouth);
         }
         private IEnumerator KissCo()
         {
             StopAllLicking();
 
+            CaressHelper.Instance.OnKissStart();
             var prevKindTouch = _hand.selectKindTouch;
             _hand.selectKindTouch = HandCtrl.AibuColliderKind.mouth;
             var messageDelivered = false;
@@ -257,13 +302,12 @@ namespace KoikatuVR.Caress
                 yield return null;
             }
             yield return new WaitForEndOfFrame();
-
+            CaressHelper.Instance.OnKissStart();
             // Try to restore the old value of selectKindTouch.
             if (_hand.selectKindTouch == HandCtrl.AibuColliderKind.mouth)
             {
                 _hand.selectKindTouch = prevKindTouch;
             }
-
             while (_kissCoShouldEnd == false && _hand.isKiss)
             {
                 yield return null;
@@ -291,6 +335,7 @@ namespace KoikatuVR.Caress
             int bodyPartId = (int)colliderKind - 2;
             var usedItem = _hand.useAreaItems[bodyPartId];
 
+
             // If another item is being used on the target body part, detach it.
             if (usedItem != null && usedItem.idUse != 2)
             {
@@ -298,6 +343,7 @@ namespace KoikatuVR.Caress
             }
 
             StartCoroutine(LickCo(colliderKind, layerNum, bodyPartId));
+            CaressHelper.Instance.OnLickStart(colliderKind);
         }
 
         private IEnumerator LickCo(HandCtrl.AibuColliderKind colliderKind, int layerNum, int bodyPartId)
@@ -311,21 +357,23 @@ namespace KoikatuVR.Caress
             _hand.selectKindTouch = colliderKind;
             while (_lickCoShouldEnd == false && _hand.areaItem[bodyPartId] == layerNum)
             {
-                if (_moMiActive)
+                if (!_sensibleH)
                 {
-                    _callMoMi(colliderKind);
+                    yield return CaressUtil.ClickCo();
+                    yield return new WaitForSeconds(0.5f);
                 }
                 else
-                    yield return CaressUtil.ClickCo();
-                yield return new WaitForSeconds(0.5f);
+                {
+                    yield return new WaitForSeconds(1f);
+                }
             }
             _lickCoShouldEnd = null;
 
+            // Still a problem, handle it.
             // Until the next fiasco.
             //if (_moMiActive)
             //{
-            //    // If we do this while SensibleH spams "JudgeProc()", we'll break HandCtrl, thus we wait (should be up to 0.6 seconds) for drag to start.
-            //    yield return new WaitUntil(() => _hand.ctrl != HandCtrl.Ctrl.click);
+            //    
             //}
             _hand.selectKindTouch = oldKindTouch;
             _hand.DetachItemByUseItem(2);

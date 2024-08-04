@@ -19,9 +19,13 @@ namespace KoikatuVR.Caress
         float? _startTime; // null if not kissing
         bool _prevEntryConditionMet = true;
 
-        public bool Step(float currentTime, Vector3 femaleFromHmd, Vector3 hmdFromFemale)//, float femaleFaceAngleY)
+        public bool Step(
+            float currentTime,
+            Vector3 femaleFromHmd,
+            Vector3 hmdFromFemale,
+            float femaleFaceAngleY)
         {
-            bool entryConditionMet = EntryScore(femaleFromHmd, hmdFromFemale) < 0;
+            bool entryConditionMet = EntryScore(femaleFromHmd, hmdFromFemale, femaleFaceAngleY) < 0;
             bool result;
             if (_startTime is float startTime)
             {
@@ -53,9 +57,9 @@ namespace KoikatuVR.Caress
             _prevEntryConditionMet = true;
         }
 
-        private static float EntryScore(Vector3 femaleFromHmd, Vector3 hmdFromFemale)
+        private static float EntryScore(Vector3 femaleFromHmd, Vector3 hmdFromFemale, float femaleFaceAngle)
         {
-            var total = OneSidedScore(femaleFromHmd) + OneSidedScore(hmdFromFemale) + 0.1f;
+            var total = OneSidedScore(femaleFromHmd) + OneSidedScore(hmdFromFemale) + 0.1f * Mathf.Abs(femaleFaceAngle);
             return total - 2.0f;
         }
 

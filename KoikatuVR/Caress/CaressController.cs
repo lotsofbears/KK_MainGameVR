@@ -51,7 +51,8 @@ namespace KoikatuVR.Caress
                 VRLog.Warn("HSceneProc not found");
                 return;
             }
-            _hand = Traverse.Create(proc).Field("hand").GetValue<HandCtrl>();   
+            _hand = proc.hand;
+            //    Traverse.Create(proc).Field("hand").GetValue<HandCtrl>();   
             VRLog.Debug($"Controller[{_controller}]");
             _aibuTracker = new AibuColliderTracker(proc, referencePoint: transform);
             _undresser = new Undresser(proc);
@@ -64,30 +65,26 @@ namespace KoikatuVR.Caress
                 ReleaseLock();
             }
         }
-
+        
         protected override void OnUpdate()
         {
-            if (Manager.Scene.Instance.NowSceneNames[0].Equals("HPointMove"))
-            {
-                // UpdateLock();
-                ReleaseLock();
-            }
             if (_lock != null)
             {
                 HandleTrigger();
                 HandleToolChange();
                 HandleUndress();
             }
+            UpdateLock();
         }
 
         protected void OnTriggerEnter(Collider other)
         {
-            //if (VRMouth._lickCoShouldEnd != null)
-            //{
-            //    return;
-            //}
             try
             {
+                if (Manager.Scene.Instance.NowSceneNames[0].Equals("HPointMove"))
+                {
+                    return;
+                }
                 bool wasIntersecting = _aibuTracker.IsIntersecting();
                 if (_aibuTracker.AddIfRelevant(other))
                 {
@@ -107,11 +104,9 @@ namespace KoikatuVR.Caress
                             }
                         }
                     }
-
-                    _undresser.Enter(other);
-                    UpdateLock();
-                    //_undresser.Enter(other);
                 }
+                _undresser.Enter(other);
+                UpdateLock();
             }
             catch (Exception e)
             {
@@ -194,14 +189,14 @@ namespace KoikatuVR.Caress
             if (_undressing is Util.ValueTuple<ChaControl, ChaFileDefine.ClothesKind, Vector3> undressing
                 && device.GetPressUp(ButtonMask.Touchpad))
             {
-                if (0.3f * 0.3f < (transform.position - undressing.Field3).sqrMagnitude)
-                {
-                    undressing.Field1.SetClothesState((int)undressing.Field2, 3);
-                }
-                else
-                {
+                //if (0.3f * 0.3f < (transform.position - undressing.Field3).sqrMagnitude)
+                //{
+                //    undressing.Field1.SetClothesState((int)undressing.Field2, 3);
+                //}
+                //else
+                //{
                     undressing.Field1.SetClothesStateNext((int)undressing.Field2);
-                }
+                //}
                 _undressing = null;
             }
         }

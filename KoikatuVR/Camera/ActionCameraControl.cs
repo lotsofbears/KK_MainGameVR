@@ -151,7 +151,7 @@ namespace KoikatuVR.Camera
         }
         public static float GetDistanceFromCurrentHeadPos(Vector3 targetPosition)
         {
-            var dist = Vector3.Distance(targetPosition, VR.Camera.SteamCam.head.position);
+            var dist = Vector3.Distance(targetPosition, VR.Camera.Head.position);
             VRLog.Debug("Distance of head from pos={0} is {1}", targetPosition, dist);
             return dist;
         }

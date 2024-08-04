@@ -52,7 +52,7 @@ namespace KoikatuVR
             Disable // Mode3: Teleport(Jump) to next character when trigger controller
         }
         private ChaControl _target;
-        private HandCtrl _hand;
+        //private HandCtrl _hand;
         private Transform _targetEyes;
         private POV_Mode povMode;
         private KoikatuSettings settings;
@@ -73,7 +73,7 @@ namespace KoikatuVR
         {
             Instance = this;
             settings = VR.Context.Settings as KoikatuSettings;
-            _hand = Traverse.Create(proc).Field("hand").GetValue<HandCtrl>(); 
+            //_hand = Traverse.Create(proc).Field("hand").GetValue<HandCtrl>(); 
             _chaControls = Traverse.Create(proc).Field("lstFemale").GetValue<List<ChaControl>>();
             _scene = Scene.Instance;
             UpdateDevices();
@@ -85,8 +85,6 @@ namespace KoikatuVR
         //}
         private void SetSettingsTrue()
         {
-            //settings.AutomaticKissing = true;
-            //settings.AutomaticTouchingByHmd = true;
             _target.fileStatus.visibleHeadAlways = true;
         }
         private void MoveToPos()
@@ -105,9 +103,9 @@ namespace KoikatuVR
         }
         public void StartPov()
         {
-            Active = true;
-            _wasAway = true;
             NextChara(keepChara: true);
+            _wasAway = true;
+            Active = true;
             UpdateDevices();
         }
         public void CameraFar()
@@ -116,14 +114,14 @@ namespace KoikatuVR
         }
         private void MoveToDesignatedHead()
         {
-            VRLog.Debug($"MoveToDesignatedHead");
+            //VRLog.Debug($"MoveToDesignatedHead");
             var head = VR.Camera.Head;
             var origin = VR.Camera.Origin;
             var curTarPos = GetEyesPosition();
             var distance = Vector3.Distance(head.position, curTarPos);
             if (_moveSpeed == 0f)
             {
-                VRMouth.NoKissingAllowed = true;
+                VRMouth.NoActionAllowed = true;
                 _moveSpeed = 0.5f + distance * 0.5f * settings.FlightSpeed;// 3f;
             }
             var angleDelta = Quaternion.Angle(origin.rotation, _targetEyes.rotation);
@@ -134,13 +132,13 @@ namespace KoikatuVR
                 {
                     VRLog.Debug("Finish setting FemalePov");
                     GirlPOV = true;
-                    //NoKissing = true;
+                    VRMouth.NoActionAllowed = true;
                 }
                 else
                 {
                     VRLog.Debug("Finish setting MalePov");
                     GirlPOV = false;
-                    VRMouth.NoKissingAllowed = false;
+                    VRMouth.NoActionAllowed = false;
                 }
                 _wasAway = false;
                 _moveSpeed = 0f;
@@ -271,11 +269,12 @@ namespace KoikatuVR
             if (chaControls.Count == 0)
             {
                 Active = false;
+                VRLog.Warn("[PoV] Can't impersonate, everyone is dead and it's all your fault.");
                 return;
             }
             var currentCharaIndex = GetCurrentCharaIndex(chaControls);
 
-            // Previous target's head becomes visible on target switch.
+            // Previous target's becomes visible.
             if (settings.HideHeadInPOV && !keepChara && _target)
                 SetSettingsTrue();
 
@@ -285,7 +284,7 @@ namespace KoikatuVR
             {
                 if (currentCharaIndex == 0)
                 {
-                    // No point in switching with only ONE active character, disable instead.
+                    // No point in switching with only one active character, disable instead.
                     povMode = POV_Mode.Disable;
                     return;
                 }
@@ -324,30 +323,30 @@ namespace KoikatuVR
             {
                 _wasAway = true;
             }
-            else if (_newAttachPoint && _device.GetPressUp(ButtonMask.Grip))
+            else if (_newAttachPoint && (_device.GetPressUp(ButtonMask.Grip) || _device1.GetPressUp(ButtonMask.Grip)))
             {
                 NewPosition();
             }
-            else if (_device.GetPress(ButtonMask.Grip))
+            else if (_device.GetPress(ButtonMask.Grip) || _device1.GetPress(ButtonMask.Grip))
             {
                 _wasAway = true;
-                if (_device.GetPressUp(128))
+                if (_device.GetPressDown(ButtonMask.Touchpad) || _device1.GetPressDown(ButtonMask.Touchpad))
                 {
-                    if (!_newAttachPoint)
-                    {
-                        VRMouth.NoKissingAllowed = true;
+                    //if (!_newAttachPoint)
+                    //{
+                        VRMouth.NoActionAllowed = true;
                         _newAttachPoint = true;
-                    }
-                    else
-                    {
-                        VRMouth.NoKissingAllowed = false;
-                        _newAttachPoint = false;
-                    }
+                    //}
+                    //else
+                    //{
+                      //  VRMouth.NoKissingAllowed = false;
+                       // _newAttachPoint = false;
+                    //}
                 }
             }
             else if (_wasAway)
             {
-                if (_device.GetPress(ButtonMask.Grip))
+                if (_device.GetPress(ButtonMask.Grip) || _device1.GetPress(ButtonMask.Grip))
                 {
                     return;
                 }
@@ -384,8 +383,7 @@ namespace KoikatuVR
             SetSettingsTrue();
             povMode = POV_Mode.Eyes;
             NewLookAtPoI();
-            VRMouth.NoKissingAllowed = false;
-            _wasAway = true;
+            VRMouth.NoActionAllowed = false;
         }
         protected override void OnUpdate()
         {
@@ -398,7 +396,7 @@ namespace KoikatuVR
                 {
                     _newAttachPoint = false;
                     _wasAway = true;
-                    VRMouth.NoKissingAllowed = false;
+                    VRMouth.NoActionAllowed = false;
                 }
                 else
                     StartCoroutine(GetButtonA());
@@ -425,7 +423,7 @@ namespace KoikatuVR
         private void HideHead()
         {
             // Every so often a shadow of a headless body during the kiss disturbs me deeply. So we don't hide it during kiss.
-            if (_target.objTop.activeSelf && !_hand.isKiss)
+            if (_target != null && VRMouth._kissCoShouldEnd != false)//!_hand.isKiss)
             {
                 var head = _target.objHead.transform;
                 var wasVisible = _target.fileStatus.visibleHeadAlways;
@@ -475,8 +473,8 @@ namespace KoikatuVR
                 timer -= Time.deltaTime;
                 yield return new WaitForEndOfFrame();
             }
-            Utils.Sound.Play(SystemSE.ok_l);
-            if (Active && clicks == 2)
+            //Utils.Sound.Play(SystemSE.ok_l);
+            if (clicks == 2 && Active)
             {
                 if (povMode == POV_Mode.Eyes)
                     ResetRotation();

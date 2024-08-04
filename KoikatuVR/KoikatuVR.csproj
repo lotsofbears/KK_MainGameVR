@@ -83,6 +83,7 @@
     <Compile Include="BepInExLoggerBackend.cs" />
     <Compile Include="Camera\VREffector.cs" />
     <Compile Include="Camera\VRMoverH.cs" />
+    <Compile Include="Caress\CaressHelper.cs" />
     <Compile Include="Caress\Undresser.cs" />
     <Compile Include="Controls\ButtonsSubtool.cs" />
     <Compile Include="Camera\CameraControlControl.cs" />

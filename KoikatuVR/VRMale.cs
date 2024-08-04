@@ -56,10 +56,11 @@ namespace KoikatuVR
         }
     }
 
+    [HarmonyPatch(typeof(ChaControl))]
     class ChaControlPatches
     {
+        [HarmonyPatch(nameof(ChaControl.Initialize))]
         [HarmonyPostfix]
-        [HarmonyPatch(typeof(ChaControl), nameof(ChaControl.Initialize))]
         static void PostInitialize(ChaControl __instance)
         {
             if (__instance.sex == 0 && __instance.transform.parent.name.Equals("HScene"))

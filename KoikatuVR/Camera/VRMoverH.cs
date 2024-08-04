@@ -94,7 +94,7 @@ namespace KoikatuVR.Camera
             var origin = VR.Camera.Origin;
             var head = VR.Camera.Head;
             var poi = _poi;
-            VRMouth.NoKissingAllowed = true;
+            VRMouth.NoActionAllowed = true;
             if (poi.position.y < 1f)
             {
                 // Not standing position(probably). For now we simply fly to the side.
@@ -131,7 +131,7 @@ namespace KoikatuVR.Camera
                     break;
                 yield return new WaitForEndOfFrame();
             }
-            VRMouth.NoKissingAllowed = false;
+            VRMouth.NoActionAllowed = false;
             VRLog.Debug($"EndOfFlight");
         }
         private IEnumerator FlyTowardPoi()
@@ -144,7 +144,7 @@ namespace KoikatuVR.Camera
             var origin = VR.Camera.Origin;
             var head = VR.Camera.Head;
             var poi = _poi;
-            VRMouth.NoKissingAllowed = true;
+            VRMouth.NoActionAllowed = true;
             if (poi.position.y < 1f)
             {
                 // Not standing position(probably). For now we simply fly to the side.
@@ -177,7 +177,7 @@ namespace KoikatuVR.Camera
                     break;
                 yield return new WaitForEndOfFrame();
             }
-            VRMouth.NoKissingAllowed = false;
+            VRMouth.NoActionAllowed = false;
             VRLog.Debug($"EndOfFlight");
         }
     }
