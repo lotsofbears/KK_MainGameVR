@@ -111,10 +111,10 @@ namespace KoikatuVR
 
         private void TweakShadowSettings()
         {
-            // Default shadows look too wobbly in VR.
-            QualitySettings.shadowProjection = ShadowProjection.StableFit;
-            QualitySettings.shadowCascades = 4;
-            QualitySettings.shadowCascade4Split = new Vector4(0.05f, 0.1f, 0.2f);
+            //// Default shadows look too wobbly in VR.
+            //QualitySettings.shadowProjection = ShadowProjection.StableFit;
+            //QualitySettings.shadowCascades = 4;
+            //QualitySettings.shadowCascade4Split = new Vector4(0.05f, 0.1f, 0.2f);
         }
     }
 

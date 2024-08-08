@@ -13,6 +13,8 @@ using Unity.Linq;
 using static Illusion.Component.ShortcutKey;
 using static SteamVR_Controller;
 using VRGIN.Controls;
+using static SaveData;
+using static UnityEngine.Experimental.Director.FrameData;
 
 namespace KoikatuVR.Caress
 {
@@ -55,6 +57,7 @@ namespace KoikatuVR.Caress
         //private Action<HandCtrl.AibuColliderKind> _callMoMi;
         private CaressHelper _helper;
         private bool _sensibleH;
+        private float _proximityTimestamp;
 
 
         protected override void OnAwake()
@@ -125,7 +128,7 @@ namespace KoikatuVR.Caress
         private void HandleScoreBasedKissing()
         {
             var inCaressMode = _hFlag.mode == HFlag.EMode.aibu;
-            if (inCaressMode)
+            if (inCaressMode && _proximityTimestamp < Time.time)
             {
                 if (_sensibleH)
                 {
@@ -136,7 +139,11 @@ namespace KoikatuVR.Caress
                         && angle < 30f)
                     {
                         VRLog.Debug($"HandleScoreBasedKissing[SensibleH] dist[{dist}] [{angle}]");
-                        StartKiss();
+                        if (IsKissingAllowed())
+                        {
+                            StartKiss();
+                        }
+                        _proximityTimestamp = Time.time + 10f;
                     }
                 }
                 else
@@ -149,7 +156,10 @@ namespace KoikatuVR.Caress
                         Mathf.DeltaAngle(_firstFemale.eulerAngles.y, _firstFemaleMouth.transform.eulerAngles.y));
                     if (decision)
                     {
-                        StartKiss();
+                        if (IsKissingAllowed())
+                        {
+                            StartKiss();
+                        }
                     }
                     else
                     {
@@ -164,7 +174,22 @@ namespace KoikatuVR.Caress
             }
             _inCaressMode = inCaressMode;
         }
-
+        private bool IsKissingAllowed()
+        {
+            var heroine = _hFlag.lstHeroine[0];
+            if (!_hFlag.isFreeH && heroine.denial.kiss == false && heroine.isGirlfriend == false)
+            {
+                if (_aibuTracker.Proc.voice.nowVoices[0].state != HVoiceCtrl.VoiceKind.voice)
+                {
+                    _hFlag.voice.playVoices[0] = 103;
+                }
+                return false;
+            }
+            else
+            {
+                return true;
+            }    
+        }
         private void HandleTriggerEnter(Collider other)
         {
             VRLog.Debug($"HandleTriggerEnter");

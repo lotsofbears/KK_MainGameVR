@@ -21,17 +21,22 @@ namespace KoikatuVR.Camera
         public static VRMoverH Instance;
         private Transform _poi;
         private Transform _eyes;
+        private Transform _chara;
+        //private ChaControl _male;
         private HFlag _hFlag;
         internal KoikatuSettings _settings;
+       // private float _height;
 
         public void Initialize(HSceneProc proc)
         {
             Instance = this;
-            var chaControl = Traverse.Create(proc).Field("lstFemale").GetValue<List<ChaControl>>().FirstOrDefault();
+            var chara = Traverse.Create(proc).Field("lstFemale").GetValue<List<ChaControl>>().FirstOrDefault();
             _hFlag = Traverse.Create(proc).Field("flags").GetValue<HFlag>();
-            _poi = chaControl.objBodyBone.transform.Find("cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_backsk_00");
-            _eyes = chaControl.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz/cf_J_Eye_tz");
+            _poi = chara.objBodyBone.transform.Find("cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_backsk_00");
+            _eyes = chara.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz/cf_J_Eye_tz");
+            _chara = chara.transform;
             _settings = VR.Context.Settings as KoikatuSettings;
+            //_male = proc.male;
         }
         public void MoveToInH(Vector3 position = new Vector3())
         {
@@ -40,6 +45,7 @@ namespace KoikatuVR.Camera
             {
                 if (_settings.FlyInPov)
                 {
+                    // We turn it off because lag is coming, and after that re-enable it and fly towards.
                     POV.Active = false;
                     StartCoroutine(FlyToPov());
                 }
@@ -76,7 +82,15 @@ namespace KoikatuVR.Camera
                 }
             }
         }
+        //private void SetMaleHeight()
+        //{
+        //    var eyes = _male.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz/cf_J_Eye_tz");
+        //    //var dudeTop = dude.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/a_n_headtop");
 
+        //    //_height = dudeEyes.position.y * 0.94f - dude.transform.position.y; 
+        //    _height = eyes.position.y - _male.transform.position.y;
+        //    VRLog.Debug($"SetMaleHeight {_height}");
+        //}
         private IEnumerator FlyToPov()
         {
             VRLog.Debug($"FlyToPov");
@@ -95,15 +109,15 @@ namespace KoikatuVR.Camera
             var head = VR.Camera.Head;
             var poi = _poi;
             VRMouth.NoActionAllowed = true;
-            if (poi.position.y < 1f)
+            if (_eyes.position.y - _chara.position.y < 0.8f)
             {
-                // Not standing position(probably). For now we simply fly to the side.
+                // Not standing position(most likely). For now we simply fly to the side.
                 var leftSide = Vector3.Distance(poi.position + poi.right * 0.001f, head.position);
                 var rightSide = Vector3.Distance(poi.position + poi.right * -0.001f, head.position);
                 if (leftSide < rightSide)
-                    position = poi.position + poi.right * 0.3f;
+                    position = poi.TransformPoint(new Vector3(0.3f, 0f, 0f));
                 else
-                    position = poi.position + poi.right * -0.3f;
+                    position = poi.TransformPoint(new Vector3(-0.3f, 0f, 0f));
                 position.y += 0.15f;
             }
             else
@@ -145,15 +159,15 @@ namespace KoikatuVR.Camera
             var head = VR.Camera.Head;
             var poi = _poi;
             VRMouth.NoActionAllowed = true;
-            if (poi.position.y < 1f)
+            if (_eyes.position.y - _chara.position.y < 0.8f)
             {
                 // Not standing position(probably). For now we simply fly to the side.
                 var leftSide = Vector3.Distance(poi.position + poi.right * 0.001f, head.position);
                 var rightSide = Vector3.Distance(poi.position + poi.right * -0.001f, head.position);
                 if (leftSide < rightSide)
-                    position = poi.position + poi.right * 0.3f;
+                    position = poi.TransformPoint(new Vector3(0.3f, 0f, 0f));
                 else
-                    position = poi.position + poi.right * -0.3f;
+                    position = poi.TransformPoint(new Vector3(-0.3f, 0f, 0f));
                 position.y += 0.15f;
             }
             else

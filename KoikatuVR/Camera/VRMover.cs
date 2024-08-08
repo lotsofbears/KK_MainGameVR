@@ -29,6 +29,7 @@ namespace KoikatuVR.Camera
         }
         private static VRMover _instance;
 
+
         private Vector3 _lastPosition;
         private Quaternion _lastRotation;
         private KoikatuSettings _settings;
@@ -42,7 +43,6 @@ namespace KoikatuVR.Camera
             _lastPosition = Vector3.zero;
             _lastRotation = Quaternion.identity;
             _settings = VR.Settings as KoikatuSettings;
-            _interpreter = VR.Interpreter as KoikatuInterpreter;
         }
 
         /// <summary>
@@ -62,10 +62,8 @@ namespace KoikatuVR.Camera
             }
             _lastPosition = position;
             _lastRotation = rotation;
-            if (_interpreter.CurrentScene == KoikatuInterpreter.SceneType.HScene && VRMoverH.Instance != null && _settings.FlyInH)
-                VRMoverH.Instance.MoveToInH(position);
-            else
-                VR.Mode.MoveToPosition(position, rotation, ignoreHeight: keepHeight);
+
+            VR.Mode.MoveToPosition(position, rotation, ignoreHeight: keepHeight);
             OnMove?.Invoke();
         }
 
@@ -135,7 +133,8 @@ namespace KoikatuVR.Camera
         /// </summary>
         public void HandleTextScenarioProgress(ADV.TextScenario textScenario)
         {
-            bool isFadingOut = IsFadingOut(new Traverse(textScenario).Field<ADVFade>("advFade").Value);
+            //bool isFadingOut = IsFadingOut(new Traverse(textScenario).Field<ADVFade>("advFade").Value);
+            bool isFadingOut = textScenario.advFade;
 
             VRLog.Debug($"HandleTextScenarioProgress isFadingOut={isFadingOut}");
 
@@ -161,9 +160,9 @@ namespace KoikatuVR.Camera
                 }
                 else
                 {
-                    VRLog.Debug("Approaching character (non-H)");
+                    VRLog.Debug($"Approaching character (non-H)");
                     var originalTarget = Camera.ActionCameraControl.GetIdealTransformFor(textScenario.AdvCamera);
-                    height = originalTarget.position.y + 0.3f;//0.2f;
+                    height = originalTarget.position.y;//0.2f;
                     rotation = originalTarget.rotation;
                 }
                 var cameraXZ = character.transform.position - rotation * (distance * Vector3.forward);

@@ -201,7 +201,6 @@ namespace KoikatuVR.Controls
                     InputDown(fun, ButtonMask.Touchpad);
                 }
             }
-
             if (_buttonsSubtool == null)
             {
                 return;
@@ -288,6 +287,18 @@ namespace KoikatuVR.Controls
                     _buttonsSubtool = null;
                     _grab = new GrabAction(Owner, Controller, buttonMask);
                     break;
+                case AssignableFunction.SCROLLUP:
+                case AssignableFunction.SCROLLDOWN:
+                case AssignableFunction.LBUTTON:
+                case AssignableFunction.MBUTTON:
+                case AssignableFunction.RBUTTON:
+                    // Move the cursor to the bottom right corner so buttons/scrolling affect the H speed control
+                    // Extremely fiddly but what can you do
+                    if (_InHScene) VR.Input.Mouse.MoveMouseBy(Screen.width - 10, Screen.height - 10);
+
+                    // Force focus the window here so the cursor doesn't go off into the desktop or click the window that's currently on top of the game window
+                    //WindowTools.BringWindowToFront();
+                    goto default;
                 default:
                     _buttonsSubtool.ButtonDown(fun);
                     break;

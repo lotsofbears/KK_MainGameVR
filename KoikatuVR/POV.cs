@@ -60,7 +60,7 @@ namespace KoikatuVR
         private bool _wasAway;
         private SteamVR_Controller.Device _device;
         private SteamVR_Controller.Device _device1;
-        private Transform _poi;
+        //private Transform _poi;
         private List<ChaControl> _chaControls;
         private Controller _controller;
         private float _moveSpeed;
@@ -130,13 +130,13 @@ namespace KoikatuVR
             {
                 if (_target.sex == 1)
                 {
-                    VRLog.Debug("Finish setting FemalePov");
+                    VRLog.Debug("Finishing setting FemalePov");
                     GirlPOV = true;
                     VRMouth.NoActionAllowed = true;
                 }
                 else
                 {
-                    VRLog.Debug("Finish setting MalePov");
+                    VRLog.Debug("Finishing setting MalePov");
                     GirlPOV = false;
                     VRMouth.NoActionAllowed = false;
                 }
@@ -172,10 +172,11 @@ namespace KoikatuVR
         }
         private Vector3 GetEyesPosition()
         {
-            return _targetEyes.position + _targetEyes.up * settings.PositionOffsetY + _targetEyes.forward * settings.PositionOffsetZ;
-            //return currentTargetEyes.TransformPoint(currentTargetEyes.localPosition + new Vector3(0f, settings.HeadPosPoVY, settings.HeadPosPoVZ));
+            return _targetEyes.TransformPoint(new Vector3(0f, settings.PositionOffsetY, settings.PositionOffsetZ));
         }
-
+        /// <summary>
+        /// Stub.
+        /// </summary>
         private void NewLookAtPoI()
         {
             if (_target == null)
@@ -319,9 +320,13 @@ namespace KoikatuVR
         
         private void SetPOV()
         {
-            if (VRMouth._kissCoShouldEnd == false || VRMouth._lickCoShouldEnd == false)
+            if (VRMouth._lickCoShouldEnd == false || VRMouth._kissCoShouldEnd == false || !_scene.AddSceneName.Equals("HProc"))
             {
-                _wasAway = true;
+                // We don't want pov while kissing/licking or if config/pointmove scene pops up.
+                if (settings.FlyInPov)
+                {
+                    _wasAway = true;
+                }
             }
             else if (_newAttachPoint && (_device.GetPressUp(ButtonMask.Grip) || _device1.GetPressUp(ButtonMask.Grip)))
             {
@@ -329,31 +334,21 @@ namespace KoikatuVR
             }
             else if (_device.GetPress(ButtonMask.Grip) || _device1.GetPress(ButtonMask.Grip))
             {
-                _wasAway = true;
+                if (settings.FlyInPov)
+                {
+                    _wasAway = true;
+                }
                 if (_device.GetPressDown(ButtonMask.Touchpad) || _device1.GetPressDown(ButtonMask.Touchpad))
                 {
-                    //if (!_newAttachPoint)
-                    //{
-                        VRMouth.NoActionAllowed = true;
-                        _newAttachPoint = true;
-                    //}
-                    //else
-                    //{
-                      //  VRMouth.NoKissingAllowed = false;
-                       // _newAttachPoint = false;
-                    //}
+                    // Most likely a bad idea to kiss/lick when detached from the head but still inheriting all the movements.
+                    VRMouth.NoActionAllowed = true;
+                    _newAttachPoint = true;
                 }
+            
             }
             else if (_wasAway)
             {
-                if (_device.GetPress(ButtonMask.Grip) || _device1.GetPress(ButtonMask.Grip))
-                {
-                    return;
-                }
-                else
-                {
-                    MoveToDesignatedHead();
-            }
+                MoveToDesignatedHead();
             }
             else
             {
@@ -401,14 +396,7 @@ namespace KoikatuVR
                 else
                     StartCoroutine(GetButtonA());
             }
-            if (!_scene.AddSceneName.Equals("HProc"))
-            {
-                if (settings.FlyInPov)
-                {
-                    _wasAway = true;
-                }
-            }
-            else if (Active) //!_scene.AddSceneName.StartsWith("Con", System.StringComparison.Ordinal) && !_scene.AddSceneName.StartsWith("HPo", System.StringComparison.Ordinal))
+            if (Active) //!_scene.AddSceneName.StartsWith("Con", System.StringComparison.Ordinal) && !_scene.AddSceneName.StartsWith("HPo", System.StringComparison.Ordinal))
             {
                 SetPOV();
             }

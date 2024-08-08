@@ -20,7 +20,6 @@ namespace KoikatuVR.Interpreters
         public SceneType CurrentScene { get; private set; }
         public SceneInterpreter SceneInterpreter;
 
-
         private Mirror.Manager _mirrorManager;
         private int _kkapiCanvasHackWait;
         private Canvas _kkSubtitlesCaption;

@@ -10,6 +10,9 @@ using System.Reflection.Emit;
 using System.Collections;
 using KoikatuVR.Interpreters;
 using System.Diagnostics;
+using KKAPI.MainGame;
+using KKAPI;
+using NodeCanvas.Tasks.Actions;
 
 namespace KoikatuVR.Camera
 {
@@ -52,7 +55,9 @@ namespace KoikatuVR.Camera
     class ActionCameraControl : ProtectedBehaviour
     {
         public Transform VRIdealCamera { get; private set; }
-
+        private static TalkScene _talkScene;
+        private static ChaControl _lastHeroine;
+        public static float _maleHeight;
         protected override void OnAwake()
         {
             VRIdealCamera = new GameObject("VRIdealCamera").transform;
@@ -139,11 +144,8 @@ namespace KoikatuVR.Camera
         //}
         public static float GetPlayerHeight()
         {
-            //todo setting?
-            //var playerHeight = VR.Camera.Head.position.y - VR.Camera.Origin.position.y;
-            //Console.WriteLine("height: " + playerHeight);
-            //return playerHeight;
-            return 1.4f;
+
+            return TalkSceneInterpreter._height;
         }
         public static bool HeadIsAwayFromPosition(Vector3 targetPosition)
         {

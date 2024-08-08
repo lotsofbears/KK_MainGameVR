@@ -14,6 +14,7 @@ namespace KoikatuVR.Interpreters
     {
         Canvas _canvasBack;
         public static float TalkDistance = 0.55f; // 0.65f;
+        public static float _height = 1.4f;
         public override void OnDisable()
         {
             DestroyControllerComponent<Controls.TalkSceneHandler>();
@@ -39,8 +40,14 @@ namespace KoikatuVR.Interpreters
                 // The default camera location is a bit too far for a friendly
                 // conversation.
                 var heroine = talkScene.targetHeroine.transform;
+                //var dude = Manager.Game.instance.Player.chaCtrl;
+               // var dudeTop = dude.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/a_n_headtop");
+
+                //_height = dudeTop.position.y * 0.94f - dude.transform.position.y;
+                TalkDistance = 0.35f + UnityEngine.Random.value * 0.25f;
+                VRLog.Debug($"StartTalkScene {_height} | {TalkDistance}");
                 Camera.VRMover.Instance.MoveTo(
-                    heroine.TransformPoint(new Vector3(0, 1.4f, 0.55f)),
+                    heroine.TransformPoint(new Vector3(0, _height, TalkDistance)),
                     heroine.rotation * Quaternion.Euler(0, 180f, 0),
                     keepHeight: true);
             };

@@ -44,7 +44,7 @@ namespace KoikatuVR.Caress
         private bool _lickCo;
         private bool _sensibleH;
         private bool _mousePressDown;
-        private float _heightDude;
+        //private float _heightDude;
 
         private List<Harmony> _activePatches = new List<Harmony>();
         private List<Coroutine> _activeCoroutines = new List<Coroutine>();
@@ -69,7 +69,7 @@ namespace KoikatuVR.Caress
         {
             Instance = this;
 
-            _hFlag = proc.flags;
+            _hFlag = Traverse.Create(proc).Field("flags").GetValue<HFlag>();
 
             //var type = AccessTools.TypeByName("KK_SensibleH.MoMiController");
             if (type != null)
@@ -103,8 +103,10 @@ namespace KoikatuVR.Caress
         }
         internal void Halt(bool disengage = true)
         {
+            // On Hold.
             // If we do this while SensibleH spams "JudgeProc()", we'll break HandCtrl, thus we wait (should be up to 0.6 seconds) for drag to start.
             //    yield return new WaitUntil(() => _hand.ctrl != HandCtrl.Ctrl.click);
+
             VRLog.Debug($"[HaltReason][Button = {UnityEngine.Input.GetMouseButtonDown(0)}] [Item = {_handCtrl.actionUseItem != -1}] [Kiss = {_handCtrl.isKiss}]");
             foreach (var coroutine in _activeCoroutines)
             {
@@ -149,10 +151,7 @@ namespace KoikatuVR.Caress
                 _activeCoroutines.Add(StartCoroutine(LickCoEx()));
                 VRMouth.NoActionAllowed = true;
             }
-
             _activeCoroutines.Add(StartCoroutine(AttachCo(colliderKind)));
-
-
         }
 
 
@@ -176,8 +175,6 @@ namespace KoikatuVR.Caress
                 }
                 _activeCoroutines.Add(StartCoroutine(KissCoEx()));
             }
-
-            
         }
 
         private IEnumerator LickCoEx()
@@ -210,7 +207,6 @@ namespace KoikatuVR.Caress
             var origin = VR.Camera.Origin;
             var head = VR.Camera.Head;
 
-            // I'll put back compatibility for longDistKissMachine a bit later.
 
             // In light of recent rework, whole "FindRoll" function is busted.
             var rollDelta = FindRollDelta();
@@ -230,10 +226,8 @@ namespace KoikatuVR.Caress
                     rollDelta = signedAngle;
             }
 
-            // We still lack distance evaluation. Bring it back.
 
             // We look for rotations of our headset relative to the girl' head and adjust position.
-            // Because headset isn't centered on the eyes.
 
             var angleModRight = rollDelta * 0.0111f;//  /90f;
             var absModRight = Mathf.Abs(angleModRight);
@@ -261,14 +255,14 @@ namespace KoikatuVR.Caress
                 // Alternative neck stays in SensibleH, functional differs way too much.
                 // Without it, this method sucks, I'll bring other back in for compatibility later.
 
-                var adjustedEyes = _eyes.position + (_eyes.up * offsetUp) + (_eyes.right * offsetRight);
-                var targetPos = adjustedEyes + _eyes.forward * offsetForward;
+                //var adjustedEyes = _eyes.position + (_eyes.up * offsetUp) + (_eyes.right * offsetRight);
+                var targetPos = _eyes.TransformPoint(new Vector3(offsetRight, offsetUp, offsetForward));// adjustedEyes + _eyes.forward * offsetForward;
 
                 var deltaEyesPos = _eyes.position - oldEyePos;
                 oldEyePos = _eyes.position;
 
                 var moveTowards = Vector3.MoveTowards(head.position, targetPos, Time.deltaTime * 0.07f);
-                var lookRotation = Quaternion.LookRotation(_eyes.position + (_eyes.right * offsetRight) - moveTowards, (_eyes.up * angleModUp) + (_eyes.right * angleModRight)); // + _eyes.forward * -0.1f);
+                var lookRotation = Quaternion.LookRotation(_eyes.TransformPoint(new Vector3(offsetRight, 0f, 0f)) - moveTowards, (_eyes.up * angleModUp) + (_eyes.right * angleModRight)); // + _eyes.forward * -0.1f);
                 origin.rotation = Quaternion.RotateTowards(origin.rotation, lookRotation, Time.deltaTime * 90f);
                 origin.position += moveTowards + deltaEyesPos - head.position;
                 yield return new WaitForEndOfFrame();
@@ -281,7 +275,7 @@ namespace KoikatuVR.Caress
             {
                 if (_device.GetPress(ButtonMask.Grip) || _device1.GetPress(ButtonMask.Grip))
                 {
-                    if (Vector3.Distance(_eyes.position, head.position) > 0.25f)
+                    if (Vector3.Distance(_eyes.position, head.position) > 0.2f)
                     {
                         Halt();
                         yield break;
@@ -294,11 +288,12 @@ namespace KoikatuVR.Caress
                 }
                 else
                 {
+                    //var stepMod = 0.5f + Random.value * 0.5f;
                     var deltaEyesPos = _eyes.position - oldEyePos;
                     oldEyePos = _eyes.position;
-                    var targetPos = _eyes.position + (_eyes.right * offsetRight) + (_eyes.forward * offsetForward) + (_eyes.up * offsetUp);
+                    var targetPos = _eyes.TransformPoint(new Vector3(offsetRight, offsetUp, offsetForward));
                     var moveTowards = Vector3.MoveTowards(head.position, targetPos, Time.deltaTime * 0.05f);
-                    var lookRotation = Quaternion.LookRotation(_eyes.position + (_eyes.right * offsetRight) - moveTowards, (_eyes.up * angleModUp) + (_eyes.right * angleModRight)); // + _eyes.forward * -0.1f);
+                    var lookRotation = Quaternion.LookRotation(_eyes.TransformPoint(new Vector3(offsetRight, 0f, 0f)) - moveTowards, (_eyes.up * angleModUp) + (_eyes.right * angleModRight)); // + _eyes.forward * -0.1f);
                     origin.rotation = Quaternion.RotateTowards(origin.rotation, lookRotation, Time.deltaTime * 15f);
                     origin.position += moveTowards + deltaEyesPos - head.position;
                 }
@@ -325,9 +320,10 @@ namespace KoikatuVR.Caress
             {
                 yield return new WaitForEndOfFrame();
             }
+            // Get away first if we are too close. Different for active pov.
+            // We only really account for kiss on this one, lick cases don't really care about disengage.
             if (Vector3.Distance(_eyes.position, head.position) < 0.25f)
             {
-                // Get away first if we are too close. Different for active pov.
                 //SensibleH.Logger.LogDebug($"EndKissCo[MoveCameraAway][pov = {pov}]");
                 var step = Time.deltaTime * 0.13f; //0.0034f * delta;
                 if (pov && _maleEyes != null)
@@ -355,13 +351,13 @@ namespace KoikatuVR.Caress
             }
             if (!pov)
             {
-                // We roll back Roll and Pitch if latter is not too big.
-                // Otherwise it's most likely desirable, so we roll for girl's eyes.
+                // We return back Roll and Pitch if latter is not too big.
+                // Otherwise it's most likely desirable, so we go for girl's eyes (other pois would be a welcome addition).
                 if (Math.Abs(Mathf.DeltaAngle(origin.eulerAngles.x, 0f)) < 50f)
                 {
-                    while ((int)origin.eulerAngles.z != 0 && (int)origin.eulerAngles.x != 0)
+                    while ((int)origin.eulerAngles.z != 0 || (int)origin.eulerAngles.x != 0)
                     {
-                        if (!_device.GetPress(ButtonMask.Grip) || !_device1.GetPress(ButtonMask.Grip))
+                        if (!_device.GetPress(ButtonMask.Grip) && !_device1.GetPress(ButtonMask.Grip))
                         {
                             var oldHeadPos = head.position;
                             origin.rotation = Quaternion.RotateTowards(origin.rotation, Quaternion.Euler(0f, origin.eulerAngles.y, 0f), GetFpsDelta);
@@ -374,7 +370,7 @@ namespace KoikatuVR.Caress
                 {
                     while (true)
                     {
-                        if (!_device.GetPress(ButtonMask.Grip) || !_device1.GetPress(ButtonMask.Grip))
+                        if (!_device.GetPress(ButtonMask.Grip) && !_device1.GetPress(ButtonMask.Grip))
                         {
                             var oldHeadPos = head.position;
                             var lookAt = Quaternion.LookRotation(_eyes.position - head.position);
@@ -446,9 +442,10 @@ namespace KoikatuVR.Caress
                     Halt();
                 }
                 //SensibleH.Logger.LogDebug($"AttachCo[MoveToItem]");
-                var adjustedItem = item.position + item.forward * dic.itemOffsetForward + item.up * dic.itemOffsetUp;
+
+                var adjustedItem = item.TransformPoint(new Vector3(0f, dic.itemOffsetUp, dic.itemOffsetForward));
                 var moveTo = Vector3.MoveTowards(head.position, adjustedItem, Time.deltaTime * 0.2f);
-                var lookAt = Quaternion.LookRotation(poi.position + poi.up * dic.poiOffsetUp - moveTo, poi.up * dic.directionUp + poi.forward * dic.directionForward);
+                var lookAt = Quaternion.LookRotation(poi.TransformPoint(new Vector3(0f, dic.poiOffsetUp, 0f)) - moveTo, poi.up * dic.directionUp + poi.forward * dic.directionForward);
                 origin.rotation = Quaternion.RotateTowards(origin.rotation, lookAt, Time.deltaTime * 60f);
                 origin.position += moveTo - head.position;
                 if (Vector3.Distance(adjustedItem, head.position) < 0.002f)
@@ -470,9 +467,9 @@ namespace KoikatuVR.Caress
                 }
                 else
                 {
-                    var targetPos = item.position + (item.forward * dic.itemOffsetForward) + (item.up * dic.itemOffsetUp);
+                    var targetPos = item.TransformPoint(new Vector3(0f, dic.itemOffsetUp, dic.itemOffsetForward));
                     var moveTo = Vector3.MoveTowards(head.position, targetPos, Time.deltaTime * 0.05f);
-                    var lookAt = Quaternion.LookRotation(poi.position + poi.up * dic.poiOffsetUp - moveTo, poi.up * dic.directionUp + poi.forward * dic.directionForward);
+                    var lookAt = Quaternion.LookRotation(poi.TransformPoint(new Vector3(0f, dic.poiOffsetUp, 0f)) - moveTo, poi.up * dic.directionUp + poi.forward * dic.directionForward);
                     origin.rotation = Quaternion.RotateTowards(origin.rotation, lookAt, Time.deltaTime * 15f);
                     origin.position += moveTo - head.position;
                 }
@@ -618,29 +615,59 @@ namespace KoikatuVR.Caress
         [HarmonyTranspiler, HarmonyPatch(typeof(HandCtrl), nameof(HandCtrl.DragAction))]
         public static IEnumerable<CodeInstruction> DragActionTranspiler(IEnumerable<CodeInstruction> instructions)
         {
-            //VRLog.Error($"PatchHandCtrlKiss");
-            var code = new List<CodeInstruction>(instructions);
-            for (var i = 0; i < code.Count; i++)
+            var done = false;
+            var found = false;
+            var counter = 0;
+            foreach (var code in instructions)
             {
-                if (code[i].opcode == OpCodes.Ldflda &&
-                    code[i].operand.ToString().Contains("calcDragLength"))
+                if (!found && code.opcode == OpCodes.Ldflda
+                    && code.operand.ToString().Contains("calcDragLength"))
                 {
-                    code[i].opcode = OpCodes.Ldsfld;
-                    code[i].operand = AccessTools.Field(typeof(CaressHelper), name: "FakeDragLength"); ;
-                    code[i + 1].opcode = OpCodes.Ldc_R4;
-                    code[i + 1].operand = 3f;
-                    code[i + 2].opcode = OpCodes.Call;
-                    code[i + 2].operand = AccessTools.FirstMethod(typeof(Vector2), method => method.Name.Equals("op_Multiply"));
-                    code[i + 3].opcode = OpCodes.Stfld;
-                    code[i + 3].operand = AccessTools.Field(typeof(HandCtrl), name: "calcDragLength");
-                    code[i + 4].opcode = OpCodes.Nop;
-                    code[i + 4].operand = null;
-                    code[i + 5].opcode = OpCodes.Nop;
-                    code[i + 5].operand = null;
-                    break;
+                    found = true;
+                    yield return new CodeInstruction(OpCodes.Ldsfld, AccessTools.Field(typeof(CaressHelper), name: "FakeDragLength"));
+                    continue;
                 }
+                else if (!done && found)
+                {
+                    if (counter == 0)
+                    {
+                        counter++;
+                        yield return new CodeInstruction(OpCodes.Stfld, AccessTools.Field(typeof(HandCtrl), name: "calcDragLength"));
+                        continue;
+                    }
+                    counter++;
+                    yield return new CodeInstruction(OpCodes.Nop);
+                    if (counter == 5)
+                    {
+                        done = true;
+                    }
+                    continue;
+                }
+                yield return code;
             }
-            return code.AsEnumerable();
+            //VRLog.Error($"PatchHandCtrlKiss");
+            //var code = new List<CodeInstruction>(instructions);
+            //for (var i = 0; i < code.Count; i++)
+            //{
+            //    if (code[i].opcode == OpCodes.Ldflda &&
+            //        code[i].operand.ToString().Contains("calcDragLength"))
+            //    {
+            //        code[i].opcode = OpCodes.Ldsfld;
+            //        code[i].operand = AccessTools.Field(typeof(CaressHelper), name: "FakeDragLength"); ;
+            //        code[i + 1].opcode = OpCodes.Ldc_R4;
+            //        code[i + 1].operand = 3f;
+            //        code[i + 2].opcode = OpCodes.Call;
+            //        code[i + 2].operand = AccessTools.FirstMethod(typeof(Vector2), method => method.Name.Equals("op_Multiply"));
+            //        code[i + 3].opcode = OpCodes.Stfld;
+            //        code[i + 3].operand = AccessTools.Field(typeof(HandCtrl), name: "calcDragLength");
+            //        code[i + 4].opcode = OpCodes.Nop;
+            //        code[i + 4].operand = null;
+            //        code[i + 5].opcode = OpCodes.Nop;
+            //        code[i + 5].operand = null;
+            //        break;
+            //    }
+            //}
+            //return code.AsEnumerable();
         }
     }
 
