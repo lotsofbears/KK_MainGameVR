@@ -8,7 +8,8 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace KoikatuVR {
+namespace KK_VR
+{
     using System;
     
     

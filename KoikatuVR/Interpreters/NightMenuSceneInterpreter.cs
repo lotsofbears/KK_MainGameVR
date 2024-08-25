@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-namespace KoikatuVR.Interpreters
+namespace KK_VR.Interpreters
 {
     class NightMenuSceneInterpreter : SceneInterpreter
     {

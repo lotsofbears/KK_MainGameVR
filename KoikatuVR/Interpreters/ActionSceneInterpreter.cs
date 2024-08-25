@@ -2,9 +2,11 @@
 using VRGIN.Core;
 using WindowsInput.Native;
 using StrayTech;
-using KoikatuVR.Settings;
+using KK_VR.Settings;
+using KK_VR.Features;
+using KK_VR.Camera;
 
-namespace KoikatuVR.Interpreters
+namespace KK_VR.Interpreters
 {
     class ActionSceneInterpreter : SceneInterpreter
     {
@@ -13,9 +15,10 @@ namespace KoikatuVR.Interpreters
 
         private GameObject _Map;
         private GameObject _CameraSystem;
+        private Transform _eyes;
         private bool _NeedsResetCamera;
         private bool _IsStanding = true;
-        private bool _Walking = false;
+        internal bool _Walking = false;
         private bool _Dashing = false; // ダッシュ時は_Walkingと両方trueになる
 
         public override void OnStart()
@@ -143,48 +146,49 @@ namespace KoikatuVR.Interpreters
 
         public void MoveCameraToPlayer(bool onlyPosition = false, bool quiet = false)
         {
-            var player = _ActionScene.Player;
 
-            var playerHead = player.chaCtrl.objHead.transform;
+            //var playerHead = player.chaCtrl.objHead.transform;
             var headCam = VR.Camera.transform;
 
-            Vector3 cf = Vector3.Scale(player.transform.forward, new Vector3(1, 0, 1)).normalized;
 
-            Vector3 pos;
-            if (_Settings.UsingHeadPos)
+            var pos = GetEyesPosition();
+            if (!_Settings.UsingHeadPos)
             {
-                pos = playerHead.position;
-            }
-            else
-            {
-                pos = player.position;
-                pos.y += _IsStanding ? _Settings.StandingCameraPos : _Settings.CrouchingCameraPos;
+                var player = _ActionScene.Player;
+                pos.y = player.position.y + (_IsStanding ? _Settings.StandingCameraPos : _Settings.CrouchingCameraPos);
             }
 
-            Camera.VRMover.Instance.MoveTo(
-                pos + cf * 0.23f, // 首が見えるとうざいのでほんの少し前目にする
-                onlyPosition ? headCam.rotation : player.rotation,
-                keepHeight: false,
-                quiet: quiet);
+            VRMover.Instance.MoveTo(
+                //pos + cf * 0.23f, // 首が見えるとうざいのでほんの少し前目にする
+                pos,
+                onlyPosition ? headCam.rotation : _eyes.rotation,
+                false,
+                quiet);
         }
 
+        private Vector3 GetEyesPosition()
+        {
+            if (_eyes == null)
+            {
+                _eyes = _ActionScene.Player.chaCtrl.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz/cf_J_Eye_tz");
+            }
+            return _eyes.TransformPoint(0f, _Settings.PositionOffsetY, _Settings.PositionOffsetZ);
+        }
         public void MovePlayerToCamera(bool onlyRotation = false)
         {
             var player = _ActionScene.Player;
-            var playerHead = player.chaCtrl.objHead.transform;
-            var headCam = VR.Camera.transform;
+            var head = VR.Camera.Head;
 
-            var pos = headCam.position;
-            pos.y += player.position.y - playerHead.position.y;
-
-            var delta_y = headCam.rotation.eulerAngles.y - player.rotation.eulerAngles.y;
-            player.transform.Rotate(Vector3.up * delta_y);
-            Vector3 cf = Vector3.Scale(player.transform.forward, new Vector3(1, 0, 1)).normalized;
-
-            if (!onlyRotation)
+            var vec = player.position - GetEyesPosition();
+            if (!_Settings.UsingHeadPos)
             {
-                player.position = pos - cf * 0.1f;
+                var attachPoint = player.position;
+                attachPoint.y = _IsStanding ? _Settings.StandingCameraPos : _Settings.CrouchingCameraPos;
+                vec = player.position - attachPoint;
             }
+            var rot = Quaternion.Euler(0f, head.eulerAngles.y, 0f);
+            player.rotation = rot;
+            player.position = head.position + vec;
         }
 
         public void Crouch()

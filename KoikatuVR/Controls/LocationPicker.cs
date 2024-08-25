@@ -8,7 +8,7 @@ using VRGIN.Controls;
 using UnityEngine;
 using HarmonyLib;
 
-namespace KoikatuVR.Controls
+namespace KK_VR.Controls
 {
     /// <summary>
     /// A component to add to the controllers the ability to pick a new location in H scenes.

@@ -8,10 +8,10 @@ using HarmonyLib;
 using System.Collections;
 using System.Diagnostics;
 using ADV;
-using KoikatuVR.Interpreters;
-using KoikatuVR.Settings;
+using KK_VR.Interpreters;
+using KK_VR.Settings;
 
-namespace KoikatuVR.Camera
+namespace KK_VR.Camera
 {
     /// <summary>
     /// A class responsible for moving the VR camera.
@@ -58,12 +58,15 @@ namespace KoikatuVR.Camera
             }
             if (!quiet)
             {
-                VRLog.Debug($"Moving camera to {position} {rotation.eulerAngles}");
+                VRLog.Debug($"VRMover:MoveTo:{position}:{rotation.eulerAngles}");
             }
             _lastPosition = position;
             _lastRotation = rotation;
 
-            VR.Mode.MoveToPosition(position, rotation, ignoreHeight: keepHeight);
+            var trimmedRotation = Quaternion.Euler(0, rotation.eulerAngles.y, 0);
+            VR.Mode.MoveToPosition(position, trimmedRotation, keepHeight);
+
+            //VR.Mode.MoveToPosition(position, rotation, ignoreHeight: keepHeight);
             OnMove?.Invoke();
         }
 
@@ -134,7 +137,7 @@ namespace KoikatuVR.Camera
         public void HandleTextScenarioProgress(ADV.TextScenario textScenario)
         {
             //bool isFadingOut = IsFadingOut(new Traverse(textScenario).Field<ADVFade>("advFade").Value);
-            bool isFadingOut = textScenario.advFade;
+            bool isFadingOut = IsFadingOut(textScenario.advFade);
 
             VRLog.Debug($"HandleTextScenarioProgress isFadingOut={isFadingOut}");
 
@@ -193,10 +196,7 @@ namespace KoikatuVR.Camera
             {
                 return f.initColor.a > 0.5f && !f.IsEnd;
             }
-
-            var trav = new Traverse(fade);
-            return IsFadingOutSub(trav.Field<ADVFade.Fade>("front").Value) ||
-                IsFadingOutSub(trav.Field<ADVFade.Fade>("back").Value);
+            return IsFadingOutSub(fade.front) || IsFadingOutSub(fade.back); 
         }
 
         private IEnumerator ImpersonateCo(bool isFadingOut, Transform head)
@@ -229,9 +229,7 @@ namespace KoikatuVR.Camera
         {
             var distance = Vector3.Distance(position, _lastPosition);
             var angleDistance = Mathf.Abs(Mathf.DeltaAngle(rotation.eulerAngles.y, VR.Camera.Origin.rotation.eulerAngles.y));
-            var result = 1f < distance / 2f + angleDistance / 90f;
-            //VRLog.Debug($"{result} dist[{distance}] ang[{angleDistance}]");
-            return result;
+            return 1f < distance / 2f + angleDistance / 90f;
         }
 
         private bool FindMaleToImpersonate(out ChaControl male)

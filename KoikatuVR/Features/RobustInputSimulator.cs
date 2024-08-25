@@ -11,7 +11,7 @@ using UnityEngine;
 using System.Threading;
 using System.Runtime.InteropServices;
 
-namespace KoikatuVR
+namespace KK_VR.Features
 {
     /// <summary>
     /// A version of InputSimulator that tries to avoid the issue of

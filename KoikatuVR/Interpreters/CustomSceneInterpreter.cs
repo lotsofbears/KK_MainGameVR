@@ -2,7 +2,7 @@
 using UnityEngine;
 using VRGIN.Core;
 
-namespace KoikatuVR.Interpreters
+namespace KK_VR.Interpreters
 {
     class CustomSceneInterpreter : SceneInterpreter
     {

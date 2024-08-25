@@ -9,7 +9,7 @@ using VRGIN.Core;
 
 // Collection of patches to Unity.
 
-namespace KoikatuVR
+namespace KK_VR.Fixes
 {
     /// <summary>
     /// GraphicRaycaster.sortOrderPriority and GraphicRaycaster.renderOrderPriority

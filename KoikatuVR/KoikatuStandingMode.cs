@@ -8,8 +8,9 @@ using VRGIN.Core;
 using VRGIN.Helpers;
 using VRGIN.Modes;
 using UnityEngine;
+using KK_VR.Features;
 
-namespace KoikatuVR
+namespace KK_VR
 {
     class KoikatuStandingMode : StandingMode
     {

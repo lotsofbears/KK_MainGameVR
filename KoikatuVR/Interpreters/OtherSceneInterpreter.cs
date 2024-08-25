@@ -1,5 +1,5 @@
 ﻿
-namespace KoikatuVR.Interpreters
+namespace KK_VR.Interpreters
 {
     class OtherSceneInterpreter : SceneInterpreter
     {

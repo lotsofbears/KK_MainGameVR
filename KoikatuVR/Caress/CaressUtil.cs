@@ -6,7 +6,7 @@ using System.Text;
 using HarmonyLib;
 using VRGIN.Core;
 
-namespace KoikatuVR.Caress
+namespace KK_VR.Caress
 {
     public class CaressUtil
     {

@@ -4,7 +4,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-namespace KoikatuVR.Mirror
+namespace KK_VR.Mirror
 {
     [ExecuteInEditMode] // Make mirror live-update even when not in play mode
     public class VRReflection : MonoBehaviour

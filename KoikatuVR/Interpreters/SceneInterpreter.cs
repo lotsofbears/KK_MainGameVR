@@ -1,7 +1,7 @@
 ﻿using VRGIN.Core;
 using UnityEngine;
 
-namespace KoikatuVR.Interpreters
+namespace KK_VR.Interpreters
 {
     abstract class SceneInterpreter
     {

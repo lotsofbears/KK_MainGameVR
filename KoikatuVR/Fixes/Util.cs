@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace KoikatuVR
+namespace KK_VR.Fixes
 {
     static class Util
     {

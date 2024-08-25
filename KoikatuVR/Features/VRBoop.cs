@@ -5,7 +5,7 @@ using UnityEngine;
 using VRGIN.Core;
 using VRGIN.Controls;
 
-namespace KoikatuVR
+namespace KK_VR.Features
 {
     /// <summary>
     /// Adds colliders to the controllers so you can boop things
@@ -108,21 +108,22 @@ namespace KoikatuVR
             if (existingCollider == null)
             {
                 //Add a DB collider to the controller
-                return AddDbCollider(controllerGameObject, colliderName);
+                //return AddDbCollider(controllerGameObject, colliderName);
+                return AddDbCollider(controllerGameObject, colliderName, 0.03f, 0f, new Vector3(0f, -0.015f, -0.06f));
             }
 
             return existingCollider;
         }
 
         private static DynamicBoneCollider AddDbCollider(GameObject controllerGameObject, string colliderName,
-            float colliderRadius = 0.03f, float collierHeight = 0f, Vector3 colliderCenter = new Vector3(), DynamicBoneCollider.Direction colliderDirection = default)
+            float colliderRadius = 0.05f, float collierHeight = 0f, Vector3 colliderCenter = new Vector3(), DynamicBoneCollider.Direction colliderDirection = default)
         {
             //Build the dynamic bone collider
             var colliderObject = new GameObject(colliderName);
             var collider = colliderObject.AddComponent<DynamicBoneCollider>();
             collider.m_Radius = colliderRadius;
             collider.m_Height = collierHeight;
-            collider.m_Center = new Vector3(0f, -0.015f, -0.06f);
+            collider.m_Center = colliderCenter;
             collider.m_Direction = colliderDirection;
             colliderObject.transform.SetParent(controllerGameObject.transform, false);
             //var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);

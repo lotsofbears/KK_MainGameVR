@@ -11,7 +11,7 @@ using System.Diagnostics;
 
 // Collection of patches that are to be enabled only during development.
 
-namespace KoikatuVR
+namespace KK_VR
 {
 #if false
     /// Report every time TransformDebug.targetTransform is rotated.

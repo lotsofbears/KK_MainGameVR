@@ -79,8 +79,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Camera\ActionCameraControl.cs" />
-    <Compile Include="Background.cs" />
-    <Compile Include="BepInExLoggerBackend.cs" />
+    <Compile Include="Camera\Background.cs" />
+    <Compile Include="Fixes\BepInExVrLogBackend.cs" />
     <Compile Include="Camera\VREffector.cs" />
     <Compile Include="Camera\VRMoverH.cs" />
     <Compile Include="Caress\CaressHelper.cs" />
@@ -93,48 +93,47 @@
     <Compile Include="Caress\HandCtrlHooks.cs" />
     <Compile Include="Caress\LongDistanceKissMachine.cs" />
     <Compile Include="Caress\VRMouth.cs" />
-    <Compile Include="Compat.cs" />
-    <Compile Include="ConfigurationManagerAttributes.cs" />
-    <Compile Include="CrossFader.cs" />
-    <Compile Include="DebugHooks.cs" />
-    <Compile Include="GameFixes.cs" />
-    <Compile Include="PrivacyScreen.cs" />
+    <Compile Include="Utils\Compat.cs" />
+    <Compile Include="Features\CrossFader.cs" />
+    <Compile Include="Utils\DebugHooks.cs" />
+    <Compile Include="Fixes\GameFixes.cs" />
+    <Compile Include="Features\PrivacyScreen.cs" />
     <Compile Include="Interpreters\ActionSceneInterpreter.cs" />
     <Compile Include="Interpreters\CustomSceneInterpreter.cs" />
     <Compile Include="Settings\KoikatuContext.cs" />
     <Compile Include="KoikatuStandingMode.cs" />
     <Compile Include="Interpreters\TalkSceneInterpreter.cs" />
     <Compile Include="Controls\LocationPicker.cs" />
-    <Compile Include="Mirror\Manager.cs" />
-    <Compile Include="Mirror\VRReflection.cs" />
+    <Compile Include="Fixes\Mirror\Manager.cs" />
+    <Compile Include="Fixes\Mirror\VRReflection.cs" />
     <Compile Include="Camera\MoverHooks.cs" />
     <Compile Include="Resource.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
       <DependentUpon>Resource.resx</DependentUpon>
     </Compile>
-    <Compile Include="RobustInputSimulator.cs" />
+    <Compile Include="Features\RobustInputSimulator.cs" />
     <Compile Include="Settings\SettingsManager.cs" />
     <Compile Include="Controls\TalkSceneHandler.cs" />
     <Compile Include="Controls\KoikatuMenuTool.cs" />
     <Compile Include="Controls\KoikatuWarpTool.cs" />
     <Compile Include="Controls\ToolUtil.cs" />
-    <Compile Include="UnityPatches.cs" />
-    <Compile Include="Util.cs" />
+    <Compile Include="Fixes\UnityPatches.cs" />
+    <Compile Include="Fixes\Util.cs" />
     <Compile Include="Interpreters\HSceneInterpreter.cs" />
     <Compile Include="Interpreters\KoikatuInterpreter.cs" />
     <Compile Include="Interpreters\OtherSceneInterpreter.cs" />
     <Compile Include="Interpreters\NightMenuSceneInterpreter.cs" />
     <Compile Include="Interpreters\SceneInterpreter.cs" />
-    <Compile Include="VRBoop.cs" />
-    <Compile Include="VRFade.cs" />
-    <Compile Include="VRMale.cs" />
+    <Compile Include="Features\VRBoop.cs" />
+    <Compile Include="Features\VRFade.cs" />
+    <Compile Include="Features\VRMale.cs" />
     <Compile Include="Camera\VRMover.cs" />
     <Compile Include="VRPlugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Controls\SchoolTool.cs" />
     <Compile Include="Settings\KoikatuSettings.cs" />
-    <Compile Include="POV.cs" />
+    <Compile Include="Features\PoV.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Deploy.props" />

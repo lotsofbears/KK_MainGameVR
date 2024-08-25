@@ -6,7 +6,7 @@ using UnityEngine;
 
 using VRGIN.Core;
 
-namespace KoikatuVR.Caress
+namespace KK_VR.Caress
 {
     /// <summary>
     /// A state machine for starting and finishing a kiss in the caress mode.

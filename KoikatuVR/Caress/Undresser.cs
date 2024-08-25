@@ -7,8 +7,9 @@ using VRGIN.Core;
 using HarmonyLib;
 
 using static ChaFileDefine;
+using KK_VR.Fixes;
 
-namespace KoikatuVR.Caress
+namespace KK_VR.Caress
 {
     /// <summary>
     /// An object responsible for determining which clothing item to remove,

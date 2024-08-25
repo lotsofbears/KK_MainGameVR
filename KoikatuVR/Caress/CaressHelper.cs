@@ -7,15 +7,26 @@ using System.Text;
 using UnityEngine;
 using static Illusion.Game.Utils.Scene;
 using static ItemObject;
-using static SteamVR_Controller;
 using Random = UnityEngine.Random;
 using VRGIN.Core;
 using Manager;
 using Illusion.Game.Elements.EasyLoader;
 using StrayTech;
 using System.Reflection.Emit;
+using static Valve.VR.EVRButtonId;
+using VRGIN.Controls;
+using Valve.VR;
+using NodeCanvas.Tasks.Actions;
+using static UnityStandardAssets.CinematicEffects.Bloom;
+using ADV.Commands.Base;
+using System.Diagnostics;
+using KK_VR.Caress;
+using KK_VR.Features;
+using KK_VR.Settings;
+using KK_VR;
+using static SteamVR_Controller.ButtonMask;
 
-namespace KoikatuVR.Caress
+namespace KK_VR.Caress
 {
     /// <summary>
     /// Helps to stay where one would like to stay.
@@ -33,56 +44,62 @@ namespace KoikatuVR.Caress
             public float directionForward;
         }
 
-        /// <summary>
-        /// State of disengagement of camera from action.
-        /// </summary>
-        internal bool _endKissCo;
         internal static CaressHelper Instance;
         internal static Vector2 FakeDragLength;
 
         private bool _kissCo;
         private bool _lickCo;
+        private bool _endKissCo;
         private bool _sensibleH;
         private bool _mousePressDown;
         //private float _heightDude;
 
         private List<Harmony> _activePatches = new List<Harmony>();
         private List<Coroutine> _activeCoroutines = new List<Coroutine>();
+
         private Transform _eyes;
         private Transform _head;
         private Transform _neck;
         private Transform _maleEyes;
         private Transform _shoulders;
+        private Transform _latestPoi;
+
         private HandCtrl _handCtrl;
         private HFlag _hFlag;
         private ChaControl _chara;
-        private SteamVR_Controller.Device _device;
-        private SteamVR_Controller.Device _device1;
 
-        private Action MoMiOnLickStart;
-        private Action MoMiOnKissStart;
+        private Controller _device;
+        private Controller _device1;
+        private KoikatuSettings _settings;
+
+        private Action<HandCtrl.AibuColliderKind> MoMiOnLickStart;
+        private Action<HandCtrl.AibuColliderKind> MoMiOnKissStart;
         private Action MoMiOnKissEnd;
 
+        /// <summary>
+        /// State of disengagement of camera from action.
+        /// </summary>
+        public bool IsEndKissCo => _endKissCo;
         private float GetFpsDelta => Time.deltaTime * 60f;
-        private bool IsTouch => _hFlag.nowAnimStateName.EndsWith("Touch", StringComparison.Ordinal);
+        internal bool IsTouch => _hFlag.nowAnimStateName.EndsWith("Touch", StringComparison.Ordinal);
         internal void Initialize(HSceneProc proc, Type type)
         {
             Instance = this;
 
             _hFlag = Traverse.Create(proc).Field("flags").GetValue<HFlag>();
-
-            //var type = AccessTools.TypeByName("KK_SensibleH.MoMiController");
+            _device = FindObjectOfType<Controller>();
+            _device1 = _device.Other;
+            _settings = VR.Context.Settings as KoikatuSettings;
             if (type != null)
             {
                 _sensibleH = true;
-                //VRLog.Debug($"KissHelper[Start] type[{type}]");
+                //VRLog.Debug($"CaressHelper:Start[type = {type}]");
                 var lickCo = AccessTools.FirstMethod(type, m => m.Name.Equals("OnLickStart"));
                 var kissStart = AccessTools.FirstMethod(type, m => m.Name.Equals("OnKissStart"));
                 var kissEnd = AccessTools.FirstMethod(type, m => m.Name.Equals("OnKissEnd"));
-                MoMiOnLickStart = AccessTools.MethodDelegate<Action>(lickCo);
-                MoMiOnKissStart = AccessTools.MethodDelegate<Action>(kissStart);
+                MoMiOnLickStart = AccessTools.MethodDelegate<Action<HandCtrl.AibuColliderKind>>(lickCo);
+                MoMiOnKissStart = AccessTools.MethodDelegate<Action<HandCtrl.AibuColliderKind>>(kissStart);
                 MoMiOnKissEnd = AccessTools.MethodDelegate<Action>(kissEnd);
-                //VRLog.Debug($"KissHelper[Start] dlgt {MoMiOnLickStart} {MoMiOnKissStart} {MoMiOnKissEnd}");
             }
 
             _handCtrl = Traverse.Create(proc).Field("hand").GetValue<HandCtrl>();
@@ -96,23 +113,31 @@ namespace KoikatuVR.Caress
             _maleEyes = dude.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz");
 
         }
-        private void UpdateDevices()
+        private void OnDestroy()
         {
-            _device = SteamVR_Controller.Input((int)VR.Mode.Right.Tracking.index);
-            _device1 = SteamVR_Controller.Input((int)VR.Mode.Left.Tracking.index);
-        }
-        internal void Halt(bool disengage = true)
-        {
-            // On Hold.
-            // If we do this while SensibleH spams "JudgeProc()", we'll break HandCtrl, thus we wait (should be up to 0.6 seconds) for drag to start.
-            //    yield return new WaitUntil(() => _hand.ctrl != HandCtrl.Ctrl.click);
-
-            VRLog.Debug($"[HaltReason][Button = {UnityEngine.Input.GetMouseButtonDown(0)}] [Item = {_handCtrl.actionUseItem != -1}] [Kiss = {_handCtrl.isKiss}]");
-            foreach (var coroutine in _activeCoroutines)
+            //foreach (var coroutine in _activeCoroutines)
+            //{
+            //    if (coroutine != null)
+            //        StopCoroutine(coroutine);
+            //}
+            StopAllCoroutines();
+            foreach (var patch in _activePatches)
             {
-                if (coroutine != null)
-                    StopCoroutine(coroutine);
+                patch.UnpatchSelf();
             }
+        }
+        public bool IsGripPress() => _device.Input.GetPress(Grip) || _device1.Input.GetPress(Grip);
+        public bool IsTriggerPressDown() => _device.Input.GetPressDown(Trigger) || _device1.Input.GetPressDown(Trigger);
+        internal void Halt(bool disengage = true, bool haltVRMouth = true)
+        {
+            //VRPlugin.Logger.LogDebug($"CaressHelper:Halt\n" +
+            //    $"{new StackTrace(0)}");
+            StopAllCoroutines();
+            //foreach (var coroutine in _activeCoroutines)
+            //{
+            //    if (coroutine != null)
+            //        StopCoroutine(coroutine);
+            //}
             foreach (var patch in _activePatches)
             {
                 patch.UnpatchSelf();
@@ -121,7 +146,7 @@ namespace KoikatuVR.Caress
             _activePatches.Clear();
             if (_sensibleH)
             {
-                if (_kissCo)
+                if (_kissCo || _lickCo)
                 {
                     MoMiOnKissEnd();
                 }
@@ -131,67 +156,94 @@ namespace KoikatuVR.Caress
                     _mousePressDown = false;
                 }
             }
-            if (disengage && (_kissCo || _lickCo))
+            if (disengage)
             {
+                //if (!_endKissCo)// && (_kissCo || _lickCo))
+                //{
                 _activeCoroutines.Add(StartCoroutine(EndKissCo()));
+                // }
+                // else
+                // {
+                //     _endKissCo = false;
+                //     VRMouth.NoActionAllowed = false;
+                //}
             }
             else
             {
-                VRMouth.NoActionAllowed = false;
+                _endKissCo = false;
             }
-            VRMouth._lickCoShouldEnd = null;
-            VRMouth._kissCoShouldEnd = null;
+            if (haltVRMouth)
+            {
+                VRMouth.Instance.StopLick();
+                VRMouth.Instance.StopKiss();
+            }
             _kissCo = false;
             _lickCo = false;
+            VRMouth.NoActionAllowed = false;
         }
         internal void OnLickStart(HandCtrl.AibuColliderKind colliderKind)
         {
+            VRPlugin.Logger.LogDebug($"CaressHelper:OnLickStart");
+            Halt(disengage: false, haltVRMouth: false);
             if (_sensibleH)
             {
-                _activeCoroutines.Add(StartCoroutine(LickCoEx()));
+                _activeCoroutines.Add(StartCoroutine(LickCoEx(colliderKind)));
                 VRMouth.NoActionAllowed = true;
             }
             _activeCoroutines.Add(StartCoroutine(AttachCo(colliderKind)));
         }
 
-
-        internal void OnKissStart()
+        internal void OnKissStart(HandCtrl.AibuColliderKind colliderKind)
         {
-            // There might be a bit of preparations to be done, so we call it before click and after click.
-            if (!_kissCo)
+            // There are preparations to be done on SensibleH side, so we call it before click and after click.
+
+            if (colliderKind == HandCtrl.AibuColliderKind.none)
             {
+                VRPlugin.Logger.LogDebug($"CaressHelper:OnKissStart[1]");
+                Halt(disengage: false, haltVRMouth: false);
                 if (_sensibleH)
                 {
-                    MoMiOnKissStart();
+                    MoMiOnKissStart(colliderKind);
                 }
-                _kissCo = true;
             }
             else
             {
+                _kissCo = true;
+                VRPlugin.Logger.LogDebug($"CaressHelper:OnKissStart[2]");
                 if (_sensibleH)
                 {
-                    MoMiOnKissStart();
+                    MoMiOnKissStart(colliderKind);
                     VRMouth.NoActionAllowed = true;
                 }
                 _activeCoroutines.Add(StartCoroutine(KissCoEx()));
             }
         }
 
-        private IEnumerator LickCoEx()
+        private IEnumerator LickCoEx(HandCtrl.AibuColliderKind colliderKind)
         {
             // There might be a bit of preparations to be done, so we call it before click and after click.
-            VRLog.Debug("LickCoEx");
-            MoMiOnLickStart();
-            yield return CaressUtil.ClickCo();
-            yield return new WaitUntil(() => !IsTouch);
-            //yield return new WaitUntil(() => _handCtrl.actionUseItem == -1);
+            MoMiOnLickStart(HandCtrl.AibuColliderKind.none);
+            //yield return CaressUtil.ClickCo();
+            //yield return new WaitUntil(() => !IsTouch);
+            //yield return CaressUtil.ClickCo();
+            //yield return new WaitForSeconds(0.2f);
 
+            yield return CaressUtil.ClickCo();
+            yield return new WaitUntil(() => !CrossFader.IsInTransition);
+
+            //yield return CaressUtil.ClickCo();
             _mousePressDown = true;
             HandCtrlHooks.InjectMouseButtonDown(0);
-
-            yield return new WaitUntil(() => GameCursor.isLock);
-            yield return new WaitForEndOfFrame();
-            MoMiOnLickStart();
+            var timer = Time.time + 3f;
+            while (!GameCursor.isLock || _handCtrl.actionUseItem == -1)
+            {
+                if (timer < Time.time)
+                {
+                    Halt();
+                }
+                yield return null;
+            }
+            MoMiOnLickStart(colliderKind);
         }
         /// <summary>
         /// Moves to and keeps camera around the mouth area.
@@ -199,31 +251,44 @@ namespace KoikatuVR.Caress
         /// </summary>
         private IEnumerator KissCoEx()
         {
-            VRLog.Debug($"KissCo[Start]");
+            VRPlugin.Logger.LogDebug($"CaressHelper:KissCoEx[Start]");
             yield return new WaitForEndOfFrame();
             _kissCo = true;
-            _activePatches.Add(Harmony.CreateAndPatchAll(typeof(PatchHandCtrlKiss)));
+            _latestPoi = _eyes;
+            if (!_hFlag.nowAnimStateName.EndsWith("Loop", StringComparison.Ordinal))
+            {
+                // That is we don't have active sonyu(houshi?) loop. Aibu kiss will be in "Touch" at this moment.
+                // And active sonyu loops have their own voices for kiss, so no need to patch drag to get voice.
+                // We still patch it in idle sonyu though. 
+                _activePatches.Add(Harmony.CreateAndPatchAll(typeof(PatchHandCtrlKiss)));
+            }
             _activePatches.Add(Harmony.CreateAndPatchAll(typeof(PatchSteamVR)));
             var origin = VR.Camera.Origin;
             var head = VR.Camera.Head;
-
 
             // In light of recent rework, whole "FindRoll" function is busted.
             var rollDelta = FindRollDelta();
             if (Math.Abs(rollDelta) < 5f)
             {
                 //var signedAngle = SignedAngle(head.position - _eyes.position, _eyes.forward, _eyes.up);
-                var signedAngle = SignedAngle(head.position - _shoulders.position, _shoulders.forward, _shoulders.up);
+                var signedAngle = SignedAngle(head.position - _eyes.position, _eyes.forward, _eyes.up);
                 if (Math.Abs(signedAngle) < 10f)
                 {
-                    rollDelta = 25f * (Random.value > 0.5f ? 1 : -1);
+                    rollDelta = 20f * (Random.value > 0.5f ? 1 : -1);
                     if (_hFlag.mode == HFlag.EMode.aibu)
                         rollDelta *= Random.value * 2f;
 
-                    //SensibleH.Logger.LogDebug($"KissCo[RandomRoll] Everything else is too small to consider it {rollDelta}");
+                    VRPlugin.Logger.LogDebug($"CaressHelper:KissCoEx[Random = {rollDelta}]");
                 }
                 else
+                {
+                    VRPlugin.Logger.LogDebug($"CaressHelper:KissCoEx[SignedAngle = {signedAngle}]");
                     rollDelta = signedAngle;
+                }
+            }
+            else
+            {
+                VRPlugin.Logger.LogDebug($"CaressHelper:KissCoEx[RollDelta = {rollDelta}]");
             }
 
 
@@ -237,17 +302,15 @@ namespace KoikatuVR.Caress
 
 
             var offsetRight = angleModRight * 0.0667f; // 15f; // 25f
-            var offsetForward = 0.09f;
+            var offsetForward = _settings.ProximityDuringKiss;
             var offsetUp = -0.04f - (Math.Abs(offsetRight) * 0.5f);
             var startDistance = Vector3.Distance(_eyes.position, head.position) - offsetForward;
             var timer = Time.time + 3f;
 
             // Placeholder.
             // Change this one to something more interesting.
-            FakeDragLength = Vector2.one * 0.5f;
-
+            FakeDragLength = Vector2.one;
             var oldEyePos = _eyes.position;
-            UpdateDevices();
             while (timer > Time.time)
             {
                 // Simple MoveTowards + added delta of head movement from previous frame.
@@ -261,27 +324,28 @@ namespace KoikatuVR.Caress
                 var deltaEyesPos = _eyes.position - oldEyePos;
                 oldEyePos = _eyes.position;
 
-                var moveTowards = Vector3.MoveTowards(head.position, targetPos, Time.deltaTime * 0.07f);
+                var moveTowards = Vector3.MoveTowards(head.position, targetPos, Time.deltaTime * 0.05f);
                 var lookRotation = Quaternion.LookRotation(_eyes.TransformPoint(new Vector3(offsetRight, 0f, 0f)) - moveTowards, (_eyes.up * angleModUp) + (_eyes.right * angleModRight)); // + _eyes.forward * -0.1f);
-                origin.rotation = Quaternion.RotateTowards(origin.rotation, lookRotation, Time.deltaTime * 90f);
+                origin.rotation = Quaternion.RotateTowards(origin.rotation, lookRotation, Time.deltaTime * 60f);
                 origin.position += moveTowards + deltaEyesPos - head.position;
                 yield return new WaitForEndOfFrame();
             }
-            //SensibleH.Logger.LogDebug($"KissCo[UnPatch]");
+
+            VRPlugin.Logger.LogDebug($"CaressHelper:KissCoEx[Unpatch]");
             var lastElement = _activePatches.Count - 1;
             _activePatches[lastElement].UnpatchSelf();
             _activePatches.RemoveAt(lastElement);
             while (true)
             {
-                if (_device.GetPress(ButtonMask.Grip) || _device1.GetPress(ButtonMask.Grip))
+                if (IsGripPress())
                 {
-                    if (Vector3.Distance(_eyes.position, head.position) > 0.2f)
+                    if (Vector3.Distance(_eyes.position, head.position) > 0.18f)
                     {
                         Halt();
                         yield break;
                     }
                 }
-                else if (_device.GetPressUp(ButtonMask.Trigger) || _device1.GetPressUp(ButtonMask.Trigger))
+                else if (IsTriggerPressDown())
                 {
                     Halt();
                     yield break;
@@ -293,76 +357,79 @@ namespace KoikatuVR.Caress
                     oldEyePos = _eyes.position;
                     var targetPos = _eyes.TransformPoint(new Vector3(offsetRight, offsetUp, offsetForward));
                     var moveTowards = Vector3.MoveTowards(head.position, targetPos, Time.deltaTime * 0.05f);
-                    var lookRotation = Quaternion.LookRotation(_eyes.TransformPoint(new Vector3(offsetRight, 0f, 0f)) - moveTowards, (_eyes.up * angleModUp) + (_eyes.right * angleModRight)); // + _eyes.forward * -0.1f);
-                    origin.rotation = Quaternion.RotateTowards(origin.rotation, lookRotation, Time.deltaTime * 15f);
-                    origin.position += moveTowards + deltaEyesPos - head.position;
+                    //var lookRotation = Quaternion.LookRotation(_eyes.TransformPoint(new Vector3(offsetRight, 0f, 0f)) - moveTowards, (_eyes.up * angleModUp) + (_eyes.right * angleModRight)); // + _eyes.forward * -0.1f);
+                    //origin.rotation = Quaternion.RotateTowards(origin.rotation, lookRotation, Time.deltaTime * 15f);
+                    origin.position += moveTowards + (deltaEyesPos) - head.position;
+                    //origin.position += head.position + (deltaEyesPos) - head.position;
                 }
                 yield return new WaitForEndOfFrame();
             }
         }
         /// <summary>
-        /// Properly disengages the player from VR actions. Possible leaves the player not familiar with "Grip Move" hanging, that is being in weird X-axis rotation.
+        /// Properly disengages the player from VR actions. Possibly leaves the player not familiar with "Grip Move" hanging, that is being in weird X-axis rotation.
         /// </summary>
         internal IEnumerator EndKissCo()
         {
-            VRLog.Debug($"EndKissCo[Start]");
+            VRPlugin.Logger.LogDebug($"CaressHelper:EndKissCo[Start]");
             _endKissCo = true;
+            VRMouth.Instance.OnDisengageStart();
             var origin = VR.Camera.Origin;
             var head = VR.Camera.Head;
-            var pov = POV.Instance != null && POV.Active;
-            UpdateDevices();
-            if (_device.GetPress(ButtonMask.Grip) || _device1.GetPress(ButtonMask.Grip))
+            var pov = PoV.Instance != null && PoV.Instance.Active;
+            if (IsGripPress())
             {
-                yield return new WaitUntil(() => !_device.GetPress(ButtonMask.Grip) && !_device1.GetPress(ButtonMask.Grip));
+                yield return new WaitUntil(() => !IsGripPress());
                 yield return new WaitForEndOfFrame();
             }
-            else
-            {
-                yield return new WaitForEndOfFrame();
-            }
+
             // Get away first if we are too close. Different for active pov.
-            // We only really account for kiss on this one, lick cases don't really care about disengage.
-            if (Vector3.Distance(_eyes.position, head.position) < 0.25f)
+            var attachPosition = _latestPoi != null ? _latestPoi.position : head.position;
+            if (Vector3.Distance(attachPosition, head.position) < 0.25f)
             {
-                //SensibleH.Logger.LogDebug($"EndKissCo[MoveCameraAway][pov = {pov}]");
-                var step = Time.deltaTime * 0.13f; //0.0034f * delta;
+                VRPlugin.Logger.LogDebug($"CaressHelper:EndKissCo[Disengage]");
+                var step = Time.deltaTime * 0.15f; //0.0034f * delta;
+                var upVec = Vector3.zero;
                 if (pov && _maleEyes != null)
                 {
-                    //SensibleH.Logger.LogDebug($"EndKissCo[PoV]");
-                    var upVec = _maleEyes.position.y - _eyes.position.y > 0.3f ? (Vector3.up * (step * 3f)) : Vector3.zero;
-                    while (VRMouth._kissCoShouldEnd == false) // _handCtrl.isKiss
-                    {
-                        var newPos = head.position + (head.forward * -step) + upVec;
-                        origin.rotation = Quaternion.RotateTowards(origin.rotation, Quaternion.Euler(origin.eulerAngles.x, origin.eulerAngles.y, 0f), GetFpsDelta);
-                        origin.position += newPos - head.position;
-                        yield return new WaitForEndOfFrame();
-                    }
+                    upVec = _maleEyes.position.y - _eyes.position.y > 0.25f ? (Vector3.up * (step * 3f)) : Vector3.zero;
                 }
-                else
+                while (Vector3.Distance(attachPosition, head.position) < 0.3f)
                 {
-                    while (Vector3.Distance(_eyes.position, head.position) < 0.3f)
+                    if (IsGripPress())
                     {
-                        var newPos = head.position + (head.forward * -step);
-                        origin.rotation = Quaternion.RotateTowards(origin.rotation, Quaternion.Euler(origin.eulerAngles.x, origin.eulerAngles.y, 0f), GetFpsDelta);
-                        origin.position += newPos - head.position;
-                        yield return new WaitForEndOfFrame();
+                        break;
                     }
+                    var newPos = head.TransformPoint(0f, 0f, -step) + upVec;
+                    origin.rotation = Quaternion.RotateTowards(origin.rotation, Quaternion.Euler(origin.eulerAngles.x, origin.eulerAngles.y, 0f), GetFpsDelta);
+                    origin.position += newPos - head.position;
+                    yield return new WaitForEndOfFrame();
                 }
+                //}
+                //else
+                //{
+                //    while (Vector3.Distance(_latestPoi.position, head.position) < 0.3f)
+                //    {
+                //        var newPos = head.TransformPoint(0f, 0f, -step);
+                //        origin.rotation = Quaternion.RotateTowards(origin.rotation, Quaternion.Euler(origin.eulerAngles.x, origin.eulerAngles.y, 0f), GetFpsDelta);
+                //        origin.position += newPos - head.position;
+                //        yield return new WaitForEndOfFrame();
+                //    }
+                //}
             }
             if (!pov)
             {
-                // We return back Roll and Pitch if latter is not too big.
-                // Otherwise it's most likely desirable, so we go for girl's eyes (other pois would be a welcome addition).
-                if (Math.Abs(Mathf.DeltaAngle(origin.eulerAngles.x, 0f)) < 50f)
+                VRPlugin.Logger.LogDebug($"CaressHelper:EndKissCo[Rotate]");
+                if (Math.Abs(Mathf.DeltaAngle(origin.eulerAngles.x, 0f)) < 45f)
                 {
-                    while ((int)origin.eulerAngles.z != 0 || (int)origin.eulerAngles.x != 0)
+                    while (Mathf.Abs(origin.eulerAngles.z) > 0.1f || Mathf.Abs(origin.eulerAngles.x) > 0.1f)
                     {
-                        if (!_device.GetPress(ButtonMask.Grip) && !_device1.GetPress(ButtonMask.Grip))
+                        if (IsGripPress())
                         {
-                            var oldHeadPos = head.position;
-                            origin.rotation = Quaternion.RotateTowards(origin.rotation, Quaternion.Euler(0f, origin.eulerAngles.y, 0f), GetFpsDelta);
-                            origin.position += oldHeadPos - head.position;
+                            break;
                         }
+                        var oldHeadPos = head.position;
+                        origin.rotation = Quaternion.RotateTowards(origin.rotation, Quaternion.Euler(0f, origin.eulerAngles.y, 0f), GetFpsDelta);
+                        origin.position += oldHeadPos - head.position;
                         yield return new WaitForEndOfFrame();
                     }
                 }
@@ -370,42 +437,37 @@ namespace KoikatuVR.Caress
                 {
                     while (true)
                     {
-                        if (!_device.GetPress(ButtonMask.Grip) && !_device1.GetPress(ButtonMask.Grip))
+                        if (IsGripPress())
                         {
-                            var oldHeadPos = head.position;
-                            var lookAt = Quaternion.LookRotation(_eyes.position - head.position);
-                            origin.rotation = Quaternion.RotateTowards(origin.rotation, Quaternion.Euler(lookAt.eulerAngles.x, origin.eulerAngles.y, 0f), GetFpsDelta);
-                            origin.position += oldHeadPos - head.position;
-
-                            if ((int)origin.eulerAngles.z == 0 && (int)origin.eulerAngles.x == (int)lookAt.eulerAngles.x)
-                            {
-                                break;
-                            }
+                            break;
                         }
+                        var oldHeadPos = head.position;
+                        var lookAt = Quaternion.LookRotation(attachPosition - head.position);
+                        origin.rotation = Quaternion.RotateTowards(origin.rotation, Quaternion.Euler(lookAt.eulerAngles.x, origin.eulerAngles.y, 0f), GetFpsDelta);
+                        origin.position += oldHeadPos - head.position;
+
+                        if (Mathf.Abs(origin.eulerAngles.z) < 0.1f && Mathf.Abs(origin.eulerAngles.x - lookAt.eulerAngles.x) < 0.1f)
+                        {
+                            break;
+                        }
+
                         yield return new WaitForEndOfFrame();
                     }
                 }
-
             }
-            if (Random.value < 0.5f)
-            {
-                _hFlag.click = HFlag.ClickKind.de_muneL;
-            }
-            VRLog.Debug($"EndKissCo[End] x = {origin.eulerAngles.x} z = {origin.eulerAngles.z}");
+            VRPlugin.Logger.LogDebug($"CaressHelper:EndKissCo[End]");
             _endKissCo = false;
             _handCtrl.DetachAllItem();
-            VRMouth.NoActionAllowed = false;
         }
         /// <summary>
-        /// TODO Centering of camera in sonyu, so it looks more plausible.
-        /// </summary> 
-        /// <summary>
         /// Partner in crime of LickCo.
+        /// TODO Centering of camera in sonyu, so it looks more plausible.
         /// </summary>
         private IEnumerator AttachCo(HandCtrl.AibuColliderKind colliderKind)
         {
-            //SensibleH.Logger.LogDebug($"AttachCo[Start]");
-            // We don't always use default parents.
+            VRPlugin.Logger.LogDebug($"CaressHelper:AttachCo[Start]");
+            // Making setting for distance of camera on this is way too much due to heavy inconsistencies in ALL positions.
+            // And the process of personal adjustment wouldn't be something user friendly at all.
             _lickCo = true;
             var dic = PoI[colliderKind];
             var poi = _chara.objBodyBone.transform.Find(dic.path);
@@ -414,35 +476,42 @@ namespace KoikatuVR.Caress
             var head = VR.Camera.Head;
 
             var prevPoiPosition = poi.position;
-
+            // Take grip away from player.
+            _activePatches.Add(Harmony.CreateAndPatchAll(typeof(PatchSteamVR)));
             while (IsTouch || _handCtrl.useItems[2] == null)
             {
                 // We move together with the point of interest during "Touch" animation.
-                origin.position += poi.position - prevPoiPosition;
+                origin.position += (poi.position - prevPoiPosition) * 1.5f;
                 prevPoiPosition = poi.position;
                 yield return new WaitForEndOfFrame();
+                if (_hFlag.isDenialvoiceWait)
+                {
+                    // There is a proper kill switch for bad states now, this shouldn't be necessary.
+                    Halt();
+                    yield break;
+                }
             }
+            _activePatches[_activePatches.Count - 1].UnpatchSelf();
 
             // Actual attachment point.
             var item = _handCtrl.useItems[2].obj.transform.Find("cf_j_tangroot");
+            _latestPoi = _handCtrl.useItems[2].obj.transform.parent;
+
             //SensibleH.Logger.LogDebug($"AttachCo[Start] {poi.rotation.eulerAngles.x}");
-            if (poi.rotation.eulerAngles.x > 30f && poi.rotation.eulerAngles.x < 90f)
+            if (colliderKind == HandCtrl.AibuColliderKind.kokan && poi.rotation.eulerAngles.x > 30f && poi.rotation.eulerAngles.x < 90f)
             {
                 // Checks if the girl is on all fours.
                 // Special setup for it. 
+                // TODO An easier way with height check?
                 dic = PoI[HandCtrl.AibuColliderKind.none];
             }
-            UpdateDevices();
-            // Probably due to rework, because it starts to slack way too much with BIG breasts.
+            VRPlugin.Logger.LogDebug($"CaressHelper:AttachCo[type = {PoI.Where(k => k.Value == dic).FirstOrDefault().Key}");
             while (true)
             {
-                if (_device.GetPressDown(ButtonMask.Trigger) || _device1.GetPressDown(ButtonMask.Trigger))
+                if (IsTriggerPressDown())
                 {
-                    //SensibleH.Logger.LogDebug($"AttachCo[PrematureEnd] no transform/triggers");
                     Halt();
                 }
-                //SensibleH.Logger.LogDebug($"AttachCo[MoveToItem]");
-
                 var adjustedItem = item.TransformPoint(new Vector3(0f, dic.itemOffsetUp, dic.itemOffsetForward));
                 var moveTo = Vector3.MoveTowards(head.position, adjustedItem, Time.deltaTime * 0.2f);
                 var lookAt = Quaternion.LookRotation(poi.TransformPoint(new Vector3(0f, dic.poiOffsetUp, 0f)) - moveTo, poi.up * dic.directionUp + poi.forward * dic.directionForward);
@@ -454,22 +523,52 @@ namespace KoikatuVR.Caress
                 }
                 yield return new WaitForEndOfFrame();
             }
+            //var oldPos = Vector3.zero;
+            //var touchStartFrame = false;
             while (true)
             {
-                if (_device.GetPressDown(ButtonMask.Trigger) || _device1.GetPressDown(ButtonMask.Trigger)) //_handCtrl.useItems[2] == null || 
+                if (IsTriggerPressDown())
                 {
                     break;
                 }
-                else if (_device.GetPress(ButtonMask.Grip) || _device1.GetPress(ButtonMask.Grip))
+                else if (IsGripPress())
                 {
+                    if (IsTriggerPressDown())
+                    {
+                        Halt(disengage: false);
+                        yield break;
+                    }
                     if (Vector3.Distance(poi.position, head.position) > 0.15f)
+                    {
                         break;
+                    }
                 }
                 else
                 {
                     var targetPos = item.TransformPoint(new Vector3(0f, dic.itemOffsetUp, dic.itemOffsetForward));
                     var moveTo = Vector3.MoveTowards(head.position, targetPos, Time.deltaTime * 0.05f);
                     var lookAt = Quaternion.LookRotation(poi.TransformPoint(new Vector3(0f, dic.poiOffsetUp, 0f)) - moveTo, poi.up * dic.directionUp + poi.forward * dic.directionForward);
+
+                    // Looks better without compensation for Touch animation.
+                    //if (IsTouch)
+                    //{
+                    //    if (!touchStartFrame)
+                    //    {
+                    //        oldPos = poi.position;
+                    //        touchStartFrame = true;
+                    //    }
+                    //    else
+                    //    {
+                    //        moveTo += poi.position - oldPos;
+                    //        oldPos = poi.position;
+                    //    }
+
+                    //}
+                    //else
+                    //{
+                    //    touchStartFrame = false;
+                    //}
+
                     origin.rotation = Quaternion.RotateTowards(origin.rotation, lookAt, Time.deltaTime * 15f);
                     origin.position += moveTo - head.position;
                 }
@@ -498,76 +597,74 @@ namespace KoikatuVR.Caress
                 HandCtrl.AibuColliderKind.muneL, new LickItem {
                 path = "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_bust00/cf_s_bust00_L/cf_d_bust01_L" +
                     "/cf_j_bust01_L/cf_d_bust02_L/cf_j_bust02_L/cf_d_bust03_L/cf_j_bust03_L/cf_s_bust03_L/k_f_mune03L_02",
-                itemOffsetForward = 0.08f,
-                itemOffsetUp = 0f,//-0.04f, 
+                    itemOffsetForward = 0.08f,
+                    itemOffsetUp = 0f,
                     poiOffsetUp = 0.05f,
-                directionUp = 1f,
-                directionForward = 0f
+                    directionUp = 1f,
+                    directionForward = 0f
                 }
             },
             {
                 HandCtrl.AibuColliderKind.muneR, new LickItem {
                 path = "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_bust00/cf_s_bust00_R/cf_d_bust01_R" +
                     "/cf_j_bust01_R/cf_d_bust02_R/cf_j_bust02_R/cf_d_bust03_R/cf_j_bust03_R/cf_s_bust03_R/k_f_mune03R_02",
-                itemOffsetForward = 0.08f,
-                itemOffsetUp = 0f,
+                    itemOffsetForward = 0.08f,
+                    itemOffsetUp = 0f,
                     poiOffsetUp = 0.05f,
-                directionUp = 1f,
-                directionForward = 0f
+                    directionUp = 1f,
+                    directionForward = 0f
                 }
             },
             {
                 HandCtrl.AibuColliderKind.kokan, new LickItem {
                 path = "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_s_waist02/k_f_kosi02_02",
-                itemOffsetForward = 0.06f,
-                itemOffsetUp = 0.03f,
+                    itemOffsetForward = 0.06f,
+                    itemOffsetUp = 0.03f,
                     poiOffsetUp = 0f,
-                directionUp = 0.5f,
-                directionForward = 0.5f
+                    directionUp = 0.5f,
+                    directionForward = 0.5f
                 }
             },
             {
                 HandCtrl.AibuColliderKind.anal, new LickItem {
                 path = "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_s_waist02/k_f_kosi02_02",
-                itemOffsetForward = -0.05f,//-0.06f, 
-                itemOffsetUp = -0.08f, // -0.06f
+                    itemOffsetForward = -0.05f,// -0.05f,
+                    itemOffsetUp = -0.08f,
                     poiOffsetUp = 0f,
-                directionUp = 1f,
-                directionForward = 0f
+                    directionUp = 1f,
+                    directionForward = 0f
                 }
             },
             {
                 HandCtrl.AibuColliderKind.siriL, new LickItem {
                 path = "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/aibu_hit_siri_L",
-                itemOffsetForward = -0.04f, // -0.06f
-                itemOffsetUp = 0.04f,
+                    itemOffsetForward = -0.08f, // -0.04f
+                    itemOffsetUp = 0f,//0.04f,
                     poiOffsetUp = 0.2f,
-                directionUp = 1f,
-                directionForward = 0f
+                    directionUp = 1f,
+                    directionForward = 0f
                 }
             },
             {
                 HandCtrl.AibuColliderKind.siriR, new LickItem {
                 path = "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/aibu_hit_siri_R",
-                itemOffsetForward = -0.04f, // -0.06f
-                    itemOffsetUp = 0.04f,
+                    itemOffsetForward = -0.08f,// -0.04f
+                    itemOffsetUp = 0f,//0.04f,
                     poiOffsetUp = 0.2f,
-                directionUp = 1f,
-                directionForward = 0f
+                    directionUp = 1f,
+                    directionForward = 0f
                 }
             },
             {
                 HandCtrl.AibuColliderKind.none, new LickItem {
                 path = "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_s_waist02/k_f_kosi02_02",
-                itemOffsetForward = -0.07f, // -0.01
-                itemOffsetUp = -0.01f,
-                poiOffsetUp = 0f,
-                directionUp = 0f,
-                directionForward = -1f
+                    itemOffsetForward = -0.07f,
+                    itemOffsetUp = -0.01f,
+                    poiOffsetUp = 0f,
+                    directionUp = 0f,
+                    directionForward = -1f
                 }
             },
-
-
         };
         private float FindRollDelta()
         {
@@ -578,7 +675,6 @@ namespace KoikatuVR.Caress
         }
         private float SignedAngle(Vector3 from, Vector3 to, Vector3 axis)
         {
-            // This one brings little to no benefit with current neck states of the kiss.
             // After recent rework became a local detractor.
             float unsignedAngle = Vector3.Angle(from, to);
 
@@ -607,6 +703,21 @@ namespace KoikatuVR.Caress
                 return true;
         }
     }
+    //class PatchSteamVR
+    //{
+    //    [HarmonyPrefix]
+    //    [HarmonyPatch(typeof(DeviceLegacyAdapter), nameof(DeviceLegacyAdapter.GetPress), new Type[] { typeof(Valve.VR.EVRButtonId) })]
+    //    public static bool GetPressPrefix(EVRButtonId buttonId, ref bool __result)
+    //    {
+    //        if (buttonId == k_EButton_Grip)
+    //        {
+    //            __result = false;
+    //            return false;
+    //        }
+    //        else
+    //            return true;
+    //    }
+    //}
     /// <summary>
     /// Because voice during kiss matters.
     /// </summary>
@@ -645,29 +756,6 @@ namespace KoikatuVR.Caress
                 }
                 yield return code;
             }
-            //VRLog.Error($"PatchHandCtrlKiss");
-            //var code = new List<CodeInstruction>(instructions);
-            //for (var i = 0; i < code.Count; i++)
-            //{
-            //    if (code[i].opcode == OpCodes.Ldflda &&
-            //        code[i].operand.ToString().Contains("calcDragLength"))
-            //    {
-            //        code[i].opcode = OpCodes.Ldsfld;
-            //        code[i].operand = AccessTools.Field(typeof(CaressHelper), name: "FakeDragLength"); ;
-            //        code[i + 1].opcode = OpCodes.Ldc_R4;
-            //        code[i + 1].operand = 3f;
-            //        code[i + 2].opcode = OpCodes.Call;
-            //        code[i + 2].operand = AccessTools.FirstMethod(typeof(Vector2), method => method.Name.Equals("op_Multiply"));
-            //        code[i + 3].opcode = OpCodes.Stfld;
-            //        code[i + 3].operand = AccessTools.Field(typeof(HandCtrl), name: "calcDragLength");
-            //        code[i + 4].opcode = OpCodes.Nop;
-            //        code[i + 4].operand = null;
-            //        code[i + 5].opcode = OpCodes.Nop;
-            //        code[i + 5].operand = null;
-            //        break;
-            //    }
-            //}
-            //return code.AsEnumerable();
         }
     }
 

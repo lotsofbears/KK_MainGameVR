@@ -13,7 +13,7 @@ using VRGIN.Core;
 using VRGIN.Helpers;
 using static VRGIN.Visuals.GUIMonitor;
 
-namespace KoikatuVR.Settings
+namespace KK_VR.Settings
 {
     /// <summary>
     /// User settings. SettingsManager is responsible for updating this.
@@ -142,14 +142,23 @@ namespace KoikatuVR.Settings
         }
         private bool _UseLegacyInputSimulator;
 
-        public bool FlyInH;
-        public float FlightSpeed;
+        public bool FlyInH { get; set; }
+        public float FlightSpeed { get; set; }
         public bool EnablePOV { get; set; }
         public float PositionOffsetY { get; set; }
         public float PositionOffsetZ { get; set; }
         public bool HideHeadInPOV { get; set; }
         public bool FlyInPov { get; set; }
         public bool AutoEnterPov { get; set; }
+        public float RotationFootprint { get; set; }
+        public float ProximityDuringKiss { get; set; }
+        public bool ContinuousRotation { get; set; }
+        public HeadsetType HeadsetSpecifications { get; set; }
+        public enum HeadsetType
+        {
+            None,
+            Pico4
+        }
     }
 
     public class KeySet

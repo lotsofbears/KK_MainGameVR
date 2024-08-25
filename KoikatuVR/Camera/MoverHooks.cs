@@ -7,12 +7,14 @@ using UnityEngine;
 using HarmonyLib;
 using System.Collections;
 using System.Reflection;
-using KoikatuVR.Settings;
+using KK_VR.Settings;
+using KK_VR.Features;
+using KK_VR.Caress;
 
 // This file is a collection of hooks to move the VR camera at appropriate
 // points of the game.
 
-namespace KoikatuVR.Camera
+namespace KK_VR.Camera
 {
     [HarmonyPatch(typeof(ADV.TextScenario))]
     class TextScenarioPatches1
@@ -98,41 +100,42 @@ namespace KoikatuVR.Camera
     {
         [HarmonyPatch("ChangeAnimator")]
         [HarmonyPostfix]
-        public static void PostChangeAnimator(HSceneProc __instance, bool _isForceCameraReset, List<ChaControl> ___lstFemale)
+        public static void PostChangeAnimator(HSceneProc.AnimationListInfo _nextAinmInfo, bool _isForceCameraReset, HSceneProc __instance, List<ChaControl> ___lstFemale)
         {
-            if (POV.Instance != null)
+            if (VRMouth.Instance != null)
             {
-                POV.Instance.OnPoseChange();
+                VRMouth.Instance.OnPositionChange(_nextAinmInfo);
             }
-            if (VRMoverH.Instance != null && VRMoverH.Instance._settings.FlyInH)
-            {
-                VRMoverH.Instance.MoveToInH();
-            }
-            else if (_isForceCameraReset)
-                UpdateVRCamera(__instance, ___lstFemale, null);
+            UpdateVRCamera(__instance, ___lstFemale, null);
+            
         }
 
-        [HarmonyPatch("ChangeCategory")]
-        [HarmonyPrefix]
-        public static void PreChangeCategory(List<ChaControl> ___lstFemale, out float __state)
-        {
-            __state = ___lstFemale[0].objTop.transform.position.y;
-        }
+        //[HarmonyPatch("ChangeCategory")]
+        //[HarmonyPrefix]
+        //public static void PreChangeCategory(List<ChaControl> ___lstFemale, out float __state)
+        //{
+        //    __state = ___lstFemale[0].objTop.transform.position.y;
+        //}
 
         [HarmonyPatch("ChangeCategory")]
         [HarmonyPostfix]
         public static void PostChangeCategory(HSceneProc __instance, List<ChaControl> ___lstFemale, float __state)
         {
-            if (POV.Instance != null)
+            if (PoV.Instance != null)
             {
-                POV.Instance.OnSpotChange();
+                PoV.Instance.OnSpotChange();
             }
-            if (VRMoverH.Instance != null && VRMoverH.Instance._settings.FlyInH)
+
+            UpdateVRCamera(__instance, ___lstFemale, null);// __state);
+        }
+        [HarmonyPatch(nameof(HSceneProc.GotoPointMoveScene))]
+        [HarmonyPostfix]
+        public static void GotoPointMoveScenePostfix()
+        {
+            if (VRMoverH.Instance != null)
             {
-                VRMoverH.Instance.MoveToInH();
+                VRMoverH.Instance.MakeUpright();
             }
-            else
-                UpdateVRCamera(__instance, ___lstFemale, __state);
         }
 
 
@@ -144,7 +147,7 @@ namespace KoikatuVR.Camera
         static void UpdateVRCamera(HSceneProc instance, List<ChaControl> lstFemale, float? previousFemaleY)
         {
             var baseTransform = lstFemale[0].objTop.transform;
-            var camDat = new Traverse(instance.flags.ctrlCamera).Field<BaseCameraControl_Ver2.CameraData>("CamDat").Value;
+            var camDat = instance.flags.ctrlCamera.CamDat;// new Traverse(instance.flags.ctrlCamera).Field<BaseCameraControl_Ver2.CameraData>("CamDat").Value;
             var cameraRotation = baseTransform.rotation * Quaternion.Euler(camDat.Rot);
             Vector3 dir;
             switch (instance.flags.mode)
@@ -160,21 +163,38 @@ namespace KoikatuVR.Camera
                     dir = Vector3.back * 0.8f;
                     break;
             }
+
             var cameraPosition = cameraRotation * dir + baseTransform.TransformPoint(camDat.Pos);
-            if (previousFemaleY is float prevY)
-            {
-                // Keep the relative Y coordinate from the female.
-                var cameraHeight = VR.Camera.transform.position.y + baseTransform.position.y - prevY;
-                var destination = new Vector3(cameraPosition.x, cameraHeight, cameraPosition.z);
-                VRMover.Instance.MaybeMoveTo(destination, cameraRotation, keepHeight: false);
-            }
-            else
+            //if (previousFemaleY is float prevY)
+            //{
+            //    // Keep the relative Y coordinate from the female.
+            //    var cameraHeight = VR.Camera.transform.position.y + baseTransform.position.y - prevY;
+            //    var destination = new Vector3(cameraPosition.x, cameraHeight, cameraPosition.z);
+
+            //    if (VRMoverH.Instance != null && VRMoverH.Instance._settings.FlyInH)
+            //    {
+            //        VRMoverH.Instance.MoveToInH(position: destination);
+            //    }
+            //    else
+            //    {
+            //        VRCameraMover.Instance.MaybeMoveTo(destination, cameraRotation, false);
+            //    }
+            //}
+            //else
             {
                 // We are starting from scratch.
                 // TODO: the height calculation below assumes standing mode.
-                var cameraHeight = lstFemale[0].transform.position.y + VR.Camera.transform.localPosition.y;
-                var destination = new Vector3(cameraPosition.x, cameraHeight, cameraPosition.z);
-                VRMover.Instance.MoveTo(destination, cameraRotation, keepHeight: false);
+
+                if (VRMoverH.Instance != null && VRMoverH.Instance._settings.FlyInH)
+                {
+                    VRMoverH.Instance.MoveToInH(cameraPosition, cameraRotation, previousFemaleY == null, instance.flags.mode);
+                }
+                else
+                {
+                    var cameraHeight = lstFemale[0].transform.position.y + VR.Camera.transform.localPosition.y;
+                    var destination = new Vector3(cameraPosition.x, cameraHeight, cameraPosition.z);
+                    VRMover.Instance.MoveTo(destination, cameraRotation, false);
+                }
             }
         }
     }

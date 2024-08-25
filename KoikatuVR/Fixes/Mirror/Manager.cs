@@ -1,11 +1,12 @@
-﻿using System;
+﻿using KK_VR;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using UnityEngine;
 using VRGIN.Core;
 
-namespace KoikatuVR.Mirror
+namespace KK_VR.Mirror
 {
     /// <summary>
     /// Mirrors in the base game look very weird in VR. This object

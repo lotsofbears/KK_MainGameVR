@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
 using System.Text;
-using KoikatuVR.Interpreters;
+using KK_VR.Interpreters;
 using VRGIN.Core;
 using VRGIN.Controls;
 using UnityEngine;
-using KoikatuVR.Settings;
+using KK_VR.Settings;
 
-namespace KoikatuVR.Controls
+namespace KK_VR.Controls
 {
     class KoikatuWarpTool : VRGIN.Controls.Tools.WarpTool
     {

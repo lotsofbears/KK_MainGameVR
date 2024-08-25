@@ -8,7 +8,7 @@ using System.Reflection.Emit;
 using VRGIN.Core;
 using UnityEngine;
 
-namespace KoikatuVR.Caress
+namespace KK_VR.Caress
 {
     /// <summary>
     /// Allows injecting simulated user inputs to HandCtrl. This is similar to
@@ -238,5 +238,31 @@ namespace KoikatuVR.Caress
             }
         }
 
+        [HarmonyPatch]
+        internal class HandCtrlHelperHook
+        {
+            // Should be safe kill switch.
+            // Triggered by overlap menus too (does so beforehand).
+            [HarmonyPostfix, HarmonyPatch(typeof(HandCtrl), nameof(HandCtrl.ForceFinish))]
+            public static void ForceFinishPostfix()
+            {
+                var helper = CaressHelper.Instance;
+                if (helper != null && !helper.IsEndKissCo)
+                {
+                    helper.Halt(disengage: false);
+                }
+            }
+
+            [HarmonyPostfix, HarmonyPatch(typeof(HAibu), nameof(HAibu.GotoDislikes))]
+            public static void GotoDislikesPostfix()
+            {
+                var helper = CaressHelper.Instance;
+                if (helper != null && !helper.IsEndKissCo)
+                {
+                    helper.Halt(disengage: true);
+                }
+            }
+
+        }
     }
 }

@@ -4,10 +4,10 @@ using System.Linq;
 using System.Text;
 using VRGIN.Core;
 using HarmonyLib;
-using KoikatuVR.Camera;
-using KoikatuVR.Interpreters;
+using KK_VR.Camera;
+using KK_VR.Interpreters;
 
-namespace KoikatuVR
+namespace KK_VR.Features
 {
     /// <summary>
     /// A component to be attached to every male character.

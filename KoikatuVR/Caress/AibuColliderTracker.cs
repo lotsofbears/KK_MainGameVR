@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using UnityEngine;
-using KoikatuVR.Interpreters;
+using KK_VR.Interpreters;
 using HarmonyLib;
 using VRGIN.Core;
+using KK_VR.Fixes;
 
-namespace KoikatuVR.Caress
+namespace KK_VR.Caress
 {
     /// <summary>
     /// An object that tracks the set of aibu colliders that we are

@@ -2,8 +2,10 @@
 using VRGIN.Core;
 using System.Collections;
 using UnityEngine.SceneManagement;
+using KK_VR.Features;
+using KK_VR.Camera;
 
-namespace KoikatuVR.Interpreters
+namespace KK_VR.Interpreters
 {
     class KoikatuInterpreter : GameInterpreter
     {

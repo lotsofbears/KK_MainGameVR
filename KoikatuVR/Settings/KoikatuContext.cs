@@ -9,7 +9,7 @@ using VRGIN.Core;
 using VRGIN.Helpers;
 using VRGIN.Visuals;
 
-namespace KoikatuVR.Settings
+namespace KK_VR.Settings
 {
     public class KoikatuContext : IVRManagerContext
     {

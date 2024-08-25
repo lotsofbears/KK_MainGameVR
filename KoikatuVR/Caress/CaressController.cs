@@ -8,11 +8,12 @@ using VRGIN.Controls;
 using VRGIN.Helpers;
 using HarmonyLib;
 using UnityEngine;
-using KoikatuVR.Interpreters;
-using KoikatuVR.Settings;
+using KK_VR.Interpreters;
+using KK_VR.Settings;
 using static SteamVR_Controller;
+using KK_VR.Fixes;
 
-namespace KoikatuVR.Caress
+namespace KK_VR.Caress
 {
     /// <summary>
     /// An extra component to be attached to each controller, providing the caress
@@ -51,7 +52,7 @@ namespace KoikatuVR.Caress
                 VRLog.Warn("HSceneProc not found");
                 return;
             }
-            _hand = proc.hand;
+            _hand = Traverse.Create(proc).Field("hand").GetValue<HandCtrl>();
             //    Traverse.Create(proc).Field("hand").GetValue<HandCtrl>();   
             VRLog.Debug($"Controller[{_controller}]");
             _aibuTracker = new AibuColliderTracker(proc, referencePoint: transform);
@@ -148,14 +149,12 @@ namespace KoikatuVR.Caress
             if (!_triggerPressed && device.GetPressDown(ButtonMask.Trigger))
             {
                 UpdateSelectKindTouch();
-                //VRLog.Debug($"HandleTrigger[Press] {_hand.selectKindTouch}");
                 HandCtrlHooks.InjectMouseButtonDown(0);
                 _controller.StartRumble(new RumbleImpulse(1000));
                 _triggerPressed = true;
             }
             else if (_triggerPressed && device.GetPressUp(ButtonMask.Trigger))
             {
-                //VRLog.Debug($"HandleTrigger[Release] {_hand.selectKindTouch}");
                 HandCtrlHooks.InjectMouseButtonUp(0);
                 _triggerPressed = false;
                 UpdateLock();

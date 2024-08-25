@@ -5,7 +5,7 @@ using System.Text;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
 
-namespace KoikatuVR
+namespace KK_VR
 {
     /// <summary>
     /// Collection of compatibility methods to support different versions of the

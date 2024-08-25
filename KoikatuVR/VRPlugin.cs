@@ -8,9 +8,13 @@ using UnityEngine;
 using HarmonyLib;
 using System.Runtime.InteropServices;
 using WindowsInput;
-using KoikatuVR.Settings;
+using KK_VR.Settings;
+using KK_VR;
+using KK_VR.Features;
+using KK_VR.Fixes;
+using BepInEx.Logging;
 
-namespace KoikatuVR
+namespace KK_VR
 {
     [BepInPlugin(GUID: GUID, Name: PluginName, Version: Version)]
     [BepInProcess("Koikatu")]
@@ -21,16 +25,23 @@ namespace KoikatuVR
         public const string PluginName = "Main Game VR";
         public const string Version = "1.2.0";
 
+        internal static new ManualLogSource Logger;
         void Awake()
         {
-            VRLog.Backend = new BepInExLoggerBackend(Logger);
+            Logger = base.Logger;
             bool vrDeactivated = Environment.CommandLine.Contains("--novr");
             bool vrActivated = Environment.CommandLine.Contains("--vr");
-            var settings = SettingsManager.Create(Config);
 
-            bool enabled = vrActivated || (!vrDeactivated && SteamVRDetector.IsRunning);
-            StartCoroutine(LoadDevice(enabled, settings));
-            CrossFader.Initialize(Config, vrActivated);
+            var settings = SettingsManager.Create(Config);
+            bool enabled = vrActivated || SteamVRDetector.IsRunning;
+            if (enabled)
+            {
+                BepInExVrLogBackend.ApplyYourself();
+
+                StartCoroutine(LoadDevice(enabled, settings));
+            }
+
+            CrossFader.Initialize(Config, enabled);
         }
 
         private const string DeviceOpenVR = "OpenVR";

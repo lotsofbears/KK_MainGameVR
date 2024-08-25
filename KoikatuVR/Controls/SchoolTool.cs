@@ -8,11 +8,11 @@ using VRGIN.Core;
 using VRGIN.Helpers;
 using static SteamVR_Controller;
 using WindowsInput.Native;
-using KoikatuVR.Interpreters;
+using KK_VR.Interpreters;
 using System.ComponentModel;
-using KoikatuVR.Settings;
+using KK_VR.Settings;
 
-namespace KoikatuVR.Controls
+namespace KK_VR.Controls
 {
     public class SchoolTool : Tool
     {
@@ -269,7 +269,6 @@ namespace KoikatuVR.Controls
                 case AssignableFunction.SCROLLUP:
                 case AssignableFunction.LROTATION:
                 case AssignableFunction.RROTATION:
-                case AssignableFunction.F4:
                     return false;
                 default:
                     return true;
@@ -289,8 +288,8 @@ namespace KoikatuVR.Controls
                     break;
                 case AssignableFunction.SCROLLUP:
                 case AssignableFunction.SCROLLDOWN:
-                case AssignableFunction.LBUTTON:
-                case AssignableFunction.MBUTTON:
+                //case AssignableFunction.LBUTTON:
+                //case AssignableFunction.MBUTTON:
                 case AssignableFunction.RBUTTON:
                     // Move the cursor to the bottom right corner so buttons/scrolling affect the H speed control
                     // Extremely fiddly but what can you do

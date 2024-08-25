@@ -8,12 +8,12 @@ using System.Reflection.Emit;
 using VRGIN.Core;
 using UnityEngine;
 using UnityStandardAssets.ImageEffects;
-using KoikatuVR.Interpreters;
-using KoikatuVR.Settings;
+using KK_VR.Interpreters;
+using KK_VR.Settings;
 
 // Fixes issues that are in the base game but are only relevant in VR.
 
-namespace KoikatuVR
+namespace KK_VR.Fixes
 {
     /// <summary>
     /// Avoid triggering resource unload when loading UI-only scenes.

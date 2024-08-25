@@ -6,7 +6,7 @@ using VRGIN.Core;
 using UnityStandardAssets.ImageEffects;
 using UnityEngine;
 
-namespace KoikatuVR.Camera
+namespace KK_VR.Camera
 {
     /// <summary>
     /// A component to be attached to the VR camera. Ensures that it has the

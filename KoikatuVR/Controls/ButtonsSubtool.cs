@@ -4,11 +4,12 @@ using System.Linq;
 using System.Text;
 using WindowsInput.Native;
 using VRGIN.Core;
-using KoikatuVR.Interpreters;
+using KK_VR.Interpreters;
 using UnityEngine;
-using KoikatuVR.Settings;
+using KK_VR.Settings;
+using KK_VR.Camera;
 
-namespace KoikatuVR.Controls
+namespace KK_VR.Controls
 {
     /// <summary>
     /// A subtool that handles an arbitrary number of simple actions that only
@@ -27,6 +28,8 @@ namespace KoikatuVR.Controls
 
         private float _ScrollRepeatTime;
         private int _ScrollRepeatAmount;
+
+        private float _contRotation = 0f;
 
         public ButtonsSubtool(KoikatuInterpreter interpreter, KoikatuSettings settings)
         {
@@ -47,6 +50,10 @@ namespace KoikatuVR.Controls
             {
                 _ScrollRepeatTime += 0.1f;
                 VR.Input.Mouse.VerticalScroll(_ScrollRepeatAmount);
+            }
+            if (_contRotation != 0)
+            {
+                ContRotation(_contRotation);
             }
         }
 
@@ -99,10 +106,10 @@ namespace KoikatuVR.Controls
                     VR.Input.Mouse.MiddleButtonDown();
                     break;
                 case AssignableFunction.LROTATION:
-                    Rotate(-_Settings.RotationAngle);
+                    Rotation(-_Settings.RotationAngle);
                     break;
                 case AssignableFunction.RROTATION:
-                    Rotate(_Settings.RotationAngle);
+                    Rotation(_Settings.RotationAngle);
                     break;
                 case AssignableFunction.SCROLLUP:
                     StartScroll(1);
@@ -153,6 +160,7 @@ namespace KoikatuVR.Controls
                     break;
                 case AssignableFunction.LROTATION:
                 case AssignableFunction.RROTATION:
+                    StopRotation();
                     break;
                 case AssignableFunction.SCROLLUP:
                 case AssignableFunction.SCROLLDOWN:
@@ -180,22 +188,52 @@ namespace KoikatuVR.Controls
             _ScrollRepeatAmount = amount;
         }
 
+        private void Rotation(float degrees)
+        {
+            if (_Settings.ContinuousRotation)
+            {
+                _contRotation = degrees * 0.05f;
+            }
+            else
+            {
+                SnapRotation(degrees);
+            }
+        }
+        private void StopRotation()
+        {
+            _contRotation = 0f;
+        }
+
         /// <summary>
         /// Rotate the camera. If we are in Roaming, rotate the protagonist as well.
         /// </summary>
-        /// <param name="degrees"></param>
-        private void Rotate(float degrees)
+        private void SnapRotation(float degrees)
         {
-            VRLog.Debug($"Rotating {degrees}");
+            //VRLog.Debug("Rotating {0} degrees", degrees);
             var actInterpreter = _Interpreter.SceneInterpreter as ActionSceneInterpreter;
             if (actInterpreter != null)
             {
-                actInterpreter.MoveCameraToPlayer(onlyPosition: true);
+                actInterpreter.MoveCameraToPlayer(true);
             }
             var camera = VR.Camera.transform;
             var newRotation = Quaternion.AngleAxis(degrees, Vector3.up) * camera.rotation;
-            Camera.VRMover.Instance.MoveTo(camera.position, newRotation, keepHeight: false);
+            VRMover.Instance.MoveTo(camera.position, newRotation, false);
             if (actInterpreter != null)
+            {
+                actInterpreter.MovePlayerToCamera();
+            }
+        }
+        private void ContRotation(float degrees)
+        {
+            var origin = VR.Camera.Origin;
+            var head = VR.Camera.Head;
+            var newRotation = Quaternion.AngleAxis(degrees, Vector3.up) * origin.rotation;
+            var oldPos = head.position;
+            origin.rotation = newRotation;
+            origin.position += oldPos - head.position;
+
+            var actInterpreter = _Interpreter.SceneInterpreter as ActionSceneInterpreter;
+            if (actInterpreter != null && !actInterpreter._Walking)
             {
                 actInterpreter.MovePlayerToCamera();
             }

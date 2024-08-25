@@ -10,7 +10,7 @@ using VRGIN.Helpers;
 using Valve.VR;
 using HarmonyLib;
 
-namespace KoikatuVR
+namespace KK_VR.Features
 {
     /// <summary>
     /// A VR fader that synchronizes with the fader of the base game.

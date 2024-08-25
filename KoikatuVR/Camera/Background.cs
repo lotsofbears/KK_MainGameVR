@@ -7,7 +7,7 @@ using UnityEngine.UI;
 using VRGIN.Core;
 using HarmonyLib;
 
-namespace KoikatuVR
+namespace KK_VR.Camera
 {
     /// <summary>
     /// A singleton object that is responsible for displaying the

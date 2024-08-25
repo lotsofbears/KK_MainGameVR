@@ -1,27 +1,35 @@
-﻿using ADV;
-using ADV.Commands.Base;
-using HarmonyLib;
-using KKAPI.Utilities;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
+using System.Text.RegularExpressions;
+using ADV;
+using ADV.Commands.Base;
+using BepInEx.Bootstrap;
+using BepInEx.Configuration;
+using HarmonyLib;
+using KK_VR.Settings;
+using KK_VR;
+using KKAPI.MainGame;
+using KKAPI.Utilities;
+using Manager;
+using Unity.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Motion = Illusion.Game.Elements.EasyLoader.Motion;
 using Object = UnityEngine.Object;
 using Random = UnityEngine.Random;
-using BepInEx.Bootstrap;
-using BepInEx.Configuration;
 using VRGIN.Core;
-using KoikatuVR.Settings;
-using static UnityEngine.Experimental.Director.FrameData;
 
-namespace KoikatuVR
+namespace KK_VR.Features
 {
+    /// <summary>
+    /// Based on KKS_CrossFader by Sabakan
+    /// </summary>
     public static class CrossFader
     {
+        public static bool IsInTransition => _inTransition;
+        private static bool _inTransition;
         public enum CrossFaderMode
         {
             Disabled,
@@ -29,21 +37,22 @@ namespace KoikatuVR
             OnlyOutsideVr,
             Always
         }
+
         public static void Initialize(ConfigFile config, bool vrActivated)
         {
             // Avoid clashing with KKS_CrossFader
             if (Chainloader.PluginInfos.ContainsKey("bero.crossfader"))
             {
-                VRLog.Warn("Disabling the AnimationCrossFader feature because KKS_CrossFader is installed");
+                VRPlugin.Logger.LogWarning("Disabling the AnimationCrossFader feature because KK_CrossFader is installed");
                 return;
             }
-
-            var enabled = config.Bind(SettingsManager.sectionGeneral, "Cross-fade character animations", CrossFaderMode.OnlyInVr,
+            var enabled = config.Bind(SettingsManager.SectionGeneral, "Cross-fade character animations", CrossFaderMode.OnlyInVr,
                                       "Interpolate between animations/poses to make transitions look less jarring.\nChanges take effect after a scene change.");
 
             // Apply changes only after a scene change to avoid cutting off animations and possibly messing up state
             SceneManager.sceneLoaded += (arg0, mode) => ApplyHooks(IsEnabled(vrActivated, enabled.Value));
         }
+
         private static bool IsEnabled(bool vrActivated, CrossFaderMode mode)
         {
             switch (mode)
@@ -57,10 +66,11 @@ namespace KoikatuVR
                 case CrossFaderMode.Always:
                     return true;
                 default:
-                    VRLog.Warn($"Invalid CrossFaderMode [{mode}], defaulting to Disabled");
+                    VRPlugin.Logger.LogWarning($"Invalid CrossFaderMode [{mode}], defaulting to Disabled");
                     return false;
             }
         }
+
         private static Harmony _hi;
         private static void ApplyHooks(bool enable)
         {
@@ -80,7 +90,7 @@ namespace KoikatuVR
             }
             catch (Exception ex)
             {
-                VRLog.Error($"Failed to apply AnimationCrossFader hooks (enable={enable}) with exception:\n{ex}");
+                VRPlugin.Logger.LogError($"Failed to apply AnimationCrossFader hooks (enable={enable}) with exception:\n{ex}");
 
                 // Try to clean up
                 try { _hi?.UnpatchSelf(); }
@@ -92,6 +102,9 @@ namespace KoikatuVR
         // CrossFade animations in ADV and TalkScene
         private static class AdvHooks
         {
+            private static bool _reaction;
+            private static readonly string _animReaction = "f_reaction_";
+
             [HarmonyPrefix]
             [HarmonyWrapSafe]
             [HarmonyPatch(typeof(Motion), nameof(Motion.Play))]
@@ -99,11 +112,22 @@ namespace KoikatuVR
             {
                 // Make the animation cross fade from the current one, uses stock game code
                 __instance.isCrossFade = true;
-                __instance.transitionDuration = Random.Range(0.2f, 0.5f);  //(0.1f, 0.3f);
+                if (Manager.Scene.Instance.AddSceneName.Equals("Talk") || (Game.IsInstance() && GameAPI.GetADVScene().isActiveAndEnabled))
+                {
+                    // We use extra long fades for talk scenes and tiny after interactions.
+                    __instance.transitionDuration = _reaction ? Random.Range(0.1f, 0.2f) : Random.Range(0.5f, 1f);
+                    _reaction = false;
+                    if (__instance.state.StartsWith(_animReaction, StringComparison.Ordinal))
+                    {
+                        _reaction = true;
+                    }
+                    VRPlugin.Logger.LogDebug($"CrossFade:Test:Motion:Play:{__instance.state}:{Manager.Scene.Instance.AddSceneName}:{Manager.Scene.Instance.LoadSceneName}:{__instance.transitionDuration}");
+
+                }
+                else
+                    __instance.transitionDuration = Random.Range(0.3f, 0.6f);
             }
-
             #region Disable screen fade effect when ADV is changing character animations
-
             [HarmonyPrefix]
             [HarmonyWrapSafe]
             [HarmonyPatch(typeof(TalkScene), nameof(TalkScene.AnimePlay))]
@@ -120,7 +144,6 @@ namespace KoikatuVR
             {
                 if (isCrossFade)
                 {
-                    //VRLog.Debug("Disabling isCrossFade in MotionPlay");
                     isCrossFade = false;
                 }
             }
@@ -167,8 +190,8 @@ namespace KoikatuVR
             //[HarmonyPatch(typeof(CrossFade), nameof(CrossFade.FadeStart))]
             //public static void DebugCrossFadeStartHook(CrossFade __instance, float time)
             //{
-            //    //if (__instance.texBase != null)
-            //        //VRLog.Warn($"CrossFade.FadeStart called (obj={__instance.GetFullPath()} time={time}) from:\n{new StackTrace(2)}");
+            //    if (__instance.texBase != null)
+            //        VRPlugin.Logger.LogWarning($"CrossFade.FadeStart called (obj={__instance.GetFullPath()} time={time}) from:\n{new StackTrace(2)}");
             //}
 #endif
 
@@ -194,7 +217,7 @@ namespace KoikatuVR
                     var newHash = __instance.bundle + "|" + __instance.asset;
                     if (newHash == hash)
                     {
-                        VRLog.Debug($"Skipping loading already loaded animator controller from [{newHash}] on [{animator.GetFullPath()}]");
+                        //VRPlugin.Logger.LogDebug($"Skipping loading already loaded animator controller from [{newHash}] on [{animator.GetFullPath()}]");
                         return false;
                     }
                     else _AnimationControllerLookup.Remove(animatorController);
@@ -221,16 +244,10 @@ namespace KoikatuVR
         }
 
         // CrossFade animations in HScenes, same as the KKS_CrossFader plugin but more compact
-        private static class HSceneHooks
+        internal static class HSceneHooks
         {
+            internal static void SetFlag(HFlag flag) => _hflag = flag;
             private static HFlag _hflag;
-
-            [HarmonyPostfix]
-            [HarmonyPatch(typeof(HSceneProc), nameof(HSceneProc.MapSameObjectDisable))]
-            public static void HSceneProcLoadPost(HSceneProc __instance)
-            {
-                _hflag = __instance.flags;
-            }
 
             [HarmonyPrefix]
             [HarmonyPatch(typeof(CrossFade), nameof(CrossFade.FadeStart), new[] { typeof(float) }, null)]
@@ -240,12 +257,10 @@ namespace KoikatuVR
             }
 
             [HarmonyPrefix]
-            [HarmonyPatch(typeof(ChaControl), nameof(ChaControl.setPlay), new Type[] { typeof(string), typeof(int)}, null)]
+            [HarmonyPatch(typeof(ChaControl), nameof(ChaControl.setPlay), new Type[] { typeof(string), typeof(int) }, null)]
             public static bool HSceneSetPlayHook(string _strAnmName, int _nLayer, ChaControl __instance, ref bool __result)
             {
-                if (!KKAPI.MainGame.GameAPI.InsideHScene) return true;
-                //if (_hflag == null) _hflag = Object.FindObjectOfType<HFlag>();
-                if (_hflag == null) return true;
+                if (!GameAPI.InsideHScene || _hflag == null) return true;
 
                 //VRLog.Debug($"syncPlay hflag={_hflag} namehash={_strAnmName} nlayer={_nLayer} chara={__instance}");
 
@@ -259,15 +274,13 @@ namespace KoikatuVR
                     case HFlag.EMode.houshi:
                     case HFlag.EMode.houshi3P:
                     case HFlag.EMode.houshi3PMMF:
+                        if (_strAnmName == "Oral_Idle_IN" || _strAnmName == "M_OUT_Start")
                         {
-                            if (_strAnmName == "Oral_Idle_IN" || _strAnmName == "M_OUT_Start")
-                            {
-                                __instance.animBody.CrossFadeInFixedTime(_strAnmName, 0.2f, _nLayer);
-                                __result = true;
-                                return false;
-                            }
-                            break;
+                            __instance.animBody.CrossFadeInFixedTime(_strAnmName, 0.2f, _nLayer);
+                            __result = true;
+                            return false;
                         }
+                        break;
                 }
 
                 if ((_strAnmName == "M_Idle" && __instance.animBody.GetCurrentAnimatorStateInfo(0).IsName("M_Touch"))
@@ -283,7 +296,7 @@ namespace KoikatuVR
             [HarmonyPrefix]
             [HarmonyPatch(typeof(HMasturbation), nameof(HMasturbation.Proc))]
             [HarmonyPatch(typeof(HLesbian), nameof(HLesbian.Proc))]
-            [HarmonyPatch(typeof(HPeeping), nameof(HPeeping.Proc))] // TODO Does this work? Interference with other plugins?)
+            //[HarmonyPatch(typeof(HPeeping), nameof(HPeeping.Proc))] // TODO Does this work? Interference with other plugins?)
             [HarmonyPatch(typeof(HAibu), nameof(HAibu.Proc))]
             [HarmonyPatch(typeof(HHoushi), nameof(HHoushi.Proc))]
             [HarmonyPatch(typeof(HSonyu), nameof(HSonyu.Proc))]
@@ -293,8 +306,8 @@ namespace KoikatuVR
             [HarmonyPatch(typeof(H3PDarkSonyu), nameof(H3PDarkSonyu.Proc))]
             public static bool HSceneProcOverrideHook(HActionBase __instance)
             {
-                var inTransition = !__instance.female.animBody.GetCurrentAnimatorStateInfo(0).IsName(__instance.flags.nowAnimStateName);
-                return !inTransition;
+                _inTransition = !__instance.female.animBody.GetCurrentAnimatorStateInfo(0).IsName(__instance.flags.nowAnimStateName);
+                return !_inTransition;
             }
         }
     }
