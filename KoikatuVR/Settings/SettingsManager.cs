@@ -7,6 +7,7 @@ using System.ComponentModel;
 using VRGIN.Core;
 using UnityEngine;
 using KKAPI.Utilities;
+using ADV.Commands.Object;
 
 namespace KK_VR.Settings
 {
@@ -175,59 +176,61 @@ namespace KK_VR.Settings
             EnableBoop = config.Bind(SectionGeneral, "Enable Boop", true,
                 "Adds colliders to the controllers so you can boop things.\nGame restart required for change to take effect.");
 
-            var enablePOV = config.Bind(SectionPov, "EnablePOV", true,
-                "Enable the ability to impersonate characters.");
+
+            var enablePOV = config.Bind(SectionPov, "Enable", true,
+                new ConfigDescription("Enable the ability to impersonate characters.", null,
+                new ConfigurationManagerAttributes { Order = 10 }));
             Tie(enablePOV, v => settings.EnablePOV = v);
 
-            var HeadPosPoVY = config.Bind(SectionGeneral, "Camera offset Y", 0.05f,
+            var HeadPosPoVY = config.Bind(SectionGeneral, "Camera offset-Y", 0.05f,
                 new ConfigDescription(
                     "Camera offset from attachment point. Applies in Roaming and H PoV mode.",
                     new AcceptableValueRange<float>(-1f, 1f)));
             Tie(HeadPosPoVY, v => settings.PositionOffsetY = v);
 
-            var HeadPosPoVZ = config.Bind(SectionGeneral, "Camera offset Z", 0.05f,
+            var HeadPosPoVZ = config.Bind(SectionGeneral, "Camera offset-Z", 0.05f,
                 new ConfigDescription(
                     "Camera offset from attachment point. Applies in Roaming and H PoV mode.",
                     new AcceptableValueRange<float>(-1f, 1f)));
             Tie(HeadPosPoVZ, v => settings.PositionOffsetZ = v);
 
-            var hideHeadInPOV = config.Bind(SectionPov, "Hide Head", true,
-                "Hide the corresponding head when the camera is in it. Can be used in combination with camera offset to have simultaneously visible head and PoV mode.");
+            var hideHeadInPOV = config.Bind(SectionPov, "Hide head", true,
+                "Hide the corresponding head when the camera is in it. Can be used in combination with camera offset to have simultaneously visible head and PoV mode.(~0.11 Z-offset for that)");
             Tie(hideHeadInPOV, v => settings.HideHeadInPOV = v);
 
-            var flyInPov = config.Bind(SectionPov, "Smooth transition", true,
-                "On position (or location) change, instead of teleportation, transition smoothly to the new location.");
+            var flyInPov = config.Bind(SectionPov, "Transition PoV", KoikatuSettings.MovementTypeH.Upright,
+                "When in PoV mode, on position (or location) change, instead of teleportation, transition smoothly to the new location.");
             Tie(flyInPov, v => settings.FlyInPov = v);
 
-            var autoEnter = config.Bind(SectionPov, "Auto enter PoV", true,
-                "If PoV mode disabled, on position change PoV mode will be automatically activated if there is a dude.");
+            var autoEnter = config.Bind(SectionPov, "Auto enter", true,
+                "If not in PoV mode, on position change PoV mode will be automatically activated if there is a male.");
             Tie(autoEnter, v => settings.AutoEnterPov = v);
 
-            var RotationFootprint = config.Bind(SectionPov, "Loose rotation", 0.1f,
+            var RotationFootprint = config.Bind(SectionPov, "Lazy rotation", 0.1f,
                 new ConfigDescription(
                     "Introduces lazy rotation when above 0. The higher the number, the lazier camera rotates in PoV mode.\n" +
                     "Changes take place after new impersonation.",
                     new AcceptableValueRange<float>(0f, 1f)));
             Tie(RotationFootprint, v => settings.RotationFootprint = v);
 
-            var flyInH = config.Bind(SectionCaress, "Camera in H", true,
-                "Instead of teleporting to the new position, progressively moves camera to it.");
+            var flyInH = config.Bind(SectionCaress, "Transition H", true,
+                "On position (or location) change, instead of teleportation, transition smoothly to the new location.");
             Tie(flyInH, v => settings.FlyInH = v);
 
-            var flightSpeed = config.Bind(SectionCaress, "Camera in H speed", 1f,
+            var flightSpeed = config.Bind(SectionCaress, "Transition H speed", 1f,
                 new ConfigDescription(
                     "Speed of progressive movement of the camera.",
                     new AcceptableValueRange<float>(0.1f, 2f)));
             Tie(flightSpeed, v => settings.FlightSpeed = v);
 
             var contRot = config.Bind(SectionRoaming, "Continuous rotation", false,
-                    "Enable continuous turn in roaming mod instead of snap turn.");
+                    "Enable continuous rotation of camera in roaming mode instead of snap turn. Influenced by setting 'Rotation angle'.");
             Tie(contRot, v => settings.ContinuousRotation = v);
 
 
             var proximityKiss = config.Bind(SectionCaress, "Kiss proximity", 0.1f,
                 new ConfigDescription(
-                    "Distance between camera and partner's head.",
+                    "Distance between camera and partner's head during assisted kiss.",
                     new AcceptableValueRange<float>(0.05f, 0.15f)));
             Tie(proximityKiss, v => settings.ProximityDuringKiss = v);
 

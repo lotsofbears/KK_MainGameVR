@@ -104,7 +104,6 @@ namespace KK_VR.Camera
 
         public static void SetIdealPositionAndRotation(Transform t, Vector3 position, Quaternion rotation)
         {
-            VRPlugin.Logger.LogWarning($"Camera:Ideal:Set");
             GetIdealTransformFor(t).SetPositionAndRotation(position, rotation);
         }
         //public static void SetIdealPositionAndRotation(Transform t, Vector3 position, Quaternion rotation)
@@ -142,7 +141,7 @@ namespace KK_VR.Camera
         //}
         public static float GetPlayerHeight()
         {
-            return 1.4f;
+            return TalkSceneInterpreter.Height != 0f ? TalkSceneInterpreter.Height : 1.4f;
         }
         public static bool HeadIsAwayFromPosition(Vector3 targetPosition)
         {

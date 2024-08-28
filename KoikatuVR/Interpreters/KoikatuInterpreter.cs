@@ -4,6 +4,7 @@ using System.Collections;
 using UnityEngine.SceneManagement;
 using KK_VR.Features;
 using KK_VR.Camera;
+using KoikatuVR.Camera;
 
 namespace KK_VR.Interpreters
 {
@@ -26,6 +27,7 @@ namespace KK_VR.Interpreters
         private int _kkapiCanvasHackWait;
         private Canvas _kkSubtitlesCaption;
         private GameObject _sceneObjCache;
+        private VRMoverEx _moverEx;
 
         protected override void OnAwake()
         {
@@ -36,6 +38,7 @@ namespace KK_VR.Interpreters
             SceneManager.sceneLoaded += OnSceneLoaded;
             _mirrorManager = new Mirror.Manager();
             VR.Camera.gameObject.AddComponent<Camera.VREffector>();
+            this.gameObject.AddComponent<VRMoverEx>();
         }
 
         protected override void OnUpdate()

@@ -73,7 +73,7 @@ namespace KK_VR.Controls
             var kind = Util.StripPrefix("Com/Hit/", nearest.tag);
             if (kind != null)
             {
-                new Traverse(_talkScene).Method("TouchFunc", new[] { typeof(string), typeof(Vector3) }).GetValue(kind, Vector3.zero);
+                _talkScene.TouchFunc(kind,Vector3.zero);
             }
         }
 

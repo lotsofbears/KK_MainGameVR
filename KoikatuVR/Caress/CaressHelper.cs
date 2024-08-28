@@ -45,7 +45,6 @@ namespace KK_VR.Caress
         }
 
         internal static CaressHelper Instance;
-        internal static Vector2 FakeDragLength;
 
         private bool _kissCo;
         private bool _lickCo;
@@ -251,17 +250,10 @@ namespace KK_VR.Caress
         /// </summary>
         private IEnumerator KissCoEx()
         {
-            VRPlugin.Logger.LogDebug($"CaressHelper:KissCoEx[Start]");
+            VRPlugin.Logger.LogDebug($"CaressHelper:KissCoEx:Start");
             yield return new WaitForEndOfFrame();
             _kissCo = true;
             _latestPoi = _eyes;
-            if (!_hFlag.nowAnimStateName.EndsWith("Loop", StringComparison.Ordinal))
-            {
-                // That is we don't have active sonyu(houshi?) loop. Aibu kiss will be in "Touch" at this moment.
-                // And active sonyu loops have their own voices for kiss, so no need to patch drag to get voice.
-                // We still patch it in idle sonyu though. 
-                _activePatches.Add(Harmony.CreateAndPatchAll(typeof(PatchHandCtrlKiss)));
-            }
             _activePatches.Add(Harmony.CreateAndPatchAll(typeof(PatchSteamVR)));
             var origin = VR.Camera.Origin;
             var head = VR.Camera.Head;
@@ -307,9 +299,6 @@ namespace KK_VR.Caress
             var startDistance = Vector3.Distance(_eyes.position, head.position) - offsetForward;
             var timer = Time.time + 3f;
 
-            // Placeholder.
-            // Change this one to something more interesting.
-            FakeDragLength = Vector2.one;
             var oldEyePos = _eyes.position;
             while (timer > Time.time)
             {
@@ -673,7 +662,7 @@ namespace KK_VR.Caress
 
             return Mathf.DeltaAngle(headsetRoll, headRoll);
         }
-        private float SignedAngle(Vector3 from, Vector3 to, Vector3 axis)
+        public static float SignedAngle(Vector3 from, Vector3 to, Vector3 axis)
         {
             // After recent rework became a local detractor.
             float unsignedAngle = Vector3.Angle(from, to);
@@ -718,45 +707,5 @@ namespace KK_VR.Caress
     //            return true;
     //    }
     //}
-    /// <summary>
-    /// Because voice during kiss matters.
-    /// </summary>
-    class PatchHandCtrlKiss
-    {
-        [HarmonyTranspiler, HarmonyPatch(typeof(HandCtrl), nameof(HandCtrl.DragAction))]
-        public static IEnumerable<CodeInstruction> DragActionTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var done = false;
-            var found = false;
-            var counter = 0;
-            foreach (var code in instructions)
-            {
-                if (!found && code.opcode == OpCodes.Ldflda
-                    && code.operand.ToString().Contains("calcDragLength"))
-                {
-                    found = true;
-                    yield return new CodeInstruction(OpCodes.Ldsfld, AccessTools.Field(typeof(CaressHelper), name: "FakeDragLength"));
-                    continue;
-                }
-                else if (!done && found)
-                {
-                    if (counter == 0)
-                    {
-                        counter++;
-                        yield return new CodeInstruction(OpCodes.Stfld, AccessTools.Field(typeof(HandCtrl), name: "calcDragLength"));
-                        continue;
-                    }
-                    counter++;
-                    yield return new CodeInstruction(OpCodes.Nop);
-                    if (counter == 5)
-                    {
-                        done = true;
-                    }
-                    continue;
-                }
-                yield return code;
-            }
-        }
-    }
 
 }

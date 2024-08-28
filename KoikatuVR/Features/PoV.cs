@@ -99,7 +99,7 @@ namespace KK_VR.Features
         private void UpdateSettings()
         {
             _rotFootprint = (int)(10f * Mathf.Lerp(0f, 30f, settings.RotationFootprint)) * 0.1f;
-            VRPlugin.Logger.LogDebug($"PoV:UpdateSettings[{_rotFootprint}]");
+            VRPlugin.Logger.LogDebug($"PoV:UpdateSettings:{_rotFootprint}");
         }
         private void SetVisibility()
         {
@@ -216,6 +216,15 @@ namespace KK_VR.Features
             VRPlugin.Logger.LogDebug($"PoV:StartPov");
             Active = true;
             NextChara(keepChara: true);
+            if (settings.FlyInPov == KoikatuSettings.MovementTypeH.Upright)
+            {
+                SetCustomRotation();
+            }
+        }
+        public void SetCustomRotation()
+        {
+            _newAttachPoint = true;
+            _offsetRotation = Quaternion.Euler(0f, _targetEyes.rotation.eulerAngles.y, 0f);
         }
         public void CameraIsFar()
         {
@@ -246,16 +255,18 @@ namespace KK_VR.Features
         }
         private void MoveToHead()
         {
-            if (!settings.FlyInPov)
+            if (settings.FlyInPov == KoikatuSettings.MovementTypeH.Disabled)
             {
                 CameraIsNear();
+                OnSpotChange();
                 return;
             }
             var head = VR.Camera.Head;
             var origin = VR.Camera.Origin;
-            var curTarget = GetEyesPosition();
-            var distance = Vector3.Distance(head.position, curTarget);
-            var angleDelta = Quaternion.Angle(origin.rotation, _targetEyes.rotation);
+            var targetPos = GetEyesPosition();
+            var targetRot = _newAttachPoint ? _offsetRotation : _targetEyes.rotation;
+            var distance = Vector3.Distance(head.position, targetPos);
+            var angleDelta = Quaternion.Angle(origin.rotation, targetRot);
             if (_moveSpeed == 0f)
             {
                 _moveSpeed = 0.5f + distance * 0.5f * settings.FlightSpeed;// 3f;
@@ -264,10 +275,11 @@ namespace KK_VR.Features
             if (distance < step)// && angleDelta < 1f)
             {
                 CameraIsNear();
+                OnSpotChange();
             }
             var rotSpeed = angleDelta / (distance / step);
-            var moveToward = Vector3.MoveTowards(head.position, curTarget, step);
-            origin.rotation = Quaternion.RotateTowards(origin.rotation, _targetEyes.rotation, 1f * rotSpeed);
+            var moveToward = Vector3.MoveTowards(head.position, targetPos, step);
+            origin.rotation = Quaternion.RotateTowards(origin.rotation, targetRot, 1f * rotSpeed);
             origin.position += moveToward - head.position;
         }
         public void OnSpotChange()
@@ -281,7 +293,9 @@ namespace KK_VR.Features
         }
         private void ResetRotation()
         {
+            var oldPos = VR.Camera.Head.position;
             VR.Camera.Origin.rotation = Quaternion.Euler(0f, VR.Camera.Origin.rotation.eulerAngles.y, 0f);
+            VR.Camera.Origin.position = oldPos - VR.Camera.Head.position;
         }
         public Vector3 GetDestination()
         {
@@ -433,21 +447,21 @@ namespace KK_VR.Features
 
         private void SetPOV()
         {
-            if (VRMouth.Instance.IsAction || SceneApi.GetIsOverlap())//!Scene.AddSceneName.Equals("HProc"))
+            if (VRMouth.Instance.IsAction || !Scene.Instance.AddSceneName.Equals("HProc")) // SceneApi.GetIsOverlap()) KKS option
             {
                 // We don't want pov while kissing/licking or if config/pointmove scene pops up.
                 CameraIsFar();
 
             }
-            else if (_newAttachPoint && (_device.Input.GetPressUp(k_EButton_Grip) || _device1.Input.GetPressUp(k_EButton_Grip)))
+            else if (_newAttachPoint && IsGripPressUp())
             {
                 NewPosition();
             }
-            else if (_device.Input.GetPress(k_EButton_Grip) || _device1.Input.GetPress(k_EButton_Grip))
+            else if (IsGripPress())
             {
                 CameraIsFar();
 
-                if (_device.Input.GetPressDown(k_EButton_SteamVR_Touchpad) || _device1.Input.GetPressDown(k_EButton_SteamVR_Touchpad))
+                if (IsTouchpadPressDown())
                 {
                     _newAttachPoint = true;
                 }

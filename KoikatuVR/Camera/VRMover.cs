@@ -58,7 +58,7 @@ namespace KK_VR.Camera
             }
             if (!quiet)
             {
-                VRLog.Debug($"VRMover:MoveTo:{position}:{rotation.eulerAngles}");
+                VRPlugin.Logger.LogDebug($"VRMover:MoveTo:{position}:{rotation.eulerAngles}");
             }
             _lastPosition = position;
             _lastRotation = rotation;

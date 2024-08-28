@@ -24,6 +24,7 @@ namespace KK_VR.Camera
         [HarmonyPostfix]
         static void PostADVCameraSetting(ADV.TextScenario __instance)
         {
+            VRPlugin.Logger.LogWarning("MoverHook:ADVCameraSetting");
             if (Manager.Scene.IsInstance() && Manager.Scene.Instance.NowSceneNames[0] == "Talk")
             {
                 // Talk scenes are handled separately.
@@ -61,6 +62,7 @@ namespace KK_VR.Camera
 
         static void Postfix(ADV.TextScenario __instance, ref IEnumerator __result)
         {
+            VRPlugin.Logger.LogWarning("MoverHook:TextScenario");
             if (Manager.Scene.IsInstance() && Manager.Scene.Instance.NowSceneNames[0] == "Talk")
             {
                 // Talk scenes are handled separately.
@@ -90,6 +92,7 @@ namespace KK_VR.Camera
         [HarmonyPostfix]
         static void PostSetNull(Transform transform)
         {
+            VRPlugin.Logger.LogWarning("MoverHook:SetNull");
             VRLog.Debug("PostSetNull");
             VRMover.Instance.MaybeMoveTo(transform.position, transform.rotation, keepHeight: false);
         }

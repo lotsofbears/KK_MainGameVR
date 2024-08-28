@@ -148,7 +148,7 @@ namespace KK_VR.Settings
         public float PositionOffsetY { get; set; }
         public float PositionOffsetZ { get; set; }
         public bool HideHeadInPOV { get; set; }
-        public bool FlyInPov { get; set; }
+        public MovementTypeH FlyInPov { get; set; }
         public bool AutoEnterPov { get; set; }
         public float RotationFootprint { get; set; }
         public float ProximityDuringKiss { get; set; }
@@ -158,6 +158,12 @@ namespace KK_VR.Settings
         {
             None,
             Pico4
+        }
+        public enum MovementTypeH
+        {
+            Disabled,
+            Straight,
+            Upright
         }
     }
 

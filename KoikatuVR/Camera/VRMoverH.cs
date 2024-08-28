@@ -72,9 +72,8 @@ namespace KK_VR.Camera
         {
             VRPlugin.Logger.LogDebug($"VRMoverH:MakeUpright");
             StartCoroutine(RotateToUpright(method, args));
-
-
         }
+        
         private IEnumerator RotateToUpright(Action method = null, params object[] args)
         {
             yield return null;
@@ -86,7 +85,7 @@ namespace KK_VR.Camera
             {
                 var uprightRot = Quaternion.Euler(0f, origin.eulerAngles.y, 0f);
                 Vector3 oldPos;
-                while ((int)origin.eulerAngles.x != 0 || (int)origin.eulerAngles.z != 0)
+                while (Mathf.Abs(origin.eulerAngles.x) > 0.1f || Mathf.Abs(origin.eulerAngles.x) > 0.1f)
                 {
                     oldPos = head.position;
                     origin.rotation = Quaternion.RotateTowards(origin.rotation, uprightRot, Time.deltaTime * 120f);

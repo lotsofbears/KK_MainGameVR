@@ -30,6 +30,8 @@ namespace KK_VR.Interpreters
 
             ResetState();
             HoldCamera();
+            var height = VR.Camera.Head.position.y - _ActionScene.Player.chaCtrl.transform.position.y;
+            VRPlugin.Logger.LogWarning($"Interpreter:Action:Start:{height}");
         }
 
         public override void OnDisable()

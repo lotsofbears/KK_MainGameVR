@@ -19,7 +19,10 @@ using UnityEngine.SceneManagement;
 using Motion = Illusion.Game.Elements.EasyLoader.Motion;
 using Object = UnityEngine.Object;
 using Random = UnityEngine.Random;
-using VRGIN.Core;
+using Illusion.Extensions;
+using Animator = UnityEngine.Animator;
+using static Illusion.Utils;
+using static TalkScene;
 
 namespace KK_VR.Features
 {
@@ -115,13 +118,19 @@ namespace KK_VR.Features
                 if (Manager.Scene.Instance.AddSceneName.Equals("Talk") || (Game.IsInstance() && GameAPI.GetADVScene().isActiveAndEnabled))
                 {
                     // We use extra long fades for talk scenes and tiny after interactions.
+                    // Change of Asset Bundles haunts us.
+                    // Capture state (no clue how) before change of asset and immediately adjust it after?
+                    // Or feed to crossfader start point from previous asset's state?
+
+                    //var timing = animTimings.Where(kv => __instance.state.StartsWith(kv.Key)).FirstOrDefault().Value;
+
                     __instance.transitionDuration = _reaction ? Random.Range(0.1f, 0.2f) : Random.Range(0.5f, 1f);
                     _reaction = false;
                     if (__instance.state.StartsWith(_animReaction, StringComparison.Ordinal))
                     {
                         _reaction = true;
                     }
-                    VRPlugin.Logger.LogDebug($"CrossFade:Test:Motion:Play:{__instance.state}:{Manager.Scene.Instance.AddSceneName}:{Manager.Scene.Instance.LoadSceneName}:{__instance.transitionDuration}");
+                    VRPlugin.Logger.LogInfo($"CrossFade:Motion:Play:{__instance.state}:{__instance.transitionDuration}");
 
                 }
                 else
@@ -135,6 +144,7 @@ namespace KK_VR.Features
             {
                 // Disable fades inside TalkScene when touching
                 __instance.crossFade = null;
+
             }
 
             [HarmonyPrefix]
@@ -198,18 +208,31 @@ namespace KK_VR.Features
             #endregion
 
             #region Fix cross fading not working properly because game constantly reloads the runtimeAnimatorController in ADV, resulting in the start animation being lost and replaced by some other animation
-
+            private static bool _talkScene;
             private static readonly Dictionary<RuntimeAnimatorController, string> _AnimationControllerLookup = new Dictionary<RuntimeAnimatorController, string>();
-
             [HarmonyPrefix]
             [HarmonyWrapSafe]
             [HarmonyPatch(typeof(Motion), nameof(Motion.LoadAnimator), typeof(Animator))]
-            public static bool LoadAnimatorOverridePre(Motion __instance, Animator animator, out bool __state)
+            public static bool LoadAnimatorPrefix(Motion __instance, Animator animator, out bool __state)
             {
                 __state = false;
-
                 var animatorController = animator.runtimeAnimatorController;
                 if (animatorController == null) return true;
+                //VRPlugin.Logger.LogWarning($"CrossFade:Motion:LoadAnimator:Prefix:{animatorController}:{__instance.state}:{__instance.bundle + "|" + __instance.asset}");
+
+                // TODO Add this as an option, to swap poses > 29 for smooth crossFade.
+                // Finish modified AssetBundle.
+
+                //if (!_talkScene && Manager.Scene.Instance.AddSceneName.Equals("Talk"))
+                //{
+                //    _talkScene = true;
+                //    SwapDic();
+                //}
+                //else if (_talkScene && !Manager.Scene.Instance.AddSceneName.Equals("Talk"))
+                //{
+                //    _talkScene = false;
+                //    RevertDic();
+                //}
 
                 // If the currently loaded controller was loaded from the same asset, skip loading it
                 if (_AnimationControllerLookup.TryGetValue(animatorController, out var hash))
@@ -217,12 +240,11 @@ namespace KK_VR.Features
                     var newHash = __instance.bundle + "|" + __instance.asset;
                     if (newHash == hash)
                     {
-                        //VRPlugin.Logger.LogDebug($"Skipping loading already loaded animator controller from [{newHash}] on [{animator.GetFullPath()}]");
+                        VRPlugin.Logger.LogDebug($"Skipping loading already loaded animator controller from [{newHash}] on [{animator.GetFullPath()}]");
                         return false;
                     }
                     else _AnimationControllerLookup.Remove(animatorController);
                 }
-
                 __state = true;
                 return true;
             }
@@ -239,7 +261,48 @@ namespace KK_VR.Features
                     _AnimationControllerLookup.Add(animator.runtimeAnimatorController, newHash);
                 }
             }
-
+            [HarmonyPostfix]
+            [HarmonyWrapSafe]
+            [HarmonyPatch(typeof(TalkScene), nameof(TalkScene.TouchFunc))]
+            public static void TalkSceneTouchFuncPostfix()
+            {
+                VRPlugin.Logger.LogDebug($"CrossFader:TalkScene:TouchFunc");
+            }
+            public static Dictionary<int, Dictionary<string, string[]>> ModDicPoseChara;
+            public static Dictionary<int, Dictionary<string, string[]>> OriginalDicPoseChara;
+            private static void SwapDic()
+            {
+                // Once setting is in, mod all charas in question.
+                // No need to revert anything then.
+                if (ModDicPoseChara.Count == 0)
+                {
+                    ModDicPoseChara = Communication.instance.dicPoseChara.DeepCopy();
+                    VRPlugin.Logger.LogDebug($"CrossFader:DicSwap:Cold");
+                }
+                else
+                {
+                    VRPlugin.Logger.LogDebug($"CrossFader:DicSwap:Hot");
+                }
+                OriginalDicPoseChara = Communication.instance.dicPoseChara;
+                var index = Object.FindObjectOfType<TalkScene>().targetHeroine.FixCharaIDOrPersonality;
+                var rand = Random.Range(0, 30).ToString();
+                if (rand.Count() == 1)
+                {
+                    rand = "0" + rand;
+                }
+                var kv = ModDicPoseChara[index].Values.ElementAt(0);
+                var kv2 = ModDicPoseChara[index].Values.ElementAt(ModDicPoseChara[index].Count - 1);
+                kv[0] = kv2[0] = "adv/motion/controller/adv/00.unity3d";
+                kv[1] = kv[4] = kv2[1] = kv2[4] = "cf_adv_00_00";
+                kv[2] = kv2[2] = "Stand_" + rand + "_00";
+                kv[3] = kv2[3] = "adv/motion/iklist/00.unity3d";
+                Communication.instance.dicPoseChara = ModDicPoseChara;
+            }
+            private static void RevertDic()
+            {
+                VRPlugin.Logger.LogDebug($"CrossFader:DicRevert");
+                Communication.instance.dicPoseChara = OriginalDicPoseChara;
+            }
             #endregion
         }
 
@@ -257,10 +320,12 @@ namespace KK_VR.Features
             }
 
             [HarmonyPrefix]
-            [HarmonyPatch(typeof(ChaControl), nameof(ChaControl.setPlay), new Type[] { typeof(string), typeof(int) }, null)]
+            [HarmonyPatch(typeof(ChaControl), nameof(ChaControl.setPlay), new System.Type[] { typeof(string), typeof(int) }, null)]
             public static bool HSceneSetPlayHook(string _strAnmName, int _nLayer, ChaControl __instance, ref bool __result)
             {
-                if (!GameAPI.InsideHScene || _hflag == null) return true;
+                if (!GameAPI.InsideHScene) return true;
+                if (_hflag == null) _hflag = Object.FindObjectOfType<HFlag>();
+                if (_hflag == null) return true;
 
                 //VRLog.Debug($"syncPlay hflag={_hflag} namehash={_strAnmName} nlayer={_nLayer} chara={__instance}");
 
