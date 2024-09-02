@@ -10,6 +10,7 @@ using System.Reflection;
 using KK_VR.Settings;
 using KK_VR.Features;
 using KK_VR.Caress;
+using KK_VR.Interpreters;
 
 // This file is a collection of hooks to move the VR camera at appropriate
 // points of the game.
@@ -110,6 +111,7 @@ namespace KK_VR.Camera
                 VRMouth.Instance.OnPositionChange(_nextAinmInfo);
             }
             UpdateVRCamera(__instance, ___lstFemale, null);
+            HSceneInterpreter.OnPoseChange(_nextAinmInfo);
             
         }
 
@@ -140,7 +142,15 @@ namespace KK_VR.Camera
                 VRMoverH.Instance.MakeUpright();
             }
         }
-
+        [HarmonyPatch(nameof(HSceneProc.ReturnVisibleForHPointMove))]
+        [HarmonyPostfix]
+        public static void ReturnVisibleForHPointMovePostfix()
+        {
+            if (VRMoverH.Instance != null)
+            {
+                VRMoverH.Instance.MakeUpright();
+            }
+        }
 
         /// <summary>
         /// Update the transform of the VR camera.

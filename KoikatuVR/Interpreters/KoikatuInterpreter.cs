@@ -31,8 +31,6 @@ namespace KK_VR.Interpreters
 
         protected override void OnAwake()
         {
-            base.OnAwake();
-
             CurrentScene = SceneType.OtherScene;
             SceneInterpreter = new OtherSceneInterpreter();
             SceneManager.sceneLoaded += OnSceneLoaded;
@@ -43,7 +41,6 @@ namespace KK_VR.Interpreters
 
         protected override void OnUpdate()
         {
-            base.OnUpdate();
 
             UpdateScene();
             SceneInterpreter.OnUpdate();
@@ -51,7 +48,6 @@ namespace KK_VR.Interpreters
 
         protected override void OnLateUpdate()
         {
-            base.OnLateUpdate();
             if (_kkSubtitlesCaption != null)
             {
                 FixupKkSubtitles();
@@ -136,7 +132,7 @@ namespace KK_VR.Interpreters
         // 前回とSceneが変わっていれば切り替え処理をする
         private void UpdateScene()
         {
-            SceneType nextSceneType = DetectScene();
+            var nextSceneType = DetectScene();
 
             if (nextSceneType != CurrentScene)
             {

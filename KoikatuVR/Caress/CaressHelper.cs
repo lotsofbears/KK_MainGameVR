@@ -129,14 +129,10 @@ namespace KK_VR.Caress
         public bool IsTriggerPressDown() => _device.Input.GetPressDown(Trigger) || _device1.Input.GetPressDown(Trigger);
         internal void Halt(bool disengage = true, bool haltVRMouth = true)
         {
-            //VRPlugin.Logger.LogDebug($"CaressHelper:Halt\n" +
-            //    $"{new StackTrace(0)}");
+            VRPlugin.Logger.LogDebug($"CaressHelper:Halt\n" +
+            //    $"{new StackTrace(0)}" +
+                $"");
             StopAllCoroutines();
-            //foreach (var coroutine in _activeCoroutines)
-            //{
-            //    if (coroutine != null)
-            //        StopCoroutine(coroutine);
-            //}
             foreach (var patch in _activePatches)
             {
                 patch.UnpatchSelf();
@@ -173,8 +169,8 @@ namespace KK_VR.Caress
             }
             if (haltVRMouth)
             {
-                VRMouth.Instance.StopLick();
-                VRMouth.Instance.StopKiss();
+                VRMouth.Instance.FinishLicking();
+                VRMouth.Instance.FinishKiss();
             }
             _kissCo = false;
             _lickCo = false;
@@ -191,7 +187,11 @@ namespace KK_VR.Caress
             }
             _activeCoroutines.Add(StartCoroutine(AttachCo(colliderKind)));
         }
-
+        internal void OnFakeKiss()
+        {
+            _kissCo = true;
+            MoMiOnKissStart(HandCtrl.AibuColliderKind.none);
+        }
         internal void OnKissStart(HandCtrl.AibuColliderKind colliderKind)
         {
             // There are preparations to be done on SensibleH side, so we call it before click and after click.
@@ -446,7 +446,7 @@ namespace KK_VR.Caress
             }
             VRPlugin.Logger.LogDebug($"CaressHelper:EndKissCo[End]");
             _endKissCo = false;
-            _handCtrl.DetachAllItem();
+            //_handCtrl.DetachAllItem();
         }
         /// <summary>
         /// Partner in crime of LickCo.

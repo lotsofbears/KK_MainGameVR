@@ -95,6 +95,7 @@
     <Compile Include="Caress\LongDistanceKissMachine.cs" />
     <Compile Include="Caress\VRMouth.cs" />
     <Compile Include="Fixes\ReduceAssetUnload.cs" />
+    <Compile Include="Interpreters\Patches\HScenePatches.cs" />
     <Compile Include="Utils\Compat.cs" />
     <Compile Include="Features\CrossFader.cs" />
     <Compile Include="Utils\DebugHooks.cs" />

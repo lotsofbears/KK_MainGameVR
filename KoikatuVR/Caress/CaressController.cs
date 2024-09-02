@@ -39,7 +39,7 @@ namespace KK_VR.Caress
         Controller.Lock _lock; // may be null but never invalid
         bool _triggerPressed; // Whether the trigger is currently pressed. false if _lock is null.
         Util.ValueTuple<ChaControl, ChaFileDefine.ClothesKind, Vector3>? _undressing;
-        private HandCtrl _hand;
+        private Vector3 GetVelocity => _controller.Input.velocity;
 
         protected override void OnAwake()
         {
@@ -52,11 +52,12 @@ namespace KK_VR.Caress
                 VRLog.Warn("HSceneProc not found");
                 return;
             }
-            _hand = Traverse.Create(proc).Field("hand").GetValue<HandCtrl>();
+            //_hand = Traverse.Create(proc).Field("hand").GetValue<HandCtrl>();
             //    Traverse.Create(proc).Field("hand").GetValue<HandCtrl>();   
             VRLog.Debug($"Controller[{_controller}]");
             _aibuTracker = new AibuColliderTracker(proc, referencePoint: transform);
             _undresser = new Undresser(proc);
+            
         }
 
         private void OnDestroy()
@@ -80,6 +81,7 @@ namespace KK_VR.Caress
 
         protected void OnTriggerEnter(Collider other)
         {
+            VRPlugin.Logger.LogDebug($"Caress:Controller:TriggerEnter:Velocity - {GetVelocity}");
             try
             {
                 if (Manager.Scene.Instance.NowSceneNames[0].Equals("HPointMove"))
@@ -98,10 +100,7 @@ namespace KK_VR.Caress
                             if (HandCtrl.AibuColliderKind.reac_head <= colliderKind &&
                                 !CaressUtil.IsSpeaking(_aibuTracker.Proc, femaleIndex))
                             {
-                                VRLog.Debug($"OnTriggerEnter[{other}]{colliderKind}");
-                                //CaressUtil.SetSelectKindTouch(_aibuTracker.Proc, femaleIndex, colliderKind);
-                                //StartCoroutine(CaressUtil.ClickCo());
-                                _hand.Reaction(colliderKind);
+                                HSceneInterpreter.handCtrl.Reaction(colliderKind);
                             }
                         }
                     }

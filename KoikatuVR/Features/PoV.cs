@@ -20,6 +20,7 @@ using KK_VR.Features;
 using KK_VR.Settings;
 using KK_VR;
 using static SteamVR_Controller.ButtonMask;
+using KK_VR.Interpreters;
 
 
 
@@ -76,15 +77,11 @@ namespace KK_VR.Features
         private float _rotFootprint;
         private bool _precisionPoint;
 
-        private HFlag _hFlag;
-        private bool IsClimax => _hFlag.nowAnimStateName.EndsWith("_Loop", System.StringComparison.Ordinal);
+        private bool IsClimax => HSceneInterpreter.hFlag.nowAnimStateName.EndsWith("_Loop", System.StringComparison.Ordinal);
         public void Initialize(HSceneProc proc)
         {
             Instance = this;
             settings = VR.Context.Settings as KoikatuSettings;
-            //_hand = Traverse.Create(proc).Field("hand").GetValue<HandCtrl>(); 
-            _hFlag = Traverse.Create(proc).Field("flags").GetValue<HFlag>();
-            CrossFader.HSceneHooks.SetFlag(_hFlag);
             _chaControls = Traverse.Create(proc).Field("lstFemale").GetValue<List<ChaControl>>();
             _device = FindObjectOfType<Controller>();
             _device1 = _device.Other;
@@ -94,7 +91,7 @@ namespace KK_VR.Features
         public bool IsGripPressUp() => _device.Input.GetPressUp(Grip) || _device1.Input.GetPressUp(Grip);
         public bool IsTouchpadPressDown() => _device.Input.GetPressDown(Touchpad) || _device1.Input.GetPressDown(Touchpad);
         public bool IsTouchpadPressUp() => _device.Input.GetPressUp(Touchpad) || _device1.Input.GetPressUp(Touchpad);
-        //public bool IsTriggerPressUp() => _device.Input.GetPressUp(SteamVR_Controller.ButtonMask.Trigger) || _device1.Input.GetPressUp(SteamVR_Controller.ButtonMask.Trigger);
+        public bool IsTriggerPress() => _device.Input.GetPress(Trigger) || _device1.Input.GetPress(Trigger);
         //public bool IsTriggerPressDown() => _device.Input.GetPressDown(SteamVR_Controller.ButtonMask.Trigger) || _device1.Input.GetPressDown(SteamVR_Controller.ButtonMask.Trigger);
         private void UpdateSettings()
         {

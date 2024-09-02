@@ -32,7 +32,6 @@ namespace KK_VR.Caress
             for (int i = 0; i < proc.flags.lstHeroine.Count; i++)
             {
                 ret.Add(i == 0 ? proc.hand : Compat.HSceenProc_hand1(proc));
-                //ret.Add(i == 0 ? proc.hand : proc.hand1);
             }
             return ret;
         }
@@ -41,16 +40,17 @@ namespace KK_VR.Caress
         /// Send a synthetic click event to the hand controls.
         /// </summary>
         /// <returns></returns>
-        public static IEnumerator ClickCo()
+        public static IEnumerator ClickCo(Action method = null, params object[] args)
         {
-            //VRLog.Debug($"ClickCo");
             bool consumed = false;
             HandCtrlHooks.InjectMouseButtonDown(0, () => consumed = true);
             while (!consumed)
             {
+                VRPlugin.Logger.LogDebug($"ClickCo:Clicking");
                 yield return null;
             }
             HandCtrlHooks.InjectMouseButtonUp(0);
+            method?.DynamicInvoke(args);
         }
 
         /// <summary>

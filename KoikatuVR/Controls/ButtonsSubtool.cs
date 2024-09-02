@@ -29,7 +29,7 @@ namespace KK_VR.Controls
         private float _ScrollRepeatTime;
         private int _ScrollRepeatAmount;
 
-        private float _contRotation = 0f;
+        private float _continuousRotation = 0f;
 
         public ButtonsSubtool(KoikatuInterpreter interpreter, KoikatuSettings settings)
         {
@@ -42,18 +42,18 @@ namespace KK_VR.Controls
         /// </summary>
         public void Update()
         {
-            if (_SentUnmatchedDown.Contains(AssignableFunction.PL2CAM))
-            {
-                IfActionScene(interpreter => interpreter.MovePlayerToCamera());
-            }
+            //if (_SentUnmatchedDown.Contains(AssignableFunction.PL2CAM))
+            //{
+            //    IfActionScene(interpreter => interpreter.MovePlayerToCamera());
+            //}
             if (_ScrollRepeatAmount != 0 && _ScrollRepeatTime < Time.unscaledTime)
             {
                 _ScrollRepeatTime += 0.1f;
                 VR.Input.Mouse.VerticalScroll(_ScrollRepeatAmount);
             }
-            if (_contRotation != 0)
+            if (_continuousRotation != 0)
             {
-                ContRotation(_contRotation);
+                ContinuousRotation(_continuousRotation);
             }
         }
 
@@ -106,10 +106,16 @@ namespace KK_VR.Controls
                     VR.Input.Mouse.MiddleButtonDown();
                     break;
                 case AssignableFunction.LROTATION:
-                    Rotation(-_Settings.RotationAngle);
+                    if (_Interpreter.CurrentScene == KoikatuInterpreter.SceneType.ActionScene)
+                    {
+                        Rotation(-_Settings.RotationAngle);
+                    }
                     break;
                 case AssignableFunction.RROTATION:
-                    Rotation(_Settings.RotationAngle);
+                    if (_Interpreter.CurrentScene == KoikatuInterpreter.SceneType.ActionScene)
+                    {
+                        Rotation(_Settings.RotationAngle);
+                    }
                     break;
                 case AssignableFunction.SCROLLUP:
                     StartScroll(1);
@@ -192,7 +198,7 @@ namespace KK_VR.Controls
         {
             if (_Settings.ContinuousRotation)
             {
-                _contRotation = degrees * 0.05f;
+                _continuousRotation = degrees * (Time.deltaTime * 2f);
             }
             else
             {
@@ -201,7 +207,7 @@ namespace KK_VR.Controls
         }
         private void StopRotation()
         {
-            _contRotation = 0f;
+            _continuousRotation = 0f;
         }
 
         /// <summary>
@@ -223,7 +229,7 @@ namespace KK_VR.Controls
                 actInterpreter.MovePlayerToCamera();
             }
         }
-        private void ContRotation(float degrees)
+        private void ContinuousRotation(float degrees)
         {
             var origin = VR.Camera.Origin;
             var head = VR.Camera.Head;

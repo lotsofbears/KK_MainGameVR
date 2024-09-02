@@ -11,17 +11,22 @@ using WindowsInput.Native;
 using KK_VR.Interpreters;
 using System.ComponentModel;
 using KK_VR.Settings;
+using static KK_VR.Interpreters.HSceneInterpreter;
+using Valve.VR;
 
 namespace KK_VR.Controls
 {
     public class SchoolTool : Tool
     {
+        public static SchoolTool Instance;
         private KoikatuInterpreter _Interpreter;
         private KoikatuSettings _Settings;
         private KeySet _KeySet;
         private int _KeySetIndex = 0;
         private bool _InHScene = false;
         private Controller.Lock _lock = VRGIN.Controls.Controller.Lock.Invalid;
+
+        private bool _interpretationBusy;
 
         private Controller.TrackpadDirection? _touchDirection;
         private Controller.TrackpadDirection? _lastPressDirection;
@@ -30,6 +35,11 @@ namespace KK_VR.Controls
         private ButtonsSubtool _buttonsSubtool;
         private GrabAction _grab;
 
+        public void SetBusy(bool state)
+        {
+            _interpretationBusy = state;
+        }
+        
         private void ChangeKeySet()
         {
             List<KeySet> keySets = KeySets();
@@ -92,7 +102,7 @@ namespace KK_VR.Controls
         protected override void OnStart()
         {
             base.OnStart();
-
+            Instance = this;
             _Settings = (VR.Context.Settings as KoikatuSettings);
             SetScene(inHScene: false);
             _Settings.AddListener("KeySets", (_, _1) => ResetKeys());
@@ -124,7 +134,6 @@ namespace KK_VR.Controls
             _Interpreter = VR.Interpreter as KoikatuInterpreter;
             _buttonsSubtool = new ButtonsSubtool(_Interpreter, _Settings);
         }
-
         protected override void OnUpdate()
         {
             base.OnUpdate();
@@ -137,7 +146,7 @@ namespace KK_VR.Controls
                 SetScene(inHScene);
             }
 
-            if (_grab != null)
+            if (!_interpretationBusy && _grab != null)
             {
                 if (_grab.HandleGrabbing() != GrabAction.Status.Continue)
                 {
@@ -146,8 +155,7 @@ namespace KK_VR.Controls
                     _buttonsSubtool = new ButtonsSubtool(_Interpreter, _Settings);
                 }
             }
-
-            if (_buttonsSubtool != null)
+            else if (_buttonsSubtool != null)
             {
                 HandleButtons();
             }
@@ -165,13 +173,13 @@ namespace KK_VR.Controls
                 _lock.Release();
             }
         }
-
         private void HandleButtons()
         {
             var device = this.Controller;
 
             if (device.GetPressDown(ButtonMask.Trigger))
             {
+                _Interpreter.SceneInterpreter.OnButtonDown(EVRButtonId.k_EButton_SteamVR_Trigger);
                 InputDown(_KeySet.Trigger, ButtonMask.Trigger);
             }
 
@@ -182,6 +190,7 @@ namespace KK_VR.Controls
 
             if (device.GetPressDown(ButtonMask.Grip))
             {
+                _Interpreter.SceneInterpreter.OnButtonDown(EVRButtonId.k_EButton_Grip);
                 InputDown(_KeySet.Grip, ButtonMask.Grip);
             }
 
@@ -195,9 +204,13 @@ namespace KK_VR.Controls
                 var dir = Owner.GetTrackpadDirection();
                 var fun = GetTrackpadFunction(dir);
                 bool requiresPress = RequiresPress(fun);
+
+                if (_Interpreter.SceneInterpreter.OnButtonDown(dir, EVRButtonId.k_EButton_SteamVR_Touchpad))
+                {
+                    SetBusy(true);
+                }
                 if (requiresPress)
                 {
-                    _lastPressDirection = dir;
                     InputDown(fun, ButtonMask.Touchpad);
                 }
             }
@@ -209,6 +222,9 @@ namespace KK_VR.Controls
             // 上げたときの位置によらず、押したボタンを離す
             if (device.GetPressUp(ButtonMask.Touchpad) && _lastPressDirection is Controller.TrackpadDirection dirP)
             {
+                _Interpreter.SceneInterpreter.OnButtonUp(dirP);
+                SetBusy(false);
+
                 InputUp(GetTrackpadFunction(dirP));
                 _lastPressDirection = null;
             }
@@ -219,18 +235,30 @@ namespace KK_VR.Controls
             if (_touchDirection != newTouchDirection)
             {
                 if (_touchDirection is Controller.TrackpadDirection oldDir &&
-                    GetTrackpadFunction(oldDir) is var oldFun &&
-                    !RequiresPress(oldFun))
+                    GetTrackpadFunction(oldDir) is var oldFun)
                 {
-                    InputUp(oldFun);
+                    _Interpreter.SceneInterpreter.OnButtonUp(oldDir);
+                    SetBusy(false);
+
+                    if (!RequiresPress(oldFun))
+                    {
+                        InputUp(oldFun);
+                    }
 
                 }
 
                 if (newTouchDirection is Controller.TrackpadDirection newDir &&
-                    GetTrackpadFunction(newDir) is var newFun &&
-                    !RequiresPress(newFun))
+                    GetTrackpadFunction(newDir) is var newFun)
                 {
-                    InputDown(newFun, ButtonMask.Touchpad);
+                    if (_Interpreter.SceneInterpreter.OnButtonDown(newDir))
+                    {
+                        SetBusy(true);
+                    }
+
+                    if (!RequiresPress(newFun))
+                    {
+                        InputDown(newFun, ButtonMask.Touchpad);
+                    }
                 }
                 _touchDirection = newTouchDirection;
             }
@@ -261,7 +289,7 @@ namespace KK_VR.Controls
         /// </summary>
         /// <param name="fun"></param>
         /// <returns></returns>
-        static bool RequiresPress(AssignableFunction fun)
+        private bool RequiresPress(AssignableFunction fun)
         {
             switch (fun)
             {
@@ -274,7 +302,7 @@ namespace KK_VR.Controls
                     return true;
             }
         }
-
+        // TODO Separate inputs for canvas/outside of it. Clicking scene exit by mistake is my personal nightmare.
         private void InputDown(AssignableFunction fun, ulong buttonMask)
         {
             switch (fun)
@@ -288,12 +316,11 @@ namespace KK_VR.Controls
                     break;
                 case AssignableFunction.SCROLLUP:
                 case AssignableFunction.SCROLLDOWN:
-                //case AssignableFunction.LBUTTON:
-                //case AssignableFunction.MBUTTON:
-                case AssignableFunction.RBUTTON:
+                case AssignableFunction.LBUTTON:
+                case AssignableFunction.MBUTTON:
                     // Move the cursor to the bottom right corner so buttons/scrolling affect the H speed control
                     // Extremely fiddly but what can you do
-                    if (_InHScene) VR.Input.Mouse.MoveMouseBy(Screen.width - 10, Screen.height - 10);
+                    //if (_InHScene) VR.Input.Mouse.MoveMouseBy(Screen.width - 10, Screen.height - 10);
 
                     // Force focus the window here so the cursor doesn't go off into the desktop or click the window that's currently on top of the game window
                     //WindowTools.BringWindowToFront();
@@ -311,8 +338,9 @@ namespace KK_VR.Controls
                 case AssignableFunction.NEXT:
                     ChangeKeySet();
                     break;
-                case AssignableFunction.GRAB:
-                    break;
+                case AssignableFunction.SCROLLUP:
+                case AssignableFunction.SCROLLDOWN:
+                    goto default;
                 default:
                     _buttonsSubtool.ButtonUp(fun);
                     break;

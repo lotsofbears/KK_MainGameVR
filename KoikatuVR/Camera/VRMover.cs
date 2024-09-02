@@ -127,7 +127,11 @@ namespace KK_VR.Camera
                     return closerPosition;
                 }
             }
-
+            if (Manager.Scene.Instance.AddSceneName.StartsWith("H", StringComparison.Ordinal))
+            {
+                // Trim rotations for H Results.
+                VRMoverH.Instance.MakeUpright();
+            }
             return position;
         }
         /// <summary>
@@ -158,7 +162,7 @@ namespace KK_VR.Camera
                 {
                     VRLog.Debug("Approaching character (H)");
                     // TODO: find a way to get a proper height.
-                    height = character.transform.position.y + 1.3f;
+                    height = character.transform.position.y + ActionCameraControl.GetPlayerHeight();
                     rotation = character.transform.rotation * Quaternion.AngleAxis(180f, Vector3.up);
                 }
                 else

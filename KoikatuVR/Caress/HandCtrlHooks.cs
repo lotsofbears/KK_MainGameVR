@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using VRGIN.Core;
 using UnityEngine;
+using System.Diagnostics;
 
 namespace KK_VR.Caress
 {
@@ -28,11 +29,9 @@ namespace KK_VR.Caress
         /// If an action is given, it will be invoked just before the message is
         /// handed over to the ctrl.
         /// </summary>
-        /// <param name="button"></param>
-        /// <param name="action"></param>
         public static void InjectMouseButtonDown(int button, Action action = null)
         {
-            VRLog.Debug($"InjectMouseButtonDown");
+            VRPlugin.Logger.LogDebug("HandCtrlHooks:InjectMouse:Down");
             GetInstance().GetButtonHandler(button)._queues[0].Enqueue(action);
         }
 
@@ -41,18 +40,15 @@ namespace KK_VR.Caress
         /// If an action is given, it will be invoked just before the message is
         /// handed over to the ctrl.
         /// </summary>
-        /// <param name="button"></param>
-        /// <param name="action"></param>
         public static void InjectMouseButtonUp(int button, Action action = null)
         {
-            VRLog.Debug($"InjectMouseButtonUp");
+            VRPlugin.Logger.LogDebug("HandCtrlHooks:InjectMouse:Up");
             GetInstance().GetButtonHandler(button)._queues[1].Enqueue(action);
         }
 
         /// <summary>
         /// Inject a synthetic mouse scroll into the hand ctrl.
         /// </summary>
-        /// <param name="amount"></param>
         public static void InjectMouseScroll(float amount)
         {
             GetInstance()._wheelHandler._request += amount;
@@ -61,18 +57,22 @@ namespace KK_VR.Caress
         // Used by the patched version of HandCtrl.
         public static bool GetMouseButtonDown(int button)
         {
+            //VRPlugin.Logger.LogDebug("HandCtrlHooks:GetMouse:Down");
             return GetInstance().GetButtonHandler(button).UpdateForFrame()._down;
         }
 
         // Used by the patched version of HandCtrl.
         public static bool GetMouseButtonUp(int button)
         {
+            //VRPlugin.Logger.LogDebug("HandCtrlHooks:GetMouse:Up");
             return GetInstance().GetButtonHandler(button).UpdateForFrame()._up;
         }
 
         // Used by the patched version of HandCtrl.
         public static bool GetMouseButton(int button)
         {
+            //VRPlugin.Logger.LogDebug("HandCtrlHooks:GetMouse:Press\n" +
+            //    $"{new StackTrace(0)}");
             return GetInstance().GetButtonHandler(button).UpdateForFrame()._pressed;
         }
 
@@ -216,8 +216,6 @@ namespace KK_VR.Caress
         /// Replace calls to UnityEngine.Input.GetMouseButton{,Down,Up} with calls to
         /// HandCtrlHooks.GetMouseButton{,Down,Up}.
         /// </summary>
-        /// <param name="insts"></param>
-        /// <returns></returns>
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> insts)
         {
             var methodsToReplace = new string[] { "GetMouseButtonDown", "GetMouseButtonUp", "GetMouseButton", "GetAxis" };
@@ -237,32 +235,31 @@ namespace KK_VR.Caress
                 }
             }
         }
-
-        [HarmonyPatch]
-        internal class HandCtrlHelperHook
+    }
+    [HarmonyPatch]
+    internal class HandCtrlHelperHook
+    {
+        // Should be safe kill switch.
+        // Triggered by overlap menus too (does so beforehand).
+        [HarmonyPostfix, HarmonyPatch(typeof(HandCtrl), nameof(HandCtrl.ForceFinish))]
+        public static void ForceFinishPostfix()
         {
-            // Should be safe kill switch.
-            // Triggered by overlap menus too (does so beforehand).
-            [HarmonyPostfix, HarmonyPatch(typeof(HandCtrl), nameof(HandCtrl.ForceFinish))]
-            public static void ForceFinishPostfix()
+            var helper = CaressHelper.Instance;
+            if (helper != null && !helper.IsEndKissCo)
             {
-                var helper = CaressHelper.Instance;
-                if (helper != null && !helper.IsEndKissCo)
-                {
-                    helper.Halt(disengage: false);
-                }
+                helper.Halt(disengage: false);
             }
-
-            [HarmonyPostfix, HarmonyPatch(typeof(HAibu), nameof(HAibu.GotoDislikes))]
-            public static void GotoDislikesPostfix()
-            {
-                var helper = CaressHelper.Instance;
-                if (helper != null && !helper.IsEndKissCo)
-                {
-                    helper.Halt(disengage: true);
-                }
-            }
-
         }
+
+        [HarmonyPostfix, HarmonyPatch(typeof(HAibu), nameof(HAibu.GotoDislikes))]
+        public static void GotoDislikesPostfix()
+        {
+            var helper = CaressHelper.Instance;
+            if (helper != null && !helper.IsEndKissCo)
+            {
+                helper.Halt(disengage: true);
+            }
+        }
+
     }
 }

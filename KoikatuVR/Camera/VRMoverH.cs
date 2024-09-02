@@ -230,7 +230,7 @@ namespace KK_VR.Camera
                 var step = Time.deltaTime * moveSpeed;
                 var rotSpeed = angleDelta / (distance / step);
                 var moveTowards = Vector3.MoveTowards(head.position, position, step);
-                origin.rotation = Quaternion.RotateTowards(origin.rotation, rotation, 1f * rotSpeed);
+                origin.rotation = Quaternion.RotateTowards(origin.rotation, rotation, rotSpeed);
                 origin.position += moveTowards - head.position;
                 if (distance < step && angleDelta < 1f)
                 {

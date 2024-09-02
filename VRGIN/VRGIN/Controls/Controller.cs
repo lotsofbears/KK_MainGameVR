@@ -70,6 +70,7 @@ namespace VRGIN.Controls
         private bool _Started = false;
 
         public SteamVR_TrackedObject Tracking;
+        public SteamVR_Controller Steam;
         public SteamVR_RenderModel Model { get; private set; }
         protected BoxCollider Collider;
 
@@ -342,7 +343,6 @@ namespace VRGIN.Controls
                 return SteamVR_Controller.Input((int)Tracking.index);
             }
         }
-
         protected override void OnUpdate()
         {
             base.OnUpdate();

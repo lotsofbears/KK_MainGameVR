@@ -1,5 +1,7 @@
 ﻿using VRGIN.Core;
 using UnityEngine;
+using VRGIN.Controls;
+using Valve.VR;
 
 namespace KK_VR.Interpreters
 {
@@ -15,7 +17,36 @@ namespace KK_VR.Interpreters
             VR.Mode.Left.gameObject.AddComponent<T>();
             VR.Mode.Right.gameObject.AddComponent<T>();
         }
-
+        // For touchpad direction without click;
+        public virtual bool OnButtonDown(Controller.TrackpadDirection direction)
+        {
+            return false;
+        }
+        // For touchpad direction without click;
+        public virtual bool OnButtonUp(Controller.TrackpadDirection direction)
+        {
+            return false;
+        }
+        // For touchpad direction + click;
+        public virtual bool OnButtonDown(Controller.TrackpadDirection direction, EVRButtonId buttonId)
+        {
+            return false;
+        }
+        // For touchpad direction + click;
+        public virtual bool OnButtonUp(Controller.TrackpadDirection direction, EVRButtonId buttonId)
+        {
+            return false;
+        }
+        // For grip/trigger/(a/x).
+        public virtual bool OnButtonDown(EVRButtonId buttonId)
+        {
+            return false;
+        }
+        // For grip/trigger/(a/x).
+        public virtual bool OnButtonUp(EVRButtonId buttonId)
+        {
+            return false;
+        }
         protected void DestroyControllerComponent<T>()
             where T: Component
         {
