@@ -16,7 +16,15 @@ using System.Diagnostics;
 using KoikatuVR.Camera;
 using UnityEngine.UI;
 using ADV;
-using KKAPI.MainGame;
+using Random = UnityEngine.Random;
+using RootMotion.FinalIK;
+using KK_VR.Fixes;
+using ADV.Commands.H;
+using Valve.VR;
+using ADV.Commands.Base;
+using static HandCtrl;
+using static KK_VR.Interpreters.Extras.TalkSceneExtras;
+using static VRGIN.Controls.Controller;
 
 namespace KK_VR.Interpreters
 {
@@ -25,10 +33,41 @@ namespace KK_VR.Interpreters
         Canvas _canvasBack;
         public static float TalkDistance = 0.55f;
         public static float Height;
+        public static TalkSceneInterpreter Instance;
+        public static TalkScene TalkScene
+        {
+            get
+            {
+                if (_talkScene == null)
+                {
+                    var scene = AdvScene.nowScene;
+                    if (scene != null && scene.GetType() == typeof(TalkScene))
+                    {
+                        _talkScene = (TalkScene)scene;
+                    }
+                    else
+                    {
+                        _talkScene = UnityEngine.Object.FindObjectOfType<TalkScene>();
+                    }
+                }
+                return _talkScene;
+            }
+        }
+        public static ADVScene AdvScene;
+        private static TalkScene _talkScene;
+        private static HitReaction _hitReaction;
+        private static List<int> lstIKEffectLateUpdate = new List<int>();
+
         private bool _adjustmentRequired;
         private bool _sittingPosition;
-        private static TalkScene _talkScene;
-        //private State _state;
+        private bool _waitForAction;
+        private float _waitTimestamp;
+        private float _waitTime;
+        private TrackpadDirection _lastDirection;
+        private Button _lastChosenButton;
+
+        private bool IsADV => AdvScene.isActiveAndEnabled;
+        private bool IsChoice => AdvScene.scenario.isChoice;
         enum State
         {
             Talk,
@@ -45,16 +84,19 @@ namespace KK_VR.Interpreters
         }
         public override void OnStart()
         {
-            AddControllerComponent<Controls.TalkSceneHandler>();
-            _talkScene = GetTalkScene();
-            _talkScene.otherInitialize += () =>
-            {
-                VRPlugin.Logger.LogDebug($"TalkScene:otherInitialize");
-                _adjustmentRequired = true;
-                _sittingPosition = (_talkScene.targetHeroine.chaCtrl.objHead.transform.position - _talkScene.targetHeroine.transform.position).y < 1f;
-            };
+            VRPlugin.Logger.LogDebug($"TalkScene:OnStart");
+            Instance = this;
+            AdvScene = Game.Instance.actScene.advScene;
+            if (TalkScene == null)
+                return;
 
-            _canvasBack = _talkScene.canvasBack;
+            TalkScene.otherInitialize += () =>
+            {
+                VRPlugin.Logger.LogDebug($"TalkScene:TriggerAction:otherInitialize");
+                _adjustmentRequired = true;
+                _sittingPosition = (TalkScene.targetHeroine.chaCtrl.objHead.transform.position - TalkScene.targetHeroine.transform.position).y < 1f;
+            };
+            _canvasBack = TalkScene.canvasBack;
         }
         public override void OnUpdate()
         {
@@ -64,46 +106,194 @@ namespace KK_VR.Interpreters
             {
                 _canvasBack.enabled = false;
             }
-            if (_adjustmentRequired && Singleton<Communication>.Instance.isInit && _talkScene.targetHeroine.transform.position != Vector3.zero)
+            if (_adjustmentRequired && TalkScene.cameraMap.enabled)
             {
                 Adjust();
+                // Don't want to init it too early, target heroine might be different/absent.
+                HitReactionInitialize();
+            }
+            if (_waitForAction && _waitTimestamp < Time.time)
+            {
+                PickAction(Timing.Full);
             }
         }
-
-        public override bool OnButtonDown(Controller.TrackpadDirection direction)
+        public override void OnLateUpdate()
         {
+            if (lstIKEffectLateUpdate.Count != 0)
+            {
+                _hitReaction.ReleaseEffector();
+                _hitReaction.SetEffector(lstIKEffectLateUpdate);
+                lstIKEffectLateUpdate.Clear();
+            }
+        }
+        public static void HitReactionInitialize()
+        {
+            if (_hitReaction == null)
+            {
+                // ADV scene is turned off quite often, so we can't utilized native component.
+
+                Util.CopyComponent(AdvScene.GetComponent<HitReaction>(), TalkScene.gameObject);
+                _hitReaction = TalkScene.GetComponent<HitReaction>();
+            }
+            _hitReaction.ik = TalkScene.targetHeroine.chaCtrl.objAnim.GetComponent<FullBodyBipedIK>();
+        }
+
+        public static void HitReactionPlay(AibuColliderKind aibuKind, ChaControl chara)
+        {
+            VRPlugin.Logger.LogDebug($"TalkScene:Interpreter:Reaction:{aibuKind}");
+            var ik = chara.objAnim.GetComponent<FullBodyBipedIK>();
+            if (_hitReaction.ik != ik)
+            {
+                _hitReaction.ik = ik;
+            }
+
+            var key = aibuKind - AibuColliderKind.reac_head;
+            var gameObject = chara.gameObject;
+            var index = Random.Range(0, dicNowReactions[key].lstParam.Count);
+            var reactionParam = dicNowReactions[key].lstParam[index];
+            var array = new Vector3[reactionParam.lstMinMax.Count];
+            for (int i = 0; i < reactionParam.lstMinMax.Count; i++)
+            {
+                array[i] = new Vector3(Random.Range(reactionParam.lstMinMax[i].min.x, reactionParam.lstMinMax[i].max.x), 
+                    Random.Range(reactionParam.lstMinMax[i].min.y, reactionParam.lstMinMax[i].max.y), 
+                    Random.Range(reactionParam.lstMinMax[i].min.z, reactionParam.lstMinMax[i].max.z));
+                array[i] = gameObject.transform.TransformDirection(array[i].normalized);
+            }
+            _hitReaction.weight = dicNowReactions[key].weight;
+            _hitReaction.HitsEffector(reactionParam.id, array);
+            lstIKEffectLateUpdate.AddRange(dicNowReactions[key].lstReleaseEffector);
+
+            if (chara.asVoice == null)
+            {
+                // Find actual experience ?
+                Features.LoadVoice.Play(Random.value < 0.5f ? Features.LoadVoice.VoiceType.Laugh : Features.LoadVoice.VoiceType.Short, chara, SaveData.Heroine.HExperienceKind.慣れ);
+            }
+        }
+        private void SetWait(float duration = 1f)
+        {
+            _waitForAction = true;
+            _waitTime = duration;
+            _waitTimestamp = Time.time + duration;
+        }
+        public override bool OnButtonDown(TrackpadDirection direction)
+        {
+            var adv = IsADV;
+            _lastDirection = direction;
             switch (direction)
             {
-                case Controller.TrackpadDirection.Up:
-                case Controller.TrackpadDirection.Down:
-                    ScrollButtons(direction == Controller.TrackpadDirection.Down);
+                case TrackpadDirection.Up:
+                case TrackpadDirection.Down:
+                    if (!adv || IsChoice)
+                    {
+                        ScrollButtons(direction == TrackpadDirection.Down, adv);
+                    }
+                    else
+                    {
+
+                    }
                     break;
-                case Controller.TrackpadDirection.Left:
-                    EnterState();
-                    break;
-                case Controller.TrackpadDirection.Right:
-                    LeaveState();
+                case TrackpadDirection.Left:
+                case TrackpadDirection.Right:
+                    SetWait();
                     break;
             }
             return false;
         }
+        public override bool OnButtonUp(TrackpadDirection direction)
+        {
+            _waitForAction = false;
+            var timing = _waitTimestamp - Time.time;
 
+            // Not interested in full wait as it performed automatically once reached via Update().
+            if (timing > 0)
+            {
+                if (_waitTime * 0.5f > timing)
+                {
+                    // More then a half, less then full wait case.
+                    PickAction(Timing.Half);
+                }
+                else
+                {
+                    PickAction(Timing.Fraction);
+                }
+            }
+            return false;
+        }
+        private void PickAction(Timing timing)
+        {
+            var adv = IsADV;
+            _waitForAction = false;
+            switch (_lastDirection)
+            {
+                case TrackpadDirection.Up:
+                case TrackpadDirection.Down:
+                    break;
+                case TrackpadDirection.Left:
+                    if (adv && !IsChoice)
+                    {
+                        VR.Input.Mouse.VerticalScroll(-1);
+                    }
+                    else
+                    {
+                        if (timing == Timing.Full)
+                        {
+
+                        }
+                        else
+                        {
+                            EnterState(adv);
+                        }
+                    }
+                    break;
+                case TrackpadDirection.Right:
+                    if (adv && !IsChoice)
+                    {
+                        if (timing == Timing.Full)
+                        {
+                            SetAutoADV();
+                        }
+                        else
+                        {
+                            VR.Input.Mouse.VerticalScroll(-1);
+                        }
+                    }
+                    else
+                    {
+                        if (timing == Timing.Full && !adv)
+                        {
+                            ClickLastButton();
+                        }
+                        else
+                        {
+                            LeaveState(adv);
+                        }
+                    }
+                    break;
+            }
+        }
+        private void SetAutoADV()
+        {
+            AdvScene.Scenario.isAuto = !AdvScene.Scenario.isAuto;
+        }
         /// <summary>
         /// We wait for TalkScene to load up to the point where chara is ready, and then adjust everything.
         /// </summary>
         private void Adjust()
         {
             _adjustmentRequired = false;
+            if (TalkScene == null) return;
 
-            if (_talkScene == null) return;
+            AddControllerComponent<Controls.TalkSceneHandler>();
+
+
             var head = VR.Camera.Head;
             var origin = VR.Camera.Origin;
-            var heroine = _talkScene.targetHeroine.transform;
+            var heroine = TalkScene.targetHeroine.transform;
             var headsetPos = head.position;
 
             Height = headsetPos.y - heroine.position.y;
             headsetPos.y = heroine.position.y;
-            TalkDistance = 0.4f + (_talkScene.targetHeroine.isGirlfriend ? 0f : 0.1f) + (0.1f - _talkScene.targetHeroine.intimacy * 0.001f);
+            TalkDistance = 0.4f + (TalkScene.targetHeroine.isGirlfriend ? 0f : 0.1f) + (0.1f - TalkScene.targetHeroine.intimacy * 0.001f);
 
             var offset = _sittingPosition ? 0.3f : 0f;
             //if (_sittingAnimations.Contains(_talkScene.targetHeroine.charaBase.motion.state))
@@ -137,21 +327,34 @@ namespace KK_VR.Interpreters
             player.rotation = flippedRotation * Quaternion.Euler(0f, angle, 0f);
             player.position = headsetPos + vec * 0.12f;
 
-            var name = _talkScene.targetHeroine.Name;
+            var name = TalkScene.targetHeroine.Name;
             foreach (var npc in actScene.npcList) 
             {
                 if (npc.heroine.Name != name)
                 {
+                    // TODO Don't add/stop walking/running animation, and check why async cloth load hates us for this.
                     npc.SetActive(npc.mapNo == actScene.Map.no);
                     npc.Pause(false);
                     npc.charaData.SetRoot(npc.gameObject);
                 }
             }
 
+            // Enable all the colliders.
+            var colliders = TalkScene.targetHeroine.chaCtrl.GetComponentsInChildren<Collider>(includeInactive: true);
+            foreach (var collider in colliders)
+            {
+                if (!collider.enabled)
+                {
+                    collider.enabled = true;
+                    collider.gameObject.layer = 10;
+                    collider.gameObject.SetActive(true);
+                }
+            }
+
             headsetPos.y = head.position.y;
             origin.rotation = flippedRotation;
             origin.position += headsetPos - head.position;
-            VRPlugin.Logger.LogDebug($"TalkScene:Adjust:{_talkScene.targetHeroine.charaBase.motion.state}:{TalkDistance}:");
+            VRPlugin.Logger.LogDebug($"TalkScene:Adjust:{TalkScene.targetHeroine.charaBase.motion.state}:{TalkDistance}:");
         }
         //private static readonly List<string> _sittingAnimations = new List<string>()
         //{
@@ -165,53 +368,47 @@ namespace KK_VR.Interpreters
         //    "Dinner"
         //};
 
-        private void AdjustPosition()
+        //private void AdjustPosition()
+        //{
+        //    if (TalkScene == null) return;
+        //    Height = VR.Camera.Head.position.y - Game.Instance.Player.transform.position.y;
+        //    VRPlugin.Logger.LogDebug($"Interpreter:TalkScene:Height:{Height}");
+        //    // The default camera location is a bit too far for a friendly
+        //    // conversation.
+        //    var heroine = TalkScene.targetHeroine;
+
+        //    TalkDistance = 0.4f + (heroine.isGirlfriend ? 0f : 0.1f) + (0.15f - heroine.intimacy * 0.0015f); //  + Random.value * 0.25f;
+        //    //TalkDistance = 0.35f + (heroine.isGirlfriend ? 0f : 0.1f) + (0.15f - (int)heroine.HExperience * 0.05f); //  + Random.value * 0.25f;
+        //    var position = heroine.chaCtrl.objHeadBone.transform.TransformPoint(new Vector3(0f, 0f, TalkDistance));
+        //    //var relativeHeight = heroine.transform.TransformPoint(new Vector3(0f, Height, 0f));
+        //    position.y = Height;
+        //    var rotation = heroine.chaCtrl.objHeadBone.transform.rotation * Quaternion.Euler(0, 180f, 0);
+        //    VRMover.Instance.MoveTo(position, rotation, false);
+        //    //VRMover.Instance.MoveTo(
+        //    //    heroine.transform.TransformPoint(new Vector3(0, Height, TalkDistance)),
+        //    //    heroine.transform.rotation * Quaternion.Euler(0, 180f, 0),
+        //    //    false);
+        //}
+        private void ClickLastButton()
         {
-            if (_talkScene == null) return;
-            Height = VR.Camera.Head.position.y - Game.Instance.Player.transform.position.y;
-            VRPlugin.Logger.LogDebug($"Interpreter:TalkScene:Height:{Height}");
-            // The default camera location is a bit too far for a friendly
-            // conversation.
-            var heroine = _talkScene.targetHeroine;
-
-            TalkDistance = 0.4f + (heroine.isGirlfriend ? 0f : 0.1f) + (0.15f - heroine.intimacy * 0.0015f); //  + Random.value * 0.25f;
-            //TalkDistance = 0.35f + (heroine.isGirlfriend ? 0f : 0.1f) + (0.15f - (int)heroine.HExperience * 0.05f); //  + Random.value * 0.25f;
-            var position = heroine.chaCtrl.objHeadBone.transform.TransformPoint(new Vector3(0f, 0f, TalkDistance));
-            //var relativeHeight = heroine.transform.TransformPoint(new Vector3(0f, Height, 0f));
-            position.y = Height;
-            var rotation = heroine.chaCtrl.objHeadBone.transform.rotation * Quaternion.Euler(0, 180f, 0);
-            VRMover.Instance.MoveTo(position, rotation, false);
-            //VRMover.Instance.MoveTo(
-            //    heroine.transform.TransformPoint(new Vector3(0, Height, TalkDistance)),
-            //    heroine.transform.rotation * Quaternion.Euler(0, 180f, 0),
-            //    false);
-        }
-
-
-        private TalkScene GetTalkScene()
-        {
-            if (_talkScene == null)
+            if (_lastChosenButton != null && _lastChosenButton.enabled)
             {
-                var scene = Game.Instance.actScene.advScene.nowScene;
-                if (scene != null && scene.GetType() == typeof(TalkScene))
-                {
-                    _talkScene = (TalkScene)scene;
-                }
-                else
-                {
-                    _talkScene = UnityEngine.Object.FindObjectOfType<TalkScene>();
-                }
+                _lastChosenButton.onClick.Invoke();
             }
-            return _talkScene;
         }
-        private void LeaveState()
+        private void LeaveState(bool adv)
         {
             var state = GetState();
-            var buttons = GetRelevantButtons(state);
-            GetSelectedButton(buttons);
-            if (state != State.None)
+            var buttons = GetRelevantButtons(state, adv);
+            var button = GetSelectedButton(buttons);
+            if (adv)
             {
-                buttons = GetRelevantButtons(State.None);
+                button.onClick.Invoke();
+                _lastChosenButton = button;
+            }
+            else if (state != State.None)
+            {
+                buttons = GetRelevantButtons(State.None, adv);
                 buttons[(int)state].onClick.Invoke();
             }
         }
@@ -228,13 +425,18 @@ namespace KK_VR.Interpreters
             }
             return null;
         }
-        private Button[] GetRelevantButtons(State state)
+        private Button[] GetRelevantButtons(State state, bool adv)
         {
-            return state == State.None ? GetMainButtons() : GetCurrentContents(state);
+            return adv ? GetADVChoices() : state == State.None ? GetMainButtons() : GetCurrentContents(state);
         }
-        private void ScrollButtons(bool increase)
+        private void ScrollButtons(bool increase, bool adv)
         {
-            var buttons = GetRelevantButtons(GetState());
+            var buttons = GetRelevantButtons(GetState(), adv);
+            var length = buttons.Length;
+            if (length == 0)
+            {
+                return;
+            }
             var selectedBtn = GetSelectedButton(buttons);
             var index = increase ? 1 : -1;
             if (selectedBtn != null)
@@ -246,33 +448,33 @@ namespace KK_VR.Interpreters
                 index = 0;
                 VRPlugin.Logger.LogDebug($"ScrollMainButtons:NotFound:Pressed");
             }
-            if (index == buttons.Length)
+            if (index == length)
             {
                 index = 0;
             }
             else if (index < 0)
             {
-                index = buttons.Length - 1;
+                index = length - 1;
             }
-            VRPlugin.Logger.LogDebug($"ScrollMainButtons{index}");
-            buttons[index].DoStateTransition(Selectable.SelectionState.Pressed, false);
+            VRPlugin.Logger.LogDebug($"ScrollButtons:Index - {index}");
+            buttons[index].DoStateTransition(adv ? Selectable.SelectionState.Highlighted : Selectable.SelectionState.Pressed, false);
             buttons[index].name += "+";
         }
         private Button[] GetMainButtons()
         {
-            return new Button[] { _talkScene.buttonTalk, _talkScene.buttonListen, _talkScene.buttonEvent };
+            return new Button[] { TalkScene.buttonTalk, TalkScene.buttonListen, TalkScene.buttonEvent };
         }
             
-        private List<Button> GetADVChoices()
+        private Button[] GetADVChoices()
         {
             return Game.Instance.actScene.advScene.scenario.choices.GetComponentsInChildren<Button>()
                 .Where(b => b.isActiveAndEnabled)
-                .ToList();
+                .ToArray();
         }
-        private void EnterState()
+        private void EnterState(bool adv)
         {
             var state = GetState();
-            var buttons = GetRelevantButtons(state);
+            var buttons = GetRelevantButtons(state, adv);
             var button = GetSelectedButton(buttons);
 
             if (button == null)
@@ -284,19 +486,20 @@ namespace KK_VR.Interpreters
             {
                 VRPlugin.Logger.LogDebug($"EnterState:State - {state}:Button - {button.name}");
             }
+            _lastChosenButton = button;
             button.onClick.Invoke();
         }
         private Button[] GetCurrentContents(State state)
         {
-            return state == State.Talk ? _talkScene.buttonTalkContents : _talkScene.buttonEventContents;
+            return state == State.Talk ? TalkScene.buttonTalkContents : TalkScene.buttonEventContents;
         }
         private State GetState()
         {
-            if (_talkScene.objTalkContentsRoot.activeSelf)
+            if (TalkScene.objTalkContentsRoot.activeSelf)
             {
                 return State.Talk;
             }
-            else if (_talkScene.objEventContentsRoot.activeSelf)
+            else if (TalkScene.objEventContentsRoot.activeSelf)
             {               
                 return State.Event; 
             }
@@ -305,5 +508,6 @@ namespace KK_VR.Interpreters
                 return State.None;
             }
         }
+        
     }
 }

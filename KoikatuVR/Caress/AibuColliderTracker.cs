@@ -156,15 +156,12 @@ namespace KK_VR.Caress
         /// <summary>
         ///  Check whether a particular body interaction is allowed.
         /// </summary>
-        /// <param name="hand"></param>
-        /// <param name="kind"></param>
-        /// <returns></returns>
         private bool AibuKindAllowed(HandCtrl hand, HandCtrl.AibuColliderKind kind)
         {
             // It's ok to use lstHeroine[0] here because this variable is not used
             // when there are more than one heroine.
             var heroine = hand.flags.lstHeroine[0];
-            var dicNowReaction = new Traverse(hand).Field("dicNowReaction").GetValue<Dictionary<int, HandCtrl.ReactionInfo>>();
+            var dicNowReaction = hand.dicNowReaction; // new Traverse(hand).Field("dicNowReaction").GetValue<Dictionary<int, HandCtrl.ReactionInfo>>();
             HandCtrl.ReactionInfo rinfo;
             switch (kind)
             {

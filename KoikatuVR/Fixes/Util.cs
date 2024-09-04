@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using UnityEngine;
 
 namespace KK_VR.Fixes
 {
@@ -59,6 +60,18 @@ namespace KK_VR.Fixes
                 return str.Substring(prefix.Length);
             }
             return null;
+        }
+        public static Component CopyComponent(Component original, GameObject destination)
+        {
+            var type = original.GetType();
+            var copy = destination.AddComponent(type);
+            // Copied fields can be restricted with BindingFlags
+            var fields = type.GetFields();
+            foreach (var field in fields)
+            {
+                field.SetValue(copy, field.GetValue(original));
+            }
+            return copy;
         }
     }
 }

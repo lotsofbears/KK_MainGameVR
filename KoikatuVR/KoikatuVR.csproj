@@ -81,6 +81,10 @@
     <Compile Include="Camera\ActionCameraControl.cs" />
     <Compile Include="Camera\Background.cs" />
     <Compile Include="Camera\VRMoverEx.cs" />
+    <Compile Include="Controls\ColliderTracker.cs" />
+    <Compile Include="Features\ClothesManipulator.cs" />
+    <Compile Include="Features\Extras\VoiceBundles.cs" />
+    <Compile Include="Features\LoadVoice.cs" />
     <Compile Include="Fixes\BepInExVrLogBackend.cs" />
     <Compile Include="Camera\VREffector.cs" />
     <Compile Include="Camera\VRMoverH.cs" />
@@ -95,6 +99,7 @@
     <Compile Include="Caress\LongDistanceKissMachine.cs" />
     <Compile Include="Caress\VRMouth.cs" />
     <Compile Include="Fixes\ReduceAssetUnload.cs" />
+    <Compile Include="Interpreters\Extras\TalkSceneExtras.cs" />
     <Compile Include="Interpreters\Patches\HScenePatches.cs" />
     <Compile Include="Utils\Compat.cs" />
     <Compile Include="Features\CrossFader.cs" />

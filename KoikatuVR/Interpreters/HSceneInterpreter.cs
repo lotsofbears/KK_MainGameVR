@@ -80,8 +80,8 @@ namespace KK_VR.Interpreters
         private PoV _pov;
         private VRMoverH _vrMoverH;
         private bool _sensibleH;
-        private float _timeStamp;
-        private float _waitWindow;
+        private float _waitTimestamp;
+        private float _waitTime;
         private bool _manipulateSpeed;
         private bool _waitForAction;
         private bool _addedModifier;
@@ -151,7 +151,7 @@ namespace KK_VR.Interpreters
                 return list;
             }
         }
-        private bool IsWait => _timeStamp > Time.time;
+        private bool IsWait => _waitTimestamp > Time.time;
 
         private System.Action<string> ClickButton;
         private System.Action<int> ChangeLoop;
@@ -322,8 +322,8 @@ namespace KK_VR.Interpreters
                 }
                 _waitForAction = true;
             }
-            _timeStamp = Time.time + duration;
-            _waitWindow = duration;
+            _waitTimestamp = Time.time + duration;
+            _waitTime = duration;
         }
 
         private bool SetHand()
@@ -373,12 +373,12 @@ namespace KK_VR.Interpreters
             VRPlugin.Logger.LogDebug($"OnButton:Up:{direction}");
             _waitForAction = false;
             _manipulateSpeed = false;
-            var timing = _timeStamp - Time.time;
+            var timing = _waitTimestamp - Time.time;
 
             // Not interested in full wait as it performed automatically once reached via Update().
             if (timing > 0)
             {
-                if (_waitWindow * 0.5f > timing)
+                if (_waitTime * 0.5f > timing)
                 {
                     // More then a half, less then full wait case.
                     PickAction(Timing.Half);
@@ -409,7 +409,7 @@ namespace KK_VR.Interpreters
                 SetWaitTime(1f, action: false);
             }
             EvaluateModifiers();
-            return false;
+            return _waitForAction;
         }
 
         public override bool OnButtonDown(TrackpadDirection direction)
@@ -918,12 +918,6 @@ namespace KK_VR.Interpreters
                 }
             }
             return array;
-        }
-        private enum Timing
-        {
-            Fraction,
-            Half,
-            Full
         }
         private void Deactivate()
         {

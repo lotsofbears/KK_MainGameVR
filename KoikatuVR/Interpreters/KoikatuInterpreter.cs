@@ -27,10 +27,13 @@ namespace KK_VR.Interpreters
         private int _kkapiCanvasHackWait;
         private Canvas _kkSubtitlesCaption;
         private GameObject _sceneObjCache;
-        private VRMoverEx _moverEx;
+        private Manager.Scene _scene;
+        private Manager.Game _game;
 
         protected override void OnAwake()
         {
+            _scene = Manager.Scene.Instance;
+            _game = Manager.Game.Instance;
             CurrentScene = SceneType.OtherScene;
             SceneInterpreter = new OtherSceneInterpreter();
             SceneManager.sceneLoaded += OnSceneLoaded;
@@ -52,6 +55,7 @@ namespace KK_VR.Interpreters
             {
                 FixupKkSubtitles();
             }
+            SceneInterpreter.OnLateUpdate();
         }
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -147,21 +151,55 @@ namespace KK_VR.Interpreters
 
         private SceneType DetectScene()
         {
-            var stack = Manager.Scene.Instance.NowSceneNames;
-            foreach (string name in stack)
+            if (_game.actScene !=  null)
             {
-                if (name == "H" && SceneObjPresent("HScene"))
-                    return SceneType.HScene;
-                if (name == "Action" && SceneObjPresent("ActionScene"))
-                    return SceneType.ActionScene;
-                if (name == "Talk" && SceneObjPresent("TalkScene"))
+                if (_game.actScene.AdvScene.isActiveAndEnabled || _scene.NowSceneNames.Contains("TalkScene"))
+                {
                     return SceneType.TalkScene;
-                if (name == "NightMenu" && SceneObjPresent("NightMenuScene"))
-                    return SceneType.NightMenuScene;
-                if (name == "CustomScene" && SceneObjPresent("CustomScene"))
-                    return SceneType.CustomScene;
+                }
+                if (_scene.NowSceneNames.Contains("H"))
+                {
+                    return SceneType.HScene;
+                }
+                //if (_scene.NowSceneNames.Contains("NightMenuScene"))
+                //{
+                //    return SceneType.NightMenuScene;
+                //}
+                return SceneType.ActionScene;
             }
+            else
+            {
+                if (_scene.LoadSceneName.Equals("H"))
+                {
+                    return SceneType.HScene;
+                }
+            }
+            //if (_scene.NowSceneNames.Contains("CustomScene"))
+            //{
+            //    return SceneType.CustomScene;
+            //}
             return SceneType.OtherScene;
+            //var scene = Manager.Scene.Instance.LoadSceneName;
+            //var stack = Manager.Scene.Instance.NowSceneNames;
+            //foreach (string name in stack)
+            //{
+            //    if (scene.Equals("Action"))
+            //    {
+
+            //    }
+
+            //    if (name == "H" && SceneObjPresent("HScene"))
+            //        return SceneType.HScene;
+            //    if (name == "Action" && SceneObjPresent("ActionScene"))
+            //        return SceneType.ActionScene;
+            //    if (name == "Talk" && SceneObjPresent("TalkScene"))
+            //        return SceneType.TalkScene;
+            //    if (name == "NightMenu" && SceneObjPresent("NightMenuScene"))
+            //        return SceneType.NightMenuScene;
+            //    if (name == "CustomScene" && SceneObjPresent("CustomScene"))
+            //        return SceneType.CustomScene;
+            //}
+            //return SceneType.OtherScene;
         }
 
         private bool SceneObjPresent(string name)

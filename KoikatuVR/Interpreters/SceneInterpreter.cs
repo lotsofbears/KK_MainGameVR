@@ -10,6 +10,10 @@ namespace KK_VR.Interpreters
         public abstract void OnStart();
         public abstract void OnDisable();
         public abstract void OnUpdate();
+        public virtual void OnLateUpdate()
+        {
+
+        }
 
         protected void AddControllerComponent<T>()
             where T: Component
@@ -46,6 +50,12 @@ namespace KK_VR.Interpreters
         public virtual bool OnButtonUp(EVRButtonId buttonId)
         {
             return false;
+        }
+        public enum Timing
+        {
+            Fraction,
+            Half,
+            Full
         }
         protected void DestroyControllerComponent<T>()
             where T: Component

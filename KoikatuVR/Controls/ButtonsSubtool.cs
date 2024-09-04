@@ -198,7 +198,7 @@ namespace KK_VR.Controls
         {
             if (_Settings.ContinuousRotation)
             {
-                _continuousRotation = degrees * (Time.deltaTime * 2f);
+                _continuousRotation = degrees * (Mathf.Min(Time.deltaTime, 0.04f) * 2f);
             }
             else
             {

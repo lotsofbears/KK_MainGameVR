@@ -8,6 +8,9 @@ using VRGIN.Helpers;
 using UnityEngine;
 using HarmonyLib;
 using KK_VR.Fixes;
+using KK_VR.Interpreters;
+using static SteamVR_Controller.ButtonMask;
+using KK_VR.Settings;
 
 namespace KK_VR.Controls
 {
@@ -20,29 +23,28 @@ namespace KK_VR.Controls
     class TalkSceneHandler : ProtectedBehaviour
     {
         private Controller _controller;
-        private TalkScene _talkScene;
-        private HashSet<Collider> _currentlyIntersecting
-            = new HashSet<Collider>();
         private Controller.Lock _lock; // null or valid
+        private ColliderTracker _tracker;
+        //private KoikatuSettings _settings;
 
         protected override void OnStart()
         {
             base.OnStart();
 
+            //_settings = VR.Context.Settings as KoikatuSettings;
             _controller = GetComponent<Controller>();
-            _talkScene = GameObject.FindObjectOfType<TalkScene>();
-            if (_talkScene == null)
-            {
-                VRLog.Warn("TalkSceneHandler: TalkScene not found");
-            }
+        }
+
+        protected void OnEnable()
+        {
+            _tracker = new ColliderTracker(TalkSceneInterpreter.TalkScene.targetHeroine.chaCtrl);
         }
 
         protected void OnDisable()
         {
-            _currentlyIntersecting.Clear();
             UpdateLock();
+            _tracker = null;
         }
-
         protected override void OnUpdate()
         {
             if (_lock != null)
@@ -53,47 +55,43 @@ namespace KK_VR.Controls
 
         private void HandleTrigger()
         {
-            var device = SteamVR_Controller.Input((int)_controller.Tracking.index);
-            if (device.GetPressUp(Valve.VR.EVRButtonId.k_EButton_SteamVR_Trigger))
+            if (_controller.Input.GetPressDown(Trigger))
             {
-                PerformAction();
+                PerformAction(triggerPress: true);
             }
         }
 
-        private void PerformAction()
+        public void PerformAction(bool triggerPress)
         {
-            // Find the nearest intersecting collider.
-            var nearest = _currentlyIntersecting
-                .OrderBy(_col => (_col.transform.position - transform.position).sqrMagnitude)
-                .FirstOrDefault();
-            if (nearest == null)
+            var aibuKind = _tracker.GetColliderKind(triggerPress, out var chara, out var tag);
+            if (aibuKind == HandCtrl.AibuColliderKind.none)
             {
                 return;
             }
-            var kind = Util.StripPrefix("Com/Hit/", nearest.tag);
-            if (kind != null)
+            VRPlugin.Logger.LogDebug($"TalkScene:Handler:PerformAction:{aibuKind}:{tag}");
+            if (!tag.Equals("") && (triggerPress || UnityEngine.Random.value < 0.67f))
             {
-                _talkScene.TouchFunc(kind,Vector3.zero);
+                TalkSceneInterpreter.TalkScene.TouchFunc(tag, Vector3.zero);
+            }
+            else
+            {
+                TalkSceneInterpreter.HitReactionPlay(aibuKind, chara);
             }
         }
 
         protected void OnTriggerEnter(Collider other)
         {
-            bool wasIntersecting = _currentlyIntersecting.Count > 0;
-            if (other.tag.StartsWith("Com/Hit/"))
+            if (_tracker.AddCollider(other))
             {
-                _currentlyIntersecting.Add(other);
-                if (!wasIntersecting)
-                {
-                    _controller.StartRumble(new RumbleImpulse(1000));
-                }
-                UpdateLock();
+                PerformAction(triggerPress: false);
+                _controller.StartRumble(new RumbleImpulse(1000));
             }
+            UpdateLock();
         }
 
         protected void OnTriggerExit(Collider other)
         {
-            if (_currentlyIntersecting.Remove(other))
+            if (_tracker.RemoveCollider(other))
             {
                 UpdateLock();
             }
@@ -101,14 +99,20 @@ namespace KK_VR.Controls
 
         private void UpdateLock()
         {
-            if (_currentlyIntersecting.Count > 0 && _lock == null)
+            if (_lock == null)
             {
-                _controller.TryAcquireFocus(out _lock);
+                if (_tracker.IsBusy)
+                {
+                    _controller.TryAcquireFocus(out _lock);
+                }
             }
-            else if (_currentlyIntersecting.Count == 0 && _lock != null)
+            else
             {
-                _lock.Release();
-                _lock = null;
+                if (!_tracker.IsBusy)
+                {
+                    _lock.Release();
+                    _lock = null;
+                }
             }
         }
     }

@@ -26,8 +26,6 @@ namespace KK_VR.Controls
         private bool _InHScene = false;
         private Controller.Lock _lock = VRGIN.Controls.Controller.Lock.Invalid;
 
-        private bool _interpretationBusy;
-
         private Controller.TrackpadDirection? _touchDirection;
         private Controller.TrackpadDirection? _lastPressDirection;
 
@@ -35,10 +33,6 @@ namespace KK_VR.Controls
         private ButtonsSubtool _buttonsSubtool;
         private GrabAction _grab;
 
-        public void SetBusy(bool state)
-        {
-            _interpretationBusy = state;
-        }
         
         private void ChangeKeySet()
         {
@@ -146,7 +140,7 @@ namespace KK_VR.Controls
                 SetScene(inHScene);
             }
 
-            if (!_interpretationBusy && _grab != null)
+            if (_grab != null)
             {
                 if (_grab.HandleGrabbing() != GrabAction.Status.Continue)
                 {
@@ -190,8 +184,10 @@ namespace KK_VR.Controls
 
             if (device.GetPressDown(ButtonMask.Grip))
             {
-                _Interpreter.SceneInterpreter.OnButtonDown(EVRButtonId.k_EButton_Grip);
-                InputDown(_KeySet.Grip, ButtonMask.Grip);
+                if (!_Interpreter.SceneInterpreter.OnButtonDown(EVRButtonId.k_EButton_Grip))
+                {
+                    InputDown(_KeySet.Grip, ButtonMask.Grip);
+                }
             }
 
             if (device.GetPressUp(ButtonMask.Grip))
@@ -205,10 +201,7 @@ namespace KK_VR.Controls
                 var fun = GetTrackpadFunction(dir);
                 bool requiresPress = RequiresPress(fun);
 
-                if (_Interpreter.SceneInterpreter.OnButtonDown(dir, EVRButtonId.k_EButton_SteamVR_Touchpad))
-                {
-                    SetBusy(true);
-                }
+                _Interpreter.SceneInterpreter.OnButtonDown(dir, EVRButtonId.k_EButton_SteamVR_Touchpad);
                 if (requiresPress)
                 {
                     InputDown(fun, ButtonMask.Touchpad);
@@ -223,7 +216,6 @@ namespace KK_VR.Controls
             if (device.GetPressUp(ButtonMask.Touchpad) && _lastPressDirection is Controller.TrackpadDirection dirP)
             {
                 _Interpreter.SceneInterpreter.OnButtonUp(dirP);
-                SetBusy(false);
 
                 InputUp(GetTrackpadFunction(dirP));
                 _lastPressDirection = null;
@@ -238,7 +230,6 @@ namespace KK_VR.Controls
                     GetTrackpadFunction(oldDir) is var oldFun)
                 {
                     _Interpreter.SceneInterpreter.OnButtonUp(oldDir);
-                    SetBusy(false);
 
                     if (!RequiresPress(oldFun))
                     {
@@ -250,10 +241,7 @@ namespace KK_VR.Controls
                 if (newTouchDirection is Controller.TrackpadDirection newDir &&
                     GetTrackpadFunction(newDir) is var newFun)
                 {
-                    if (_Interpreter.SceneInterpreter.OnButtonDown(newDir))
-                    {
-                        SetBusy(true);
-                    }
+                    _Interpreter.SceneInterpreter.OnButtonDown(newDir);
 
                     if (!RequiresPress(newFun))
                     {
@@ -338,9 +326,8 @@ namespace KK_VR.Controls
                 case AssignableFunction.NEXT:
                     ChangeKeySet();
                     break;
-                case AssignableFunction.SCROLLUP:
-                case AssignableFunction.SCROLLDOWN:
-                    goto default;
+                case AssignableFunction.GRAB:
+                    break;
                 default:
                     _buttonsSubtool.ButtonUp(fun);
                     break;
