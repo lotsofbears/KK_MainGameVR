@@ -15,6 +15,7 @@ using UnityEngine;
 using VRGIN.Core;
 using static RootMotion.FinalIK.InteractionTrigger;
 using static UnityEngine.UI.Image;
+using KK_VR.Interpreters;
 
 namespace KK_VR.Camera
 {
@@ -32,12 +33,12 @@ namespace KK_VR.Camera
         //private List<Coroutine> _activeCoroutines = new List<Coroutine>();
         internal KoikatuSettings _settings;
 
-        public void Initialize(HSceneProc proc)
+        public void Initialize()
         {
             Instance = this;
             _pov = PoV.Instance;
-            var chara = Traverse.Create(proc).Field("lstFemale").GetValue<List<ChaControl>>().FirstOrDefault();
-            _chara = chara.objTop.transform;
+            var chara = HSceneInterpreter.lstFemale[0];
+            _chara = chara.transform;
             _eyes = chara.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz/cf_J_Eye_tz");
             _torso = chara.objBodyBone.transform.Find("cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03");
             _kokan = chara.objBodyBone.transform.Find("cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_d_kokan/cf_j_kokan");

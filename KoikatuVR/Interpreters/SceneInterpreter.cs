@@ -7,47 +7,69 @@ namespace KK_VR.Interpreters
 {
     abstract class SceneInterpreter
     {
-        public abstract void OnStart();
-        public abstract void OnDisable();
-        public abstract void OnUpdate();
+        public virtual void OnStart()
+        {
+
+        }
+        public virtual void OnDisable()
+        {
+
+        }
+        public virtual void OnUpdate()
+        {
+
+        }
         public virtual void OnLateUpdate()
         {
 
         }
-
-        protected void AddControllerComponent<T>()
+        protected static T[] AddControllerComponent<T>()
             where T: Component
         {
-            VR.Mode.Left.gameObject.AddComponent<T>();
-            VR.Mode.Right.gameObject.AddComponent<T>();
+            // Controller indexes are 1(L) and 2(R).
+            var components = new T[2];
+            if (VR.Mode.Left.gameObject.GetComponent<T>() == null)
+            {
+                components[0] = VR.Mode.Left.gameObject.AddComponent<T>();
+                components[1] = VR.Mode.Right.gameObject.AddComponent<T>();
+            }
+            else
+            {
+                components[0] = VR.Mode.Left.gameObject.GetComponent<T>();
+                components[1] = VR.Mode.Right.gameObject.GetComponent<T>();
+            }
+            return components;
         }
-        // For touchpad direction without click;
-        public virtual bool OnButtonDown(Controller.TrackpadDirection direction)
+        /// <summary>
+        /// For touchpad direction without click.
+        /// </summary>
+        public virtual bool OnDirectionDown(Controller.TrackpadDirection direction, int index)
+        {
+            if (direction == Controller.TrackpadDirection.Left)
+            {
+
+                KoikatuInterpreter.Instance.ChangeModelAnim(2);
+            }
+            return false;
+        }
+        /// <summary>
+        /// For touchpad direction without click.
+        /// </summary>
+        public virtual bool OnDirectionUp(Controller.TrackpadDirection direction, int index)
         {
             return false;
         }
-        // For touchpad direction without click;
-        public virtual bool OnButtonUp(Controller.TrackpadDirection direction)
+        /// <summary>
+        /// For actual click.
+        /// </summary>
+        public virtual bool OnButtonDown(EVRButtonId buttonId, Controller.TrackpadDirection direction, int index)
         {
             return false;
         }
-        // For touchpad direction + click;
-        public virtual bool OnButtonDown(Controller.TrackpadDirection direction, EVRButtonId buttonId)
-        {
-            return false;
-        }
-        // For touchpad direction + click;
-        public virtual bool OnButtonUp(Controller.TrackpadDirection direction, EVRButtonId buttonId)
-        {
-            return false;
-        }
-        // For grip/trigger/(a/x).
-        public virtual bool OnButtonDown(EVRButtonId buttonId)
-        {
-            return false;
-        }
-        // For grip/trigger/(a/x).
-        public virtual bool OnButtonUp(EVRButtonId buttonId)
+        /// <summary>
+        /// For actual click.
+        /// </summary>
+        public virtual bool OnButtonUp(EVRButtonId buttonId, Controller.TrackpadDirection direction, int index)
         {
             return false;
         }
@@ -57,7 +79,7 @@ namespace KK_VR.Interpreters
             Half,
             Full
         }
-        protected void DestroyControllerComponent<T>()
+        protected static void DestroyControllerComponent<T>()
             where T: Component
         {
             var left = VR.Mode.Left.GetComponent<T>();

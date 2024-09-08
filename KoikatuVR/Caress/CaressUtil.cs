@@ -14,27 +14,27 @@ namespace KK_VR.Caress
         /// Modify the internal state of the hand controls so that subsequent mouse button
         /// presses are interpreted to point to the specified (female, point) pair.
         /// </summary>
-        public static void SetSelectKindTouch(HSceneProc proc, int femaleIndex, HandCtrl.AibuColliderKind colliderKind)
-        {
-            var hands = GetHands(proc);
-            for (int i = 0; i < hands.Count; i++)
-            {
-                var kind = i == femaleIndex ? colliderKind : HandCtrl.AibuColliderKind.none;
-                hands[i].selectKindTouch = kind;
-                //new Traverse(hands[i]).Field("selectKindTouch").SetValue(kind);
-                //VRLog.Debug($"SetSelectKindTouch[{i}][{kind}] - {hands[i].selectKindTouch}");
-            }
-        }
+        //public static void SetSelectKindTouch(HSceneProc proc, int femaleIndex, HandCtrl.AibuColliderKind colliderKind)
+        //{
+        //    var hands = GetHands(proc);
+        //    for (int i = 0; i < hands.Count; i++)
+        //    {
+        //        var kind = i == femaleIndex ? colliderKind : HandCtrl.AibuColliderKind.none;
+        //        hands[i].selectKindTouch = kind;
+        //        //new Traverse(hands[i]).Field("selectKindTouch").SetValue(kind);
+        //        //VRLog.Debug($"SetSelectKindTouch[{i}][{kind}] - {hands[i].selectKindTouch}");
+        //    }
+        //}
 
-        public static List<HandCtrl> GetHands(HSceneProc proc)
-        {
-            var ret = new List<HandCtrl>();
-            for (int i = 0; i < proc.flags.lstHeroine.Count; i++)
-            {
-                ret.Add(i == 0 ? proc.hand : Compat.HSceenProc_hand1(proc));
-            }
-            return ret;
-        }
+        //public static List<HandCtrl> GetHands(HSceneProc proc)
+        //{
+        //    var ret = new List<HandCtrl>();
+        //    for (int i = 0; i < proc.flags.lstHeroine.Count; i++)
+        //    {
+        //        ret.Add(i == 0 ? proc.hand : Compat.HSceenProc_hand1(proc));
+        //    }
+        //    return ret;
+        //}
 
         /// <summary>
         /// Send a synthetic click event to the hand controls.
@@ -53,13 +53,13 @@ namespace KK_VR.Caress
             method?.DynamicInvoke(args);
         }
 
-        /// <summary>
-        /// Is the specified female speaking? Moans are ignored.
-        /// </summary>
-        public static bool IsSpeaking(HSceneProc proc, int femaleIndex)
-        {
-            return proc.voice.nowVoices[femaleIndex].state == HVoiceCtrl.VoiceKind.voice &&
-                Manager.Voice.Instance.IsVoiceCheck(proc.flags.transVoiceMouth[femaleIndex], true);
-        }
+        ///// <summary>
+        ///// Is the specified female speaking? Moans are ignored.
+        ///// </summary>
+        //public static bool IsSpeaking(HSceneProc proc, int femaleIndex)
+        //{
+        //    return proc.voice.nowVoices[femaleIndex].state == HVoiceCtrl.VoiceKind.voice &&
+        //        Manager.Voice.Instance.IsVoiceCheck(proc.flags.transVoiceMouth[femaleIndex], true);
+        //}
     }
 }

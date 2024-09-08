@@ -90,7 +90,7 @@ namespace KK_VR.Interpreters.Patches
 
                     if (hand.action == HandCtrl.HandAction.none)
                     {
-                        HSceneInterpreter.Instance.SetPlay("Idle");
+                        HSceneInterpreter.SetPlay("Idle");
                         CaressHelper.Instance.Halt(disengage: false, haltVRMouth: false);
                         if (!HSceneInterpreter.IsVoiceActive)
                         {

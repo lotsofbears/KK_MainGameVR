@@ -85,10 +85,7 @@ namespace KK_VR.Caress
 
         private static HandCtrlHooks GetInstance()
         {
-            if (_instance == null)
-            {
-                _instance = new HandCtrlHooks();
-            }
+            _instance ??= new HandCtrlHooks();
             return _instance;
         }
 

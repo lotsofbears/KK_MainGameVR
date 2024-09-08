@@ -72,7 +72,7 @@ namespace VRGIN.Controls
         public SteamVR_TrackedObject Tracking;
         public SteamVR_Controller Steam;
         public SteamVR_RenderModel Model { get; private set; }
-        protected BoxCollider Collider;
+        //public BoxCollider Collider;
 
         private float? appButtonPressTime;
 
@@ -193,21 +193,14 @@ namespace VRGIN.Controls
             BuildCanvas();
 
             // Add Physics
-            Collider = new GameObject("Collider").AddComponent<BoxCollider>();
-            Collider.transform.SetParent(transform, false);
-            Collider.center = new Vector3(0f, -0.01f, -0.04f); //(0, -0.02f, -0.06f);
-            Collider.size = new Vector3(0.05f, 0.04f, 0.05f);
-            Collider.transform.localRotation = Quaternion.Euler(30f, 0f, 0f);
-            Collider.isTrigger = true;
-            //var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            //cube.transform.SetParent(transform, false);
-            //cube.transform.localScale = new Vector3(0.05f, 0.04f, 0.05f);
-            //cube.transform.localPosition = new Vector3(0f, -0.01f, -0.04f);
-            //cube.transform.localRotation = Quaternion.Euler(30f, 0f, 0f);
-            //cube.GetComponent<Collider>().enabled = false;
-            //cube.GetComponent<Renderer>().material.color = new Color(0, 0, 1, 0.3f);
+            //Collider = new GameObject("Collider").AddComponent<BoxCollider>();
+            //Collider.transform.SetParent(transform, false);
+            //Collider.center = new Vector3(0f, -0.01f, -0.04f); //(0, -0.02f, -0.06f);
+            //Collider.size = new Vector3(0.05f, 0.04f, 0.05f);
+            //Collider.transform.localRotation = Quaternion.Euler(30f, 0f, 0f);
+            //Collider.isTrigger = true;
 
-            gameObject.AddComponent<Rigidbody>().isKinematic = true;
+            //gameObject.AddComponent<Rigidbody>().isKinematic = true;
         }
         private void _OnRenderModelLoaded(SteamVR_RenderModel model, bool isLoaded)
         {
@@ -346,7 +339,6 @@ namespace VRGIN.Controls
         protected override void OnUpdate()
         {
             base.OnUpdate();
-            var device = SteamVR_Controller.Input((int)Tracking.index);
 
             if (_Lock != null && _Lock.IsInvalidating)
             {
@@ -355,16 +347,16 @@ namespace VRGIN.Controls
 
             if (_Lock == null || !_Lock.IsValid || _Lock.KeepsTool)
             {
-                if (device.GetPressDown(EVRButtonId.k_EButton_ApplicationMenu))
+                if (Input.GetPressDown(EVRButtonId.k_EButton_ApplicationMenu))
                 {
                     appButtonPressTime = Time.unscaledTime;
                 }
-                if (device.GetPress(EVRButtonId.k_EButton_ApplicationMenu) && (Time.unscaledTime - appButtonPressTime) > APP_BUTTON_TIME_THRESHOLD)
+                if (Input.GetPress(EVRButtonId.k_EButton_ApplicationMenu) && (Time.unscaledTime - appButtonPressTime) > APP_BUTTON_TIME_THRESHOLD)
                 {
                     ShowHelp();
                     appButtonPressTime = null;
                 }
-                if (device.GetPressUp(EVRButtonId.k_EButton_ApplicationMenu))
+                if (Input.GetPressUp(EVRButtonId.k_EButton_ApplicationMenu))
                 {
                     if (helpShown)
                     {
@@ -489,7 +481,6 @@ namespace VRGIN.Controls
 
             img.color = Color.cyan;
 
-
             tool.Icon = img.gameObject;
             tool.Icon.SetActive(false);
             tool.Icon.layer = 0;
@@ -504,11 +495,11 @@ namespace VRGIN.Controls
 
         public enum TrackpadDirection
         {
+            Center,
             Up,
             Down,
             Left,
-            Right,
-            Center,
+            Right
         }
 
         public TrackpadDirection GetTrackpadDirection()

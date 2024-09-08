@@ -1,0 +1,96 @@
+﻿//using System;
+//using Harmony;
+//using System.Collections.Generic;
+//using UnityEngine;
+//using static ItemObject;
+//using static SetParentKK.KK_SetParentVR;
+
+//namespace SetParentKK
+//{
+//	public static class Hooks
+//	{
+//		public static void VRHSceneLoadPostfix(VRHScene __instance)
+//		{
+//			if (setParentObj != null)
+//				UnityEngine.Object.Destroy(setParentObj);
+
+//			setParentObj = __instance.gameObject.AddComponent<SetParent>();
+//			setParentObj.Init(__instance.sprites[0], (List<MotionIK>)Traverse.Create(__instance).Field("lstMotionIK").GetValue());
+//		}
+
+//		[HarmonyPrefix]
+//		[HarmonyPatch(typeof(VRHScene), "SetLocalPosition")]
+//		public static void SetLocalPositionPrefix()
+//		{
+//			if (setParentObj != null)
+//			{
+//				foreach (SetParent.Limb limb in setParentObj.limbs)
+//				{
+//					if (limb.AnchorObj)
+//						setParentObj.FixLimbToggle(limb);
+//				}
+//				setParentObj.txtMaleLeftFoot.text = "男の左足固定";
+//				setParentObj.txtMaleRightFoot.text = "男の右足固定";
+
+//				setParentObj.UnsetP();
+
+//				setParentObj.male_p_cf_bodybone.transform.localPosition = Vector3.zero;
+//				setParentObj.male_p_cf_bodybone.transform.localRotation = Quaternion.identity;
+//				setParentObj.female_p_cf_bodybone.transform.localPosition = Vector3.zero;
+//				setParentObj.female_p_cf_bodybone.transform.localRotation = Quaternion.identity;
+//			}			
+//		}
+
+//		[HarmonyPostfix]
+//		[HarmonyPatch(typeof(ItemObject), "LoadItem")]
+//		public static void LoadItemPostfix(ItemObject __instance)
+//		{
+//			if (setParentObj != null)
+//			{
+//				Dictionary<int, Item> dictItem = (Dictionary<int, Item>)Traverse.Create(__instance).Field("dicItem").GetValue();
+//				foreach (Item item in dictItem.Values)
+//				{
+//					setParentObj.SetObjectColliders(item.objItem.transform);
+//				}
+//			}
+//		}
+
+//		///// <summary>
+//		///// Disable controller input when controller is being used as parent
+//		///// </summary>
+//		//[HarmonyPrefix]
+//		//[HarmonyPatch(typeof(VRViveController), "IsPressDown")]
+//		//public static bool IsPressDownPre(VRViveController __instance, ref bool __result)
+//		//{
+//		//	if (!DisableParentInput.Value)
+//		//		return true;
+			
+//		//	if ((setParentObj?.setFlag ?? false) && setParentObj.parentController == __instance.gameObject)
+//		//	{
+//		//		__result = false;
+//		//		return false;
+//		//	}
+//		//	else
+//		//		return true;
+//		//}
+
+//		///// <summary>
+//		///// Disable controller input when controller is being used as parent
+//		///// </summary>
+//		//[HarmonyPrefix]
+//		//[HarmonyPatch(typeof(VRViveController), "IsPressUp")]
+//		//public static bool IsPressUpPre(VRViveController __instance, ref bool __result)
+//		//{
+//		//	if (!DisableParentInput.Value)
+//		//		return true;
+
+//		//	if ((setParentObj?.setFlag ?? false) && setParentObj.parentController == __instance.gameObject)
+//		//	{
+//		//		__result = false;
+//		//		return false;
+//		//	}
+//		//	else
+//		//		return true;
+//		//}
+//	}
+//}

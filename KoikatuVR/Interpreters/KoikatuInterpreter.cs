@@ -5,6 +5,13 @@ using UnityEngine.SceneManagement;
 using KK_VR.Features;
 using KK_VR.Camera;
 using KoikatuVR.Camera;
+using Studio;
+using static KK_VR.Interpreters.KoikatuInterpreter;
+using System.Runtime.Remoting;
+using RootMotion;
+using System.Collections.Generic;
+using KK_VR.Handlers;
+using VRGIN.Controls;
 
 namespace KK_VR.Interpreters
 {
@@ -12,16 +19,18 @@ namespace KK_VR.Interpreters
     {
         public enum SceneType
         {
+            None,
             OtherScene,
             ActionScene,
             TalkScene,
-            HScene,
-            NightMenuScene,
-            CustomScene,
+            HScene
+            //NightMenuScene,
+            //CustomScene
         }
-
-        public SceneType CurrentScene { get; private set; }
-        public SceneInterpreter SceneInterpreter;
+        public static KoikatuInterpreter Instance { get; private set; }
+        public static SceneType CurrentScene { get; private set; }
+        public static SceneInterpreter SceneInterpreter;
+        public static float DeltaTime;
 
         private Mirror.Manager _mirrorManager;
         private int _kkapiCanvasHackWait;
@@ -29,26 +38,55 @@ namespace KK_VR.Interpreters
         private GameObject _sceneObjCache;
         private Manager.Scene _scene;
         private Manager.Game _game;
-
+        private static bool _deltaSet;
+        private List<float> _deltaTimes = new List<float>();
+        private ModelHandler _modelHandler;
         protected override void OnAwake()
         {
+            Instance = this;
             _scene = Manager.Scene.Instance;
             _game = Manager.Game.Instance;
             CurrentScene = SceneType.OtherScene;
             SceneInterpreter = new OtherSceneInterpreter();
             SceneManager.sceneLoaded += OnSceneLoaded;
             _mirrorManager = new Mirror.Manager();
-            VR.Camera.gameObject.AddComponent<Camera.VREffector>();
-            this.gameObject.AddComponent<VRMoverEx>();
+            VR.Camera.gameObject.AddComponent<VREffector>();
+            VR.Manager.ModeInitialized += AddModels;
         }
-
         protected override void OnUpdate()
         {
-
             UpdateScene();
             SceneInterpreter.OnUpdate();
+            if (!_deltaSet && !_scene.IsNowLoadingFade)
+            {
+                if (_deltaTimes.Count < 100)
+                {
+                    if (Time.deltaTime < 0.05f && Time.frameCount % 5 == 0)
+                    {
+                        _deltaTimes.Add(Time.deltaTime);
+                    }
+                }
+                else
+                {
+                    var coef = 1f / _deltaTimes.Count;
+                    DeltaTime = 0f;
+                    foreach (var t in _deltaTimes)
+                    {
+                        DeltaTime += t * coef;
+                    }
+                    _deltaTimes.Clear();
+                    _deltaSet = true;
+                }
+            }
         }
-
+        public void ChangeModelAnim(int index)
+        {
+            StartCoroutine(_modelHandler.AnimChange(index));
+        }
+        public void AddModels(object sender, ModeInitializedEventArgs e)
+        {
+            _modelHandler = new ModelHandler();
+        }
         protected override void OnLateUpdate()
         {
             if (_kkSubtitlesCaption != null)
@@ -132,34 +170,57 @@ namespace KK_VR.Interpreters
 
             return false;
         }
+        public static bool StartScene(SceneType type, MonoBehaviour behaviour = null, params object[] args)
+        {
+            if (CurrentScene != type)
+            {
+                VRPlugin.Logger.LogDebug($"Interpreter:Start:{type}");
+                CurrentScene = type;
+                SceneInterpreter.OnDisable();
+                SceneInterpreter = CreateSceneInterpreter(type, behaviour, args);
+                SceneInterpreter.OnStart();
+                _deltaSet = false;
+                return true;
+            }
+            else
+            {
+                VRPlugin.Logger.LogDebug($"Interpreter:AlreadyExists:{type}");
+                return false;
+            }
+        }
+        public static void EndScene(SceneType type)
+        {
+            if (CurrentScene == type)
+            {
+                StartScene(SceneType.OtherScene);
+            }
+            else
+            {
+                VRPlugin.Logger.LogDebug($"Interpreter:End:WrongScene:Current - {CurrentScene} - {type}");
+            }
+        }
 
         // 前回とSceneが変わっていれば切り替え処理をする
         private void UpdateScene()
         {
-            var nextSceneType = DetectScene();
-
-            if (nextSceneType != CurrentScene)
+            if (CurrentScene < SceneType.TalkScene)
             {
-                VRLog.Info($"Start {nextSceneType}");
-                SceneInterpreter.OnDisable();
-
-                CurrentScene = nextSceneType;
-                SceneInterpreter = CreateSceneInterpreter(nextSceneType);
-                SceneInterpreter.OnStart();
+                var sceneType = DetectScene();
+                if (CurrentScene != sceneType)
+                {
+                    EndScene(CurrentScene);
+                    StartScene(sceneType);
+                }
             }
         }
 
         private SceneType DetectScene()
         {
-            if (_game.actScene !=  null)
+            if (_game.actScene != null)
             {
-                if (_game.actScene.AdvScene.isActiveAndEnabled || _scene.NowSceneNames.Contains("TalkScene"))
+                if (_game.actScene.AdvScene.isActiveAndEnabled)
                 {
                     return SceneType.TalkScene;
-                }
-                if (_scene.NowSceneNames.Contains("H"))
-                {
-                    return SceneType.HScene;
                 }
                 //if (_scene.NowSceneNames.Contains("NightMenuScene"))
                 //{
@@ -167,74 +228,39 @@ namespace KK_VR.Interpreters
                 //}
                 return SceneType.ActionScene;
             }
-            else
-            {
-                if (_scene.LoadSceneName.Equals("H"))
-                {
-                    return SceneType.HScene;
-                }
-            }
-            //if (_scene.NowSceneNames.Contains("CustomScene"))
-            //{
-            //    return SceneType.CustomScene;
-            //}
             return SceneType.OtherScene;
-            //var scene = Manager.Scene.Instance.LoadSceneName;
-            //var stack = Manager.Scene.Instance.NowSceneNames;
-            //foreach (string name in stack)
-            //{
-            //    if (scene.Equals("Action"))
-            //    {
-
-            //    }
-
-            //    if (name == "H" && SceneObjPresent("HScene"))
-            //        return SceneType.HScene;
-            //    if (name == "Action" && SceneObjPresent("ActionScene"))
-            //        return SceneType.ActionScene;
-            //    if (name == "Talk" && SceneObjPresent("TalkScene"))
-            //        return SceneType.TalkScene;
-            //    if (name == "NightMenu" && SceneObjPresent("NightMenuScene"))
-            //        return SceneType.NightMenuScene;
-            //    if (name == "CustomScene" && SceneObjPresent("CustomScene"))
-            //        return SceneType.CustomScene;
-            //}
-            //return SceneType.OtherScene;
         }
 
-        private bool SceneObjPresent(string name)
-        {
-            if (_sceneObjCache != null && _sceneObjCache.name == name)
-            {
-                return true;
-            }
-            var obj = GameObject.Find(name);
-            if (obj != null)
-            {
-                _sceneObjCache = obj;
-                return true;
-            }
-            return false;
-        }
+        //private bool SceneObjPresent(string name)
+        //{
+        //    if (_sceneObjCache != null && _sceneObjCache.name == name)
+        //    {
+        //        return true;
+        //    }
+        //    var obj = GameObject.Find(name);
+        //    if (obj != null)
+        //    {
+        //        _sceneObjCache = obj;
+        //        return true;
+        //    }
+        //    return false;
+        //}
 
-        private static SceneInterpreter CreateSceneInterpreter(SceneType ty)
+        private static SceneInterpreter CreateSceneInterpreter(SceneType type, MonoBehaviour behaviour, params object[] args)
         {
-            switch(ty)
+            switch(type)
             {
-                case SceneType.OtherScene:
-                    return new OtherSceneInterpreter();
                 case SceneType.ActionScene:
                     return new ActionSceneInterpreter();
-                case SceneType.CustomScene:
-                    return new CustomSceneInterpreter();
-                case SceneType.NightMenuScene:
-                    return new NightMenuSceneInterpreter();
+                //case SceneType.CustomScene:
+                //    return new CustomSceneInterpreter();
+                //case SceneType.NightMenuScene:
+                //    return new NightMenuSceneInterpreter();
                 case SceneType.HScene:
-                    return new HSceneInterpreter();
+                    return new HSceneInterpreter(behaviour);
                 case SceneType.TalkScene:
-                    return new TalkSceneInterpreter();
+                    return new TalkSceneInterpreter(behaviour);
                 default:
-                    VRLog.Warn($"Unknown scene type: {ty}");
                     return new OtherSceneInterpreter();
             }
         }

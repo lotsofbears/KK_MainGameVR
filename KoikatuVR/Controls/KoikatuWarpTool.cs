@@ -46,7 +46,7 @@ namespace KK_VR.Controls
             // Detect teleporting in Roam mode.
             if (_settings.TeleportWithProtagonist &&
                 (origin.position - oldOriginPosition).sqrMagnitude > 0.04f &&
-                _interpreter.SceneInterpreter is ActionSceneInterpreter act &&
+                KoikatuInterpreter.SceneInterpreter is ActionSceneInterpreter act &&
                 GameObject.Find("ActionScene/Player") is GameObject player &&
                 player.activeInHierarchy)
             {
@@ -85,7 +85,7 @@ namespace KK_VR.Controls
             player.chaCtrl.objTop.SetActive(false);
             // Wait for the game to correct the protagonist's position.
             yield return null;
-            if (_interpreter.SceneInterpreter is ActionSceneInterpreter act)
+            if (KoikatuInterpreter.SceneInterpreter is ActionSceneInterpreter act)
             {
                 VRLog.Debug("Following player");
                 act.MoveCameraToPlayer();

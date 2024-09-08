@@ -16,7 +16,9 @@ using KK_VR;
 using KK_VR.Interpreters;
 using KK_VR.Interpreters.Patches;
 using Random = UnityEngine.Random;
-using static UnityEngine.Experimental.Director.FrameData;
+using static KK_VR.Interpreters.HSceneInterpreter;
+using KK_VR.Controls;
+using KK_VR.Handlers;
 
 namespace KK_VR.Caress
 {
@@ -46,19 +48,17 @@ namespace KK_VR.Caress
         internal static VRMouth Instance;
 
         private Vector3 _headsetPosLastFrame = Vector3.zero;
-        private Transform _firstFemale;
-        private Transform _firstFemaleMouth;
+        //private Transform _firstFemale;
+        //private Transform _firstFemaleMouth;
         private Transform _eyes;
         private Transform _shoulders;
 
-        private HandCtrl _hand;
-        private HandCtrl _hand1;
         private ChaControl _chara;
         private KoikatuSettings _settings;
         private VRMouthColliderObject _small, _large;
-        private AibuColliderTracker _aibuTracker;
+        private ColliderTracker _tracker;
         private CaressHelper _helper;
-        private readonly LongDistanceKissMachine _machine = new LongDistanceKissMachine();
+        //private readonly LongDistanceKissMachine _machine = new LongDistanceKissMachine();
 
         private bool  _denial;
         private bool  _sensibleH;
@@ -87,36 +87,27 @@ namespace KK_VR.Caress
             _large.TriggerExit += HandleTriggerExit;
             NoActionAllowed = false;
 
-
-            var hProc = GameObject.FindObjectOfType<HSceneProc>();
-
-            if (hProc == null)
-            {
-                VRLog.Error("hProc is null");
-            }
-
-            var type = AccessTools.TypeByName("KK_SensibleH.Caress.MoMiController");
+            //var type = AccessTools.TypeByName("KK_SensibleH.Caress.MoMiController");
             _helper = this.gameObject.AddComponent<CaressHelper>();
-            _helper.Initialize(hProc, type);
-            _aibuTracker = new AibuColliderTracker(hProc, referencePoint: transform);
-            var traverse = Traverse.Create(hProc);
-            _hand = traverse.Field("hand").GetValue<HandCtrl>();
-            _hand1 = traverse.Field("hand1").GetValue<HandCtrl>();
-            _chara = traverse.Field("lstFemale").GetValue<List<ChaControl>>().FirstOrDefault();
+            _helper.Initialize();
+            _tracker = new ColliderTracker();
 
-            _sensibleH = type != null;
+            //_chara = traverse.Field("lstFemale").GetValue<List<ChaControl>>().FirstOrDefault();
 
-            if (_sensibleH)
-            {
+
+            // Too far gone for compatibility without it.
+            //if (_sensibleH)
+            //{
+            _chara = lstFemale[0];
                 // Not so sure about rotation and position of the mouth acc, while very familiar with the eyes, so we go with them to check angle and distance.
                 _eyes = _chara.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz/cf_J_Eye_tz");
                 _shoulders = _chara.objBodyBone.transform.Find("cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_backsk_00");
-            }
-            _firstFemale = _chara.objTop.transform;
-            _firstFemaleMouth = _chara.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceLow_tz/a_n_mouth");
-            var heroine = HSceneInterpreter.hFlag.lstHeroine[0];
+            //}
+            //_firstFemale = _chara.objTop.transform;
+            //_firstFemaleMouth = _chara.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceLow_tz/a_n_mouth");
+            var heroine = hFlag.lstHeroine[0];
             _kissAttemptChance = 0.1f + ((int)heroine.HExperience - 1) * 0.15f + (heroine.weakPoint == 0 ? 0.1f : 0f);
-            _denial = !HSceneInterpreter.hFlag.isFreeH && heroine.denial.kiss == false && heroine.isGirlfriend == false;
+            _denial = !hFlag.isFreeH && heroine.denial.kiss == false && heroine.isGirlfriend == false;
             VRPlugin.Logger.LogDebug($"VRMouth:Awake:Finish");
         }
         private void OnDestroy()
@@ -129,7 +120,7 @@ namespace KK_VR.Caress
             if (_inCaressMode && !NoActionAllowed && !AttemptToKiss())// || _helper.IsEndKissCo))
             {
                 HandleScoreBasedKissing();
-                if (_kissAttempt && !HSceneInterpreter.IsKissAnim)
+                if (_kissAttempt && !IsKissAnim)
                 {
                     _kissAttempt = false;
                     _kissDistance = 0.2f;
@@ -145,14 +136,14 @@ namespace KK_VR.Caress
                 //    $":Angle - {Vector3.Angle(headPos - _shoulders.position, _shoulders.forward)}" +
                 //    $":DeltaAngle - {Mathf.Abs(Mathf.DeltaAngle(_shoulders.eulerAngles.y, _eyes.eulerAngles.y))}");
                 if (Random.value < _kissAttemptChance
-                    && HSceneInterpreter.IsIdleOutside
+                    && IsIdleOutside
                     && Mathf.Abs(Mathf.DeltaAngle(_shoulders.eulerAngles.y, _eyes.eulerAngles.y)) < 30f
                     && Vector3.Distance(_eyes.position, headPos) < 0.55f
                     && Vector3.Angle(headPos - _shoulders.position, _shoulders.forward) < 30f)
                 {
                     _kissAttempt = true;
                     _kissDistance = 0.4f;
-                    HSceneInterpreter.Instance.LeanToKiss();
+                    LeanToKiss();
                     SetAttemptTimestamp(2f + Random.value * 2f);
                 }
                 else
@@ -171,36 +162,38 @@ namespace KK_VR.Caress
         {
             if (_settings.AutomaticKissing)
             {
-                if (!_sensibleH)
+                // At this point there is no choice but to forsake compatibility.
+
+                //if (!_sensibleH)
+                //{
+                //    bool decision =
+                //    _machine.Step(
+                //        Time.time,
+                //        _small.transform.InverseTransformPoint(_firstFemaleMouth.position),
+                //        _firstFemaleMouth.InverseTransformPoint(_small.transform.position),
+                //        Mathf.DeltaAngle(_firstFemale.eulerAngles.y, _firstFemaleMouth.transform.eulerAngles.y));
+                //    if (decision)
+                //    {
+                //        StartKiss();
+                //    }
+                //    else
+                //    {
+                //        FinishKiss();
+                //    }
+                //}
+                //else
+                //{
+                var head = VR.Camera.Head;
+                if (!CrossFader.IsInTransition
+                    && Vector3.Distance(_eyes.position, head.position) < _kissDistance
+                    && Vector3.Angle(_eyes.position - head.position, head.forward) < 30f)
                 {
-                    bool decision =
-                    _machine.Step(
-                        Time.time,
-                        _small.transform.InverseTransformPoint(_firstFemaleMouth.position),
-                        _firstFemaleMouth.InverseTransformPoint(_small.transform.position),
-                        Mathf.DeltaAngle(_firstFemale.eulerAngles.y, _firstFemaleMouth.transform.eulerAngles.y));
-                    if (decision)
+                    if (IsKissingAllowed())
                     {
                         StartKiss();
                     }
-                    else
-                    {
-                        FinishKiss();
-                    }
                 }
-                else
-                {
-                    var head = VR.Camera.Head;
-                    if (!CrossFader.IsInTransition
-                        && Vector3.Distance(_eyes.position, head.position) < _kissDistance
-                        && Vector3.Angle(_eyes.position - head.position, head.forward) < 30f)
-                    {
-                        if (IsKissingAllowed())
-                        {
-                            StartKiss();
-                        }
-                    }
-                }
+                //}
             }
         }
 
@@ -212,9 +205,9 @@ namespace KK_VR.Caress
             {
                 if (_denial)
                 {
-                    if (!HSceneInterpreter.IsVoiceActive)
+                    if (!IsVoiceActive)
                     {
-                        HSceneInterpreter.hFlag.voice.playVoices[0] = 103;
+                        hFlag.voice.playVoices[0] = 103;
                         _proximityTimestamp = Time.time + 10f;
                     }
                     return false;
@@ -253,31 +246,28 @@ namespace KK_VR.Caress
 
         private void HandleTriggerEnter(Collider other)
         {
-            if (_aibuTracker.AddIfRelevant(other) && !NoActionAllowed)// || _helper.IsEndKissCo))
+            if (_tracker.AddCollider(other, out var colliderKind) && !NoActionAllowed)// || _helper.IsEndKissCo))
             {
-                VRPlugin.Logger.LogDebug($"VRMouth:HandleTriggerEnter[{other}]");
-                var colliderKind = _aibuTracker.GetCurrentColliderKind(out int femaleIndex);
-                UpdateKissLick(colliderKind);
-
-                if (_kissCoShouldEnd == null &&
-                    HandCtrl.AibuColliderKind.reac_head <= colliderKind &&
-                    _settings.AutomaticTouchingByHmd) // &&
-                                                      //!CaressUtil.IsSpeaking(_aibuTracker.Proc, femaleIndex))
+                handCtrl.selectKindTouch = colliderKind[1];
+                if (colliderKind[1] != HandCtrl.AibuColliderKind.none)
                 {
-                    _hand.Reaction(colliderKind);
+                    StartKissLick(colliderKind[1]);
+                }
+                else if (_settings.AutomaticTouchingByHeadset)
+                {
+                    handCtrl.Reaction(colliderKind[0]);
                 }
             }
         }
         private void HandleTriggerExit(Collider other)
         {
-            if (_aibuTracker.RemoveIfRelevant(other) && !NoActionAllowed)// || _helper.IsEndKissCo))
+            if (_tracker.RemoveCollider(other, out var colliderKind))
             {
-                VRPlugin.Logger.LogDebug($"VRMouth:HandleTriggerExit[{other}]");
-                var colliderKind = _aibuTracker.GetCurrentColliderKind(out int _);
-                UpdateKissLick(colliderKind);
+                handCtrl.selectKindTouch = colliderKind[1];
             }
+            
         }
-        private void UpdateKissLick(HandCtrl.AibuColliderKind colliderKind)
+        private void StartKissLick(HandCtrl.AibuColliderKind colliderKind)
         {
             if (_settings.AutomaticKissing && !_inCaressMode && colliderKind == HandCtrl.AibuColliderKind.mouth)
             {
@@ -287,27 +277,18 @@ namespace KK_VR.Caress
             {
                 StartLicking(colliderKind, layerNum);
             }
-            else
-            {
-                if (!_inCaressMode)
-                {
-                    FinishKiss();
-                }
-                FinishLicking();
-            }
         }
         private bool IsLickingOk(HandCtrl.AibuColliderKind colliderKind, out int layerNum)
         {
             layerNum = 0;
-            if (colliderKind <= HandCtrl.AibuColliderKind.mouth
-                || colliderKind >= HandCtrl.AibuColliderKind.reac_head || _proximityTimestamp > Time.time)
+            if (_proximityTimestamp > Time.time)
             {
                 return false;
             }
 
             int bodyPartId = (int)colliderKind - 2;
-            var layerInfos = _hand.dicAreaLayerInfos[bodyPartId];
-            int clothState = _hand.GetClothState(colliderKind);
+            var layerInfos = handCtrl.dicAreaLayerInfos[bodyPartId];
+            int clothState = handCtrl.GetClothState(colliderKind);
             var layerKv = layerInfos
                 .Where(kv => kv.Value.useArray == 2)
                 .FirstOrDefault();
@@ -331,8 +312,8 @@ namespace KK_VR.Caress
             {
                 return false;
             }
-            var heroine = _hand.flags.lstHeroine[0];
-            if (_hand.flags.mode != HFlag.EMode.aibu &&
+            var heroine = handCtrl.flags.lstHeroine[0];
+            if (handCtrl.flags.mode != HFlag.EMode.aibu &&
                 colliderKind == HandCtrl.AibuColliderKind.anal &&
                 !heroine.denial.anal &&
                 heroine.hAreaExps[3] == 0f)
@@ -348,7 +329,7 @@ namespace KK_VR.Caress
         private void StartKiss()
         {
             VRPlugin.Logger.LogDebug($"VRMouth:StartKiss");
-            if (_kissCoShouldEnd != null || _hand.IsKissAction())
+            if (_kissCoShouldEnd != null || handCtrl.IsKissAction())
             {
                 // Already kissing.
                 return;
@@ -361,8 +342,8 @@ namespace KK_VR.Caress
             StopAllLicking();
 
             CaressHelper.Instance.OnKissStart(HandCtrl.AibuColliderKind.none);
-            var prevKindTouch = _hand.selectKindTouch;
-            _hand.selectKindTouch = HandCtrl.AibuColliderKind.mouth;
+            var prevKindTouch = handCtrl.selectKindTouch;
+            handCtrl.selectKindTouch = HandCtrl.AibuColliderKind.mouth;
             var messageDelivered = false;
             HandCtrlHooks.InjectMouseButtonDown(0, () => messageDelivered = true);
             while (!messageDelivered)
@@ -372,11 +353,11 @@ namespace KK_VR.Caress
             yield return new WaitForEndOfFrame();
             CaressHelper.Instance.OnKissStart(HandCtrl.AibuColliderKind.mouth);
             // Try to restore the old value of selectKindTouch.
-            if (_hand.selectKindTouch == HandCtrl.AibuColliderKind.mouth)
+            if (handCtrl.selectKindTouch == HandCtrl.AibuColliderKind.mouth)
             {
-                _hand.selectKindTouch = prevKindTouch;
+                handCtrl.selectKindTouch = prevKindTouch;
             }
-            while (_kissCoShouldEnd == false && _hand.IsKissAction())
+            while (_kissCoShouldEnd == false && handCtrl.IsKissAction())
             {
                 yield return new WaitForSeconds(0.2f);
             }
@@ -400,13 +381,13 @@ namespace KK_VR.Caress
             }
 
             int bodyPartId = (int)colliderKind - 2;
-            var usedItem = _hand.useAreaItems[bodyPartId];
+            var usedItem = handCtrl.useAreaItems[bodyPartId];
 
 
             // If another item is being used on the target body part, detach it.
             if (usedItem != null && usedItem.idUse != 2)
             {
-                _hand.DetachItemByUseItem(usedItem.idUse);
+                handCtrl.DetachItemByUseItem(usedItem.idUse);
             }
 
             StartCoroutine(LickCo(colliderKind, layerNum, bodyPartId));
@@ -417,12 +398,12 @@ namespace KK_VR.Caress
         {
             _lickCoShouldEnd = false;
 
-            var oldLayerNum = _hand.areaItem[bodyPartId];
-            _hand.areaItem[bodyPartId] = layerNum;
+            var oldLayerNum = handCtrl.areaItem[bodyPartId];
+            handCtrl.areaItem[bodyPartId] = layerNum;
 
-            var oldKindTouch = _hand.selectKindTouch;
-            _hand.selectKindTouch = colliderKind;
-            while (_lickCoShouldEnd == false && _hand.areaItem[bodyPartId] == layerNum)
+            var oldKindTouch = handCtrl.selectKindTouch;
+            handCtrl.selectKindTouch = colliderKind;
+            while (_lickCoShouldEnd == false && handCtrl.areaItem[bodyPartId] == layerNum)
             {
                 if (!_sensibleH)
                 {
@@ -435,11 +416,11 @@ namespace KK_VR.Caress
                 }
             }
             _lickCoShouldEnd = null;
-            _hand.selectKindTouch = oldKindTouch;
-            _hand.DetachItemByUseItem(2);
-            if (_hand.areaItem[bodyPartId] == layerNum)
+            handCtrl.selectKindTouch = oldKindTouch;
+            handCtrl.DetachItemByUseItem(2);
+            if (handCtrl.areaItem[bodyPartId] == layerNum)
             {
-                _hand.areaItem[bodyPartId] = oldLayerNum;
+                handCtrl.areaItem[bodyPartId] = oldLayerNum;
             }
         }
         public void FinishLicking()
@@ -453,7 +434,7 @@ namespace KK_VR.Caress
         private void StopAllLicking()
         {
             FinishLicking();
-            _hand.DetachItemByUseItem(2);
+            handCtrl.DetachItemByUseItem(2);
         }
 
         internal void OnPositionChange(HSceneProc.AnimationListInfo animationList)
@@ -461,7 +442,7 @@ namespace KK_VR.Caress
             _inCaressMode = animationList.mode == HFlag.EMode.aibu;
             FinishLicking();
             FinishKiss();
-            _machine.Reset();
+            //_machine.Reset();
         }
 
         public void OnDisengageStart() => _headsetPosLastFrame = Vector3.zero;

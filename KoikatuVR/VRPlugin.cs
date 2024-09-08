@@ -13,6 +13,8 @@ using KK_VR;
 using KK_VR.Features;
 using KK_VR.Fixes;
 using BepInEx.Logging;
+using KKAPI.MainGame;
+using KK_VR.Interpreters;
 
 namespace KK_VR
 {
@@ -29,16 +31,21 @@ namespace KK_VR
         void Awake()
         {
             Logger = base.Logger;
+
+            VRPlugin.Logger.LogDebug($"VRPlugin:Awake");
+
             bool vrDeactivated = Environment.CommandLine.Contains("--novr");
             bool vrActivated = Environment.CommandLine.Contains("--vr");
 
             var settings = SettingsManager.Create(Config);
+
             bool enabled = vrActivated || SteamVRDetector.IsRunning;
+
             if (enabled)
             {
                 BepInExVrLogBackend.ApplyYourself();
 
-                StartCoroutine(LoadDevice(enabled, settings));
+                StartCoroutine(LoadDevice(settings));
             }
 
             CrossFader.Initialize(Config, enabled);
@@ -47,24 +54,24 @@ namespace KK_VR
         private const string DeviceOpenVR = "OpenVR";
         private const string DeviceNone = "None";
 
-        IEnumerator LoadDevice(bool vrMode, KoikatuSettings settings)
+        IEnumerator LoadDevice(KoikatuSettings settings)
         {
-            var newDevice = vrMode ? DeviceOpenVR : DeviceNone;
+            //yield return new WaitUntil(() => Manager.Scene.Instance != null && Manager.Scene.Instance.LoadSceneName.Equals("Title"));
 
-            if (UnityEngine.VR.VRSettings.loadedDeviceName != newDevice)
+            if (UnityEngine.VR.VRSettings.loadedDeviceName != DeviceOpenVR)
             {
                 // 指定されたデバイスの読み込み.
-                UnityEngine.VR.VRSettings.LoadDeviceByName(newDevice);
+                UnityEngine.VR.VRSettings.LoadDeviceByName(DeviceOpenVR);
                 // 次のフレームまで待つ.
                 yield return null;
             }
             // VRモードを有効にする.
-            UnityEngine.VR.VRSettings.enabled = vrMode;
+            UnityEngine.VR.VRSettings.enabled = true;
             // 次のフレームまで待つ.
-            yield return null;
+            //yield return null;
 
             // デバイスの読み込みが完了するまで待つ.
-            while (UnityEngine.VR.VRSettings.loadedDeviceName != newDevice || UnityEngine.VR.VRSettings.enabled != vrMode)
+            while (UnityEngine.VR.VRSettings.loadedDeviceName != DeviceOpenVR)
             {
                 yield return null;
             }
@@ -76,31 +83,29 @@ namespace KK_VR
                 {
                     break;
                 }
-                VRLog.Info("waiting for the window rect to be non-empty");
+                //VRLog.Info("waiting for the window rect to be non-empty");
                 yield return null;
             }
-            VRLog.Info("window rect is not empty!");
+            //VRLog.Info("window rect is not empty!");
 
-            if (vrMode)
-            {
-                new Harmony(VRPlugin.GUID).PatchAll();
-                // Boot VRManager!
-                VRManager.Create<Interpreters.KoikatuInterpreter>(new KoikatuContext(settings));
-                // VRGIN doesn't update the near clip plane until a first "main" camera is created, so we set it here.
-                UpdateNearClipPlane(settings);
-                settings.AddListener("NearClipPlane", (_, _1) => UpdateNearClipPlane(settings));
-                SetInputSimulator(settings);
-                settings.AddListener("UseLegacyInputSimulator", (_, _1) => SetInputSimulator(settings));
-                VR.Manager.SetMode<KoikatuStandingMode>();
-                VRFade.Create();
-                PrivacyScreen.Initialize();
-                GraphicRaycasterPatches.Initialize();
-                // It's been reported in #28 that the game window defocues when
-                // the game is under heavy load. We disable window ghosting in
-                // an attempt to counter this.
-                NativeMethods.DisableProcessWindowsGhosting();
-                TweakShadowSettings();
-            }
+            new Harmony(VRPlugin.GUID).PatchAll();
+            // Boot VRManager!
+            VRManager.Create<KoikatuInterpreter>(new KoikatuContext(settings));
+            // VRGIN doesn't update the near clip plane until a first "main" camera is created, so we set it here.
+            UpdateNearClipPlane(settings);
+            settings.AddListener("NearClipPlane", (_, _1) => UpdateNearClipPlane(settings));
+            SetInputSimulator(settings);
+            settings.AddListener("UseLegacyInputSimulator", (_, _1) => SetInputSimulator(settings));
+            VR.Manager.SetMode<KoikatuStandingMode>();
+            VRFade.Create();
+            PrivacyScreen.Initialize();
+            GraphicRaycasterPatches.Initialize();
+            // It's been reported in #28 that the game window defocues when
+            // the game is under heavy load. We disable window ghosting in
+            // an attempt to counter this.
+            NativeMethods.DisableProcessWindowsGhosting();
+            //TweakShadowSettings();
+            GameAPI.RegisterExtraBehaviour<InterpreterHooks>(GUID);
         }
 
         private void UpdateNearClipPlane(KoikatuSettings settings)
@@ -122,10 +127,10 @@ namespace KK_VR
 
         private void TweakShadowSettings()
         {
-            //// Default shadows look too wobbly in VR.
-            //QualitySettings.shadowProjection = ShadowProjection.StableFit;
-            //QualitySettings.shadowCascades = 4;
-            //QualitySettings.shadowCascade4Split = new Vector4(0.05f, 0.1f, 0.2f);
+            // Default shadows look too wobbly in VR.
+            QualitySettings.shadowProjection = ShadowProjection.StableFit;
+            QualitySettings.shadowCascades = 4;
+            QualitySettings.shadowCascade4Split = new Vector4(0.05f, 0.1f, 0.2f);
         }
     }
 

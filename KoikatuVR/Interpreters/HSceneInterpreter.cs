@@ -5,23 +5,23 @@ using System.Collections.Generic;
 using KK_VR.Camera;
 using KK_VR.Features;
 using System;
-using static SteamVR_Events;
 using Manager;
 using System.Linq;
 using System.Collections;
 using KK_VR.Interpreters.Patches;
-using KKAPI.Utilities;
 using KK_VR.Caress;
 using Random = UnityEngine.Random;
 using static HFlag;
 using static HandCtrl;
-using ADV.Commands.Chara;
-using Illusion.Extensions;
-using VRGIN.Controls;
 using static VRGIN.Controls.Controller;
-using static SteamVR_Controller;
 using Valve.VR;
+using KK_VR.Handlers;
 using KK_VR.Controls;
+using RootMotion.FinalIK;
+using ADV.Commands.H;
+using ADV;
+using KK_VR.Fixes;
+using KK_VR.Interpreters.Extras;
 
 namespace KK_VR.Interpreters
 {
@@ -74,45 +74,51 @@ namespace KK_VR.Interpreters
         // Those HotKey hooks are flimsy at best, LF global hotkey rework.
 
 
-        private bool _active;
-        private HSceneProc _proc;
-        private Caress.VRMouth _vrMouth;
-        private PoV _pov;
-        private VRMoverH _vrMoverH;
-        private bool _sensibleH;
-        private float _waitTimestamp;
-        private float _waitTime;
-        private bool _manipulateSpeed;
-        private bool _waitForAction;
-        private bool _addedModifier;
-        private TrackpadDirection _lastDir;
+        //private bool _active;
+        private readonly VRMouth _vrMouth;
+        private readonly PoV _pov;
+        private readonly VRMoverH _vrMoverH;
+        private readonly bool _sensibleH;
+        private readonly float[] _waitTimestamp = new float[2];
+        private readonly float[] _waitTime = new float[2];
+        private readonly bool[] _manipulateSpeed = new bool[2];
+        private readonly bool[] _waitForAction = new bool[2];
+        //private bool _addedModifier;
+        private readonly TrackpadDirection[] _lastDir = new TrackpadDirection[2];
         //private State _state;
         private HPointMove _hPointMove;
-        private int _backIdle;
+        //private HSceneHandler[] _handlers;
 
-        internal static HSceneInterpreter Instance;
+        private readonly static List<int> lstIKEffectLateUpdate = new List<int>();
+        private static bool _lateHitReaction;
+
         internal static HFlag hFlag;
         internal static HSprite sprite;
-        internal static HFlag.EMode mode;
+        internal static EMode mode;
         internal static HandCtrl handCtrl;
+        internal static HandCtrl handCtrl1;
         internal static HAibu hAibu;
         internal static HVoiceCtrl hVoice;
         internal static List<HActionBase> lstProc;
+        internal static List<ChaControl> lstFemale;
+        internal static ChaControl male;
+        private static int _backIdle;
+        private static bool adjustDirLight;
 
-        private List<EVRButtonId> _modifierList = new List<EVRButtonId>();
-        public static bool IsActive => Instance != null && Instance._active;
+        private readonly int[] _modifierList = new int[2];
         public static bool IsInsertIdle => hFlag.nowAnimStateName.EndsWith("InsertIdle", StringComparison.Ordinal);
         public static bool IsIdleOutside => hFlag.nowAnimStateName.Equals("Idle");
         public static bool IsEndInside => hFlag.nowAnimStateName.EndsWith("IN_A", StringComparison.Ordinal);
         public static bool IsEndOutside => hFlag.nowAnimStateName.EndsWith("OUT_A", StringComparison.Ordinal);
         public static bool IsEndInMouth => hFlag.nowAnimStateName.StartsWith("Oral", StringComparison.Ordinal);
-        public static bool IsFinishLoop => hFlag.finish != HFlag.FinishKind.none && IsOrgasmLoop;
+        public static bool IsFinishLoop => hFlag.finish != FinishKind.none && IsOrgasmLoop;
         public static bool IsWeakLoop => hFlag.nowAnimStateName.EndsWith("WLoop", StringComparison.Ordinal);
         public static bool IsStrongLoop => hFlag.nowAnimStateName.EndsWith("SLoop", StringComparison.Ordinal);
         public static bool IsOrgasmLoop => hFlag.nowAnimStateName.EndsWith("OLoop", StringComparison.Ordinal);
         public static bool IsKissAnim => hFlag.nowAnimStateName.StartsWith("K_", StringComparison.Ordinal);
+        public static bool IsTouch => hFlag.nowAnimStateName.EndsWith("Touch", StringComparison.Ordinal);
         public HPointMove GetHPointMove => _hPointMove == null ? _hPointMove = UnityEngine.Object.FindObjectOfType<HPointMove>() : _hPointMove;
-        public static int GetBackIdle => Instance._backIdle;
+        public static int GetBackIdle => _backIdle;
         public static bool IsHPointMove => Scene.Instance.AddSceneName.Equals("HPointMove");
         public static bool IsVoiceActive => hVoice.nowVoices[0].state == HVoiceCtrl.VoiceKind.voice;
         public static bool IsHandAttached => handCtrl.useItems[0] != null || handCtrl.useItems[1] != null;
@@ -133,7 +139,7 @@ namespace KK_VR.Interpreters
                 }
             }
         }
-        private List<string> _aibuAnims = new List<string>()
+        private static readonly List<string> _aibuAnims = new List<string>()
         {   
             "Idle",     // 0
             "M_Touch",  // 1
@@ -151,18 +157,37 @@ namespace KK_VR.Interpreters
                 return list;
             }
         }
-        private bool IsWait => _waitTimestamp > Time.time;
 
-        private System.Action<string> ClickButton;
-        private System.Action<int> ChangeLoop;
+        private readonly Action<string> ClickButton;
+        private readonly Action<int> ChangeLoop;
         /// <summary>
         /// -1 for all, otherwise (HFlag.EMode) 0...2 for specific, or anything higher(e.g. 3) for current EMode.
         /// </summary>
-        private System.Action<int> ChangeAnimation;
+        private readonly Action<int> ChangeAnimation;
+        private List<HSceneHandler> _hSceneHandlers;
 
-        public override void OnStart()
+        public HSceneInterpreter(MonoBehaviour proc)
         {
-            Instance = this;
+            var traverse = Traverse.Create(proc);
+            hFlag = traverse.Field("flags").GetValue<HFlag>();
+            sprite = traverse.Field("sprite").GetValue<HSprite>();
+            handCtrl = traverse.Field("hand").GetValue<HandCtrl>();
+            handCtrl1 = traverse.Field("hand1").GetValue<HandCtrl>();
+            lstProc = traverse.Field("lstProc").GetValue<List<HActionBase>>();
+            hVoice = traverse.Field("voice").GetValue<HVoiceCtrl>();
+            lstFemale = traverse.Field("lstFemale").GetValue<List<ChaControl>>();
+            male = traverse.Field("male").GetValue<ChaControl>();
+            hAibu = (HAibu)lstProc[0];
+
+            _pov = VR.Camera.gameObject.AddComponent<PoV>();
+            _pov.Initialize();
+            _vrMouth = VR.Camera.gameObject.AddComponent<VRMouth>();
+            _vrMoverH = VR.Camera.gameObject.AddComponent<VRMoverH>();
+            _vrMoverH.Initialize();
+            HitReactionInitialize(hFlag.lstHeroine[0].chaCtrl);
+
+            CrossFader.HSceneHooks.SetFlag(hFlag);
+
             var type = AccessTools.TypeByName("KK_SensibleH.AutoMode.LoopController");
             _sensibleH = type != null;
 
@@ -175,77 +200,88 @@ namespace KK_VR.Interpreters
                 ChangeLoop = AccessTools.MethodDelegate<System.Action<int>>(methodLoop);
                 ChangeAnimation = AccessTools.MethodDelegate<System.Action<int>>(methodAnimation);
             }
+            VRBoop.RefreshDynamicBones(true);
         }
-
         public override void OnDisable()
         {
-            Deactivate();
+            GameObject.Destroy(_pov);
+            GameObject.Destroy(_vrMouth);
+            GameObject.Destroy(_vrMoverH);
+            ModelHandler.DestroyHandlerComponent<HSceneHandler>();
+            //DestroyControllerComponent<HSceneHandler>();
         }
         public override void OnUpdate()
         {
-            if (_active)
+            if (_manipulateSpeed[0])
             {
-                if (!_proc || !_proc.enabled)
+                if (_lastDir[0] == TrackpadDirection.Up)
                 {
-                    // The HProc scene is over, but there may be one more coming.
-                    Deactivate();
-                    return;
+                    SpeedUp(0);
                 }
-                if (_manipulateSpeed)
+                else if (_lastDir[0] == TrackpadDirection.Down)
                 {
-                    if (_lastDir == TrackpadDirection.Up)
-                    {
-                        SpeedUp();
-                    }
-                    else if (_lastDir == TrackpadDirection.Down)
-                    {
-                        SlowDown();
-                    }
-                }
-                if (_waitForAction)
-                {
-                    if (!IsWait)
-                    {
-                        PickAction(Timing.Full);
-                    }
-                }
-                else
-                {
-                    // We catch modifiers before action button pressed and filter them.
-                    if (_addedModifier && !IsWait)
-                    {
-                        VRPlugin.Logger.LogDebug($"Update:ClearModifiers");
-                        _modifierList.Clear();
-                        _addedModifier = false;
-                    }
+                    SlowDown(0);
                 }
             }
-
-            if (!_active &&
-                Scene.GetRootComponent<HSceneProc>("HProc") is HSceneProc proc &&
-                proc.enabled)
+            if (_manipulateSpeed[1])
             {
-                _proc = proc;
-                _active = true;
-                var traverse = Traverse.Create(proc);
-                hFlag = traverse.Field("flags").GetValue<HFlag>();
-                sprite = traverse.Field("sprite").GetValue<HSprite>();
-                handCtrl = traverse.Field("hand").GetValue<HandCtrl>();
-                lstProc = traverse.Field("lstProc").GetValue<List<HActionBase>>();
-                hVoice = traverse.Field("voice").GetValue<HVoiceCtrl>();
-                hAibu = (HAibu)lstProc[0];
+                if (_lastDir[1] == TrackpadDirection.Up)
+                {
+                    SpeedUp(1);
+                }
+                else if (_lastDir[1] == TrackpadDirection.Down)
+                {
+                    SlowDown(1);
+                }
+            }
+            if (_waitForAction[0] && _waitTimestamp[0] < Time.time)
+            {
+                PickAction(Timing.Full, 0);
+            }
+            if (_waitForAction[1] && _waitTimestamp[1] < Time.time)
+            {
+                PickAction(Timing.Full, 1);
+            }
+            //else
+            //{
+            //    // We catch modifiers before action button pressed and filter them.
+            //    if (_addedModifier && !IsWait)
+            //    {
+            //        VRPlugin.Logger.LogDebug($"Update:ClearModifiers");
+            //        _modifierList[0] = 0;
+            //        _modifierList[1] = 0;
+            //        _addedModifier = false;
+            //    }
+            //}
 
-                _pov = VR.Camera.gameObject.AddComponent<PoV>();
-                _pov.Initialize(proc);
-                _vrMouth = VR.Camera.gameObject.AddComponent<Caress.VRMouth>();
-                _vrMoverH = VR.Camera.gameObject.AddComponent<VRMoverH>();
-                _vrMoverH.Initialize(proc);
-                AddControllerComponent<CaressController>();
+            // Exit through the title button in config doesn't trigger hook.
+            if (hFlag == null)
+            {
+                KoikatuInterpreter.EndScene(KoikatuInterpreter.SceneType.HScene);
+            }
 
-                CrossFader.HSceneHooks.SetFlag(hFlag);
+        }
+        public override void OnLateUpdate()
+        {
+            if (_lateHitReaction)
+            {
+                _lateHitReaction = false;
+                _hitReaction.ReleaseEffector();
+                _hitReaction.SetEffector(lstIKEffectLateUpdate);
+                lstIKEffectLateUpdate.Clear();
+            }
+            if (adjustDirLight)
+            {
+                TalkSceneExtras.RepositionDirLight(lstFemale[0]);
+                adjustDirLight = false;
             }
         }
-        private void SpeedUp()
+        /// <param name="headset">Overrides index</param>
+        private HSceneHandler GetHandler(int index, bool headset = false)
+        {
+            return ModelHandler.GetActiveHandler<HSceneHandler>(headset ? 0 : index + 1);
+        }
+        private void SpeedUp(int index)
         {
             if (mode == EMode.aibu)
             {
@@ -264,11 +300,11 @@ namespace KK_VR.Interpreters
                 }
                 else
                 {
-                    AttemptFinish();
+                    AttemptFinish(index);
                 }
             }
         }
-        private void SlowDown()
+        private void SlowDown(int index)
         {
             if (mode == EMode.aibu)
             {
@@ -288,31 +324,31 @@ namespace KK_VR.Interpreters
                 }
                 else
                 {
-                    AttemptStop();
+                    AttemptStop(index);
                 }
             }
         }
-        private void AttemptFinish()
+        private void AttemptFinish(int index)
         {
             if (hFlag.gaugeMale == 100f)
             {
                 VRPlugin.Logger.LogDebug($"AttemptFinish");
                 // There will be only one finish appropriate for the current mode/setting.
                 RandomButton();
-                _manipulateSpeed = false;
+                _manipulateSpeed[index] = false;
             }
         }
-        private void AttemptStop()
+        private void AttemptStop(int index)
         {
             // Happens only when we recently pressed the button.
-            if (IsWait)
+            if (_waitForAction[0] || _waitForAction[1])
             {
                 VRPlugin.Logger.LogDebug($"AttemptStop");
-                Pull();
-                _manipulateSpeed = false;
+                Pull(index);
+                _manipulateSpeed[index] = false;
             }
         }
-        private void SetWaitTime(float duration, bool action = true)
+        private void SetWaitTime(float duration, int index, bool action = true)
         {
             if (action)
             {
@@ -320,10 +356,10 @@ namespace KK_VR.Interpreters
                 {
                     duration = 0.5f;
                 }
-                _waitForAction = true;
+                _waitForAction[index] = true;
             }
-            _waitTimestamp = Time.time + duration;
-            _waitTime = duration;
+            _waitTimestamp[index] = Time.time + duration;
+            _waitTime[index] = duration;
         }
 
         private bool SetHand()
@@ -368,154 +404,135 @@ namespace KK_VR.Interpreters
                 return true;
             }
         }
-        public override bool OnButtonUp(TrackpadDirection direction)
+        public override bool OnDirectionUp(TrackpadDirection direction, int index)
         {
             VRPlugin.Logger.LogDebug($"OnButton:Up:{direction}");
-            _waitForAction = false;
-            _manipulateSpeed = false;
-            var timing = _waitTimestamp - Time.time;
+            _waitForAction[index] = false;
+            _manipulateSpeed[index] = false;
+            var timing = _waitTimestamp[index] - Time.time;
 
             // Not interested in full wait as it performed automatically once reached via Update().
             if (timing > 0)
             {
-                if (_waitTime * 0.5f > timing)
+                if (_waitTime[index] * 0.5f > timing)
                 {
                     // More then a half, less then full wait case.
-                    PickAction(Timing.Half);
+                    PickAction(Timing.Half, index);
                 }
                 else
                 {
-                    PickAction(Timing.Fraction);
+                    PickAction(Timing.Fraction, index);
                 }
+            }
+            _modifierList[0] = 0;
+            _modifierList[1] = 0;
+            return false;
+        }
+        public override bool OnButtonDown(EVRButtonId buttonId, TrackpadDirection direction, int index)
+        {
+            VRPlugin.Logger.LogDebug($"OnButton:Down:{buttonId}:{direction}:Action - {_waitForAction}");
+            switch (buttonId)
+            {
+                case EVRButtonId.k_EButton_SteamVR_Trigger:
+                    VR.Input.Mouse.LeftButtonDown();
+                    VRPlugin.Logger.LogInfo($"MouseClick:{handCtrl.selectKindTouch}");
+                    _modifierList[0]++;
+                    break;
+                case EVRButtonId.k_EButton_Grip:
+                    _modifierList[1]++;
+                    break;
+            }
+            if (!_waitForAction[0] && !_waitForAction[1])
+            {
+                SetWaitTime(1f, index, action: false);
+            }
+            EvaluateModifiers(index);
+            return false;
+        }
+        public override bool OnButtonUp(EVRButtonId buttonId, TrackpadDirection direction, int index)
+        {
+            switch (buttonId)
+            {
+                case EVRButtonId.k_EButton_SteamVR_Trigger:
+                    VR.Input.Mouse.LeftButtonUp();
+                    break;
             }
             return false;
         }
-        public override bool OnButtonDown(TrackpadDirection direction, EVRButtonId buttonId)
+        public override bool OnDirectionDown(TrackpadDirection direction, int index)
         {
-            VRPlugin.Logger.LogDebug($"OnButton:Down:{direction}:{buttonId}");
-            if (direction == TrackpadDirection.Center)
+            VRPlugin.Logger.LogDebug($"OnButton:Down:{direction}:{IsHPointMove}:{IsActionLoop}:[{_modifierList[0]}][{_modifierList[1]}]");
+            _lastDir[index] = direction;
+            switch (direction)
             {
-
-            }
-            return false;
-        }
-        public override bool OnButtonDown(EVRButtonId buttonId)
-        {
-            VRPlugin.Logger.LogDebug($"OnButton:Down:{buttonId}:Action - {_waitForAction}");
-            _modifierList.Add(buttonId);
-            _addedModifier = true;
-            if (!_waitForAction)
-            {
-                SetWaitTime(1f, action: false);
-            }
-            EvaluateModifiers();
-            return _waitForAction;
-        }
-
-        public override bool OnButtonDown(TrackpadDirection direction)
-        {
-            var array = EvaluateModifiers();
-            VRPlugin.Logger.LogDebug($"OnButton:Down:{direction}:{IsHPointMove}:{IsActionLoop}:[{array[0]}][{array[1]}]");
-            _lastDir = direction;
-
-            if (IsHPointMove)
-            {
-                switch (direction)
-                {
-                    case TrackpadDirection.Up:
-                    case TrackpadDirection.Down:
-                        MoveCategory(direction == TrackpadDirection.Down);
-                        break;
-                    case TrackpadDirection.Left:
-                        GetHPointMove.Return();
-                        break;
-                    case TrackpadDirection.Right:
-                        SetWaitTime(1f);
-                        break;
-                }
-            }
-            else if (IsActionLoop)
-            {
-                if (mode == EMode.aibu)
-                {
-                    switch (direction)
+                case TrackpadDirection.Up:
+                case TrackpadDirection.Down:
+                    if (!GetHandler(index).DoUndress(direction == TrackpadDirection.Down))
                     {
-                        case TrackpadDirection.Up:
-                            if (IsHandActive)
+                        if (IsHPointMove)
+                        {
+                            MoveCategory(direction == TrackpadDirection.Down);
+                        }
+                        else if (IsActionLoop)
+                        {
+                            if (mode == EMode.aibu)
                             {
-                                // Reaction if too long, speed meanwhile.
-                                SetWaitTime(3f);
-                                _manipulateSpeed = true;
+                                if (IsHandActive)
+                                {
+                                    // Reaction if too long, speed meanwhile.
+                                    SetWaitTime(3f, index);
+                                    _manipulateSpeed[index] = true;
+                                }
+                                else
+                                {
+                                    // Reaction/Attach hand/Start auto/Lean to kiss.
+                                    SetWaitTime(1f, index);
+                                }
                             }
                             else
                             {
-                                // Reaction/Attach hand/Start auto
-                                SetWaitTime(1f);
+                                _manipulateSpeed[index] = true;
                             }
-                            break;
-                        case TrackpadDirection.Down:
-                            if (IsHandActive)
-                            {
-                                // Lean to kiss if too long, speed meanwhile.
-                                SetWaitTime(3f);
-                                _manipulateSpeed = true;
-                            }
-                            else
-                            {
-                                // Lean to kiss.
-                                SetWaitTime(1f);
-                            }
-                            break;
-                        case TrackpadDirection.Left:
-                        case TrackpadDirection.Right:
+
+                        }
+                        else
+                        {
+                            // Attach hand/Lean to kiss.
+                            SetWaitTime(0.5f, index);
+                        }
+                    }
+                    break;
+                case TrackpadDirection.Left:
+                case TrackpadDirection.Right:
+                    if (IsHPointMove)
+                    {
+                        if (direction == TrackpadDirection.Right)
+                        {
+                            SetWaitTime(1f, index);
+                        }
+                        else
+                        {
+                            GetHPointMove.Return();
+                        }
+                    }
+                    else if (IsActionLoop)
+                    {
+                        if (mode == EMode.aibu)
+                        {
                             ScrollAibuAnim(direction == TrackpadDirection.Right);
-                            break;
-                    }
-                }
-                else // Non-Aibu mode.
-                {
-                    switch (direction)
-                    {
-                        case TrackpadDirection.Up:
-                        case TrackpadDirection.Down:
-                            _manipulateSpeed = true;
-                            break;
-                        case TrackpadDirection.Left:
-                        case TrackpadDirection.Right:
+                        }
+                        else
+                        {
                             ChangeLoop(GetCurrentLoop(direction == TrackpadDirection.Right));
-                            break;
-
-                            // No respect for lefties.
-                            // In all honesty though this has to be done on fundamental level in settings and then a lot of functional of the whole plugin reworked/adjusted. 
-                            // But who will do it? There is like no (legit) lefties among code monkeys, and this whole work is voluntary, so..
+                        }
                     }
-                }
-            }
-            else
-            {
-                if (mode == EMode.aibu)
-                {
-                    switch (direction)
+                    else
                     {
-                        case TrackpadDirection.Up:
-                            // Attach hand
-                            SetWaitTime(0.5f);
-                            break;
-                        case TrackpadDirection.Down:
-                            // Lean to kiss
-                            SetWaitTime(0.5f);
-                            break;
-                        case TrackpadDirection.Left:
-                        case TrackpadDirection.Right:
-                            // PointMove/ChangeAnim
-                            SetWaitTime(1f);
-                            break;
+                        SetWaitTime(1f, index);
                     }
-                }
-                else
-                    SetWaitTime(1f);
+                    break;
             }
-            if (_waitForAction)
+            if (_waitForAction[0] || _waitForAction[1])
             {
                 return true;
             }
@@ -545,15 +562,14 @@ namespace KK_VR.Interpreters
             }
             handCtrl.selectKindTouch = AibuColliderKind.none;
         }
-        private void PickAction(Timing timing)
+        private void PickAction(Timing timing, int index)
         {
-            _waitForAction = false;
-            _manipulateSpeed = false;
+            _waitForAction[index] = false;
+            _manipulateSpeed[index] = false;
             // Array[0] - Trigger modifier
             // Array[1] - Grip modifier
-            var array = EvaluateModifiers();
-            VRPlugin.Logger.LogDebug($"PickAction:{_lastDir}:{timing}:[{array[0]}][{array[1]}]");
-            switch (_lastDir)
+            VRPlugin.Logger.LogDebug($"PickAction:{_lastDir}:{timing}:[{_modifierList[0]}][{_modifierList[1]}]");
+            switch (_lastDir[index])
             {
                 case TrackpadDirection.Up:
                     if (mode == EMode.aibu)
@@ -614,7 +630,7 @@ namespace KK_VR.Interpreters
                                 PlayReaction();
                                 break;
                             case Timing.Full:
-                                Insert(noVoice: array[0] > 0, anal: array[1] > 0);
+                                Insert(noVoice: _modifierList[0] > 0, anal: _modifierList[1] > 0, index);
                                 break;
                         }
                     }
@@ -630,7 +646,7 @@ namespace KK_VR.Interpreters
                                 case Timing.Half:
                                     break;
                                 case Timing.Full:
-                                    if (!IsHandActive && (array[1] > 0 || array[0] > 0))
+                                    if (!IsHandActive && (_modifierList[1] > 0 || _modifierList[0] > 0))
                                     {
                                         handCtrl.DetachAllItem();
                                         hAibu.SetIdleForItem(0, true);
@@ -664,7 +680,7 @@ namespace KK_VR.Interpreters
                                 PlayReaction();
                                 break;
                             case Timing.Full:
-                                Pull();
+                                Pull(index);
                                 break;
                         }
                     }
@@ -696,7 +712,7 @@ namespace KK_VR.Interpreters
                             PlayShort();
                             break;
                         case Timing.Full:
-                            if (array[1] > 0)
+                            if (_modifierList[1] > 0)
                             {
                                 // Grip modifier, any animation goes.
                                 ChangeAnimation(-1);
@@ -705,13 +721,14 @@ namespace KK_VR.Interpreters
                             {
                                 // No grip, specific or mode's default.
                                 // Amount of Triggers defines mode. (HFlag.EMode)(Trigger Count - 1).
-                                var triggerModifier = array[0] == 0 ? 3 : array[0] - 1;
+                                var triggerModifier = _modifierList[0] == 0 ? 3 : _modifierList[0] - 1;
                                 ChangeAnimation(triggerModifier);
                             }
                             break;
                     }
                     break;
             }
+            _lastDir[index] = TrackpadDirection.Center;
         }
         private void PlayShort(bool voiceWait = true)
         {
@@ -724,18 +741,18 @@ namespace KK_VR.Interpreters
         {
             if (startScene)
             {
-                hFlag.click = HFlag.ClickKind.pointmove;
+                hFlag.click = ClickKind.pointmove;
                 yield return new WaitUntil(() => IsHPointMove);
                 //yield return null;
             }
             var hPoint = GetHPointMove;
-            var key = hPoint.dicObj.ElementAt(UnityEngine.Random.Range(0, hPoint.dicObj.Count)).Key;
+            var key = hPoint.dicObj.ElementAt(Random.Range(0, hPoint.dicObj.Count)).Key;
             ChangeCategory(GetHPointCategoryList.IndexOf(key));
             yield return null;
             var dicList = hPoint.dicObj[hPoint.nowCategory];
-            var hPointData = dicList[UnityEngine.Random.Range(0, dicList.Count)].GetComponent<H.HPointData>();
+            var hPointData = dicList[Random.Range(0, dicList.Count)].GetComponent<H.HPointData>();
             hPoint.actionSelect(hPointData, hPoint.nowCategory);
-            Singleton<Manager.Scene>.Instance.UnLoad();
+            Singleton<Scene>.Instance.UnLoad();
 
         }
         private int GetCurrentAibuIndex()
@@ -745,7 +762,7 @@ namespace KK_VR.Interpreters
             _backIdle = index == 4 ? 0 : index;
             return index;
         }
-        internal void LeanToKiss()
+        public static void LeanToKiss()
         {
             HScenePatches.HoldKissLoop();
             CaressHelper.Instance.OnFakeKiss();
@@ -824,7 +841,7 @@ namespace KK_VR.Interpreters
             HScenePatches.suppressSetIdle = true;
             SetPlay(_aibuAnims[index]);
         }
-        internal void SetPlay(string animation)
+        public static void SetPlay(string animation)
         {
             lstProc[(int)hFlag.mode].SetPlay(animation, true);
         }
@@ -887,58 +904,33 @@ namespace KK_VR.Interpreters
         {
             hFlag.SpeedUpClick(increase ? 0.25f : -0.25f, 1f);
         }
-        private int[] EvaluateModifiers()
+        private void EvaluateModifiers(int index)
         {
-            var array = new int[2];
-            foreach (var modifier in _modifierList )
-            {
-                if (modifier == EVRButtonId.k_EButton_SteamVR_Trigger)
-                {
-                    array[0]++;
-                }
-                else
-                {
-                    array[1]++;
-                }
-            }
-            if (_waitForAction)
+            if (_waitForAction[index])
             {
                 var number = 0;
 
-                if (_lastDir == TrackpadDirection.Left && !IsHPointMove)
+                if (_lastDir[index] == TrackpadDirection.Left && !IsHPointMove)
                 {
                     // Animation pick, default wait is long (5s).
                     // If we got the Grip modifier then no point in waiting, an extra Trigger and off we go.
-                    number = array[1] > 0 ? 0 : 2;
+                    number = _modifierList[1] > 0 ? 0 : 2;
                 }
-                if (array[0] > number)
+                if (_modifierList[0] > number)
                 {
                     // Immediate action on the Trigger(s).
-                    PickAction(Timing.Full);
+                    PickAction(Timing.Full, index);
                 }
             }
-            return array;
         }
-        private void Deactivate()
-        {
-            if (_active)
-            {
-                GameObject.Destroy(_pov);
-                GameObject.Destroy(_vrMouth);
-                GameObject.Destroy(_vrMoverH);
-                DestroyControllerComponent<Caress.CaressController>();
-                _proc = null;
-                _active = false;
-            }
-        }
-        private bool InsertHelper()
+        private bool InsertHelper(int index)
         {
             if (IsInsertIdle || IsEndInside)
             {
                 // Sonyu start auto.
                 VRPlugin.Logger.LogDebug($"StartAuto");
-                hFlag.click = HFlag.ClickKind.modeChange;
-                _manipulateSpeed = true;
+                hFlag.click = ClickKind.modeChange;
+                _manipulateSpeed[index] = true;
             }
             else if (IsEndInMouth)
             {
@@ -955,7 +947,7 @@ namespace KK_VR.Interpreters
             }
             return false;
         }
-        private bool PullHelper()
+        private bool PullHelper(int index)
         {
             if (IsIdleOutside || IsEndOutside)
             {
@@ -978,7 +970,7 @@ namespace KK_VR.Interpreters
                     hFlag.click = ClickKind.modeChange;
 
                     // Will prompt the same action on the next frame.
-                    _waitForAction = true;
+                    _waitForAction[index] = true;
                 }
                 else// if (_mode == HFlag.EMode.houshi)
                 {
@@ -1009,11 +1001,15 @@ namespace KK_VR.Interpreters
                     mode = anim.mode;
                     break;
             }
-
+            adjustDirLight = true;
         }
-        private void Insert(bool noVoice, bool anal)
+        internal static void OnSpotChange()
         {
-            if (InsertHelper())
+            adjustDirLight = true;
+        }
+        private void Insert(bool noVoice, bool anal, int index)
+        {
+            if (InsertHelper(index))
             {
                 VRPlugin.Logger.LogDebug($"Insert");
                 ClickButton(GetButtonName(anal, noVoice));
@@ -1042,9 +1038,9 @@ namespace KK_VR.Interpreters
             VRPlugin.Logger.LogDebug($"GetButtonName:{name}");
             return name;
         }
-        private void Pull()
+        private void Pull(int index)
         {
-            if (PullHelper())
+            if (PullHelper(index))
             {
                 VRPlugin.Logger.LogDebug($"Pull");
                 var name = "Pull";
@@ -1059,6 +1055,46 @@ namespace KK_VR.Interpreters
         {
             ClickButton("");
         }
+        private static HitReaction _hitReaction;
+        public void HitReactionInitialize(ChaControl chara)
+        {
+            if (_hitReaction == null)
+            {
+                _hitReaction = handCtrl1.hitReaction;
+            }
+            ColliderTracker.Initialize(chara, hScene: true);
+            _hSceneHandlers = ModelHandler.AddHandlerComponent<HSceneHandler>();
+        }
+        public static void HitReactionPlay(AibuColliderKind aibuKind, ChaControl chara)
+        {
+            // This roundabout way is to allow player to touch anybody present, including himself, janitor,
+            // and charas from kPlug (actually don't know if they have FullBodyBipedIK or not, because we need it).
 
+            // TODO voice is a placeHolder, in h we have a good dic lying around with the proper ones.
+
+            VRPlugin.Logger.LogDebug($"Interpreter:Reaction:{aibuKind}:{chara}");
+            _hitReaction.ik = chara.objAnim.GetComponent<FullBodyBipedIK>();
+
+            var dic = handCtrl.dicNowReaction;
+            var key = aibuKind - AibuColliderKind.reac_head;
+            var index = Random.Range(0, dic[key].lstParam.Count);
+            var reactionParam = dic[key].lstParam[index];
+            var array = new Vector3[reactionParam.lstMinMax.Count];
+            for (int i = 0; i < reactionParam.lstMinMax.Count; i++)
+            {
+                array[i] = new Vector3(Random.Range(reactionParam.lstMinMax[i].min.x, reactionParam.lstMinMax[i].max.x),
+                    Random.Range(reactionParam.lstMinMax[i].min.y, reactionParam.lstMinMax[i].max.y),
+                    Random.Range(reactionParam.lstMinMax[i].min.z, reactionParam.lstMinMax[i].max.z));
+                array[i] = chara.transform.TransformDirection(array[i].normalized);
+            }
+            _hitReaction.weight = dic[key].weight;
+            _hitReaction.HitsEffector(reactionParam.id, array);
+            _lateHitReaction = true;
+            lstIKEffectLateUpdate.AddRange(dic[key].lstReleaseEffector);
+            if (!IsVoiceActive)
+            {
+                Features.LoadVoice.Play(Random.value < 0.5f ? Features.LoadVoice.VoiceType.Laugh : Features.LoadVoice.VoiceType.Short, chara);
+            }
+        }
     }
 }

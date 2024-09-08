@@ -19,7 +19,8 @@ namespace KK_VR.Camera
     public class VRMover
     {
         public static VRMover Instance {
-            get {
+            get 
+            {
                 if (_instance == null)
                 {
                     _instance = new VRMover();
@@ -33,7 +34,6 @@ namespace KK_VR.Camera
         private Vector3 _lastPosition;
         private Quaternion _lastRotation;
         private KoikatuSettings _settings;
-        private KoikatuInterpreter _interpreter;
 
         public delegate void OnMoveAction();
         public event OnMoveAction OnMove;
@@ -118,7 +118,7 @@ namespace KK_VR.Camera
 
                 //if (Vector3.Angle(positionNoY, averageNoY) < 90)
                 {
-                    var closerPosition = Vector3.MoveTowards(positionNoY, averageNoY, Vector3.Distance(positionNoY, averageNoY) - TalkSceneInterpreter.TalkDistance);
+                    var closerPosition = Vector3.MoveTowards(positionNoY, averageNoY, Vector3.Distance(positionNoY, averageNoY) - TalkSceneInterpreter.talkDistance);
 
                     closerPosition.y = averageV.y + ActionCameraControl.GetPlayerHeight();
 
@@ -155,7 +155,7 @@ namespace KK_VR.Camera
             else if (ShouldApproachCharacter(textScenario, out var character))
             {
                 //var distance = InCafe() ? 0.95f :  0.7f;
-                var distance = InCafe() ? 0.75f : TalkSceneInterpreter.TalkDistance;
+                var distance = InCafe() ? 0.75f : TalkSceneInterpreter.talkDistance;
                 float height;
                 Quaternion rotation;
                 if (Manager.Scene.Instance.NowSceneNames[0] == "H")

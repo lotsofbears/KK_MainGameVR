@@ -9,6 +9,7 @@ using VRGIN.Helpers;
 using VRGIN.Modes;
 using UnityEngine;
 using KK_VR.Features;
+using KK_VR.Interpreters;
 
 namespace KK_VR
 {
@@ -42,16 +43,15 @@ namespace KK_VR
             //return AddComponents(base.CreateLeftController());
 
             var controller = AddComponents(base.CreateLeftController());
-            controller.ToolIndex = 2;
-            VRBoop.Initialize(controller, 0);
+            controller.ToolIndex = 1;
             return controller;
         }
 
         protected override Controller CreateRightController()
         {
+            VRPlugin.Logger.LogDebug($"CreateController");
             var controller = AddComponents(base.CreateRightController());
             controller.ToolIndex = 0;
-            VRBoop.Initialize(controller, 1);
             return controller;
         }
 

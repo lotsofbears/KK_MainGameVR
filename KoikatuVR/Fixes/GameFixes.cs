@@ -88,6 +88,8 @@ namespace KK_VR.Fixes
     [HarmonyPatch(typeof(ChaControl))]
     public class ChaControlPatches1
     {
+        public static KoikatuSettings _setting = VR.Settings as KoikatuSettings;
+
         [HarmonyPrefix]
         [HarmonyPatch(nameof(ChaControl.LateUpdateForce))]
         private static bool PreLateUpdateForce(ChaControl __instance)
@@ -102,15 +104,10 @@ namespace KK_VR.Fixes
             return !SafeToSkipUpdate(__instance);
         }
 
-        public static bool SafeToSkipUpdate(ChaControl control)
+        public static bool SafeToSkipUpdate(ChaControl chara)
         {
-            return
-                VR.Settings is KoikatuSettings settings &&
-                settings.OptimizeHInsideRoaming &&
-                control.objTop?.activeSelf == false &&
-                VR.Interpreter is KoikatuInterpreter interpreter &&
-                (interpreter.CurrentScene == KoikatuInterpreter.SceneType.HScene ||
-                    interpreter.CurrentScene == KoikatuInterpreter.SceneType.TalkScene);
+            return _setting.OptimizeHInsideRoaming && chara.objTop?.activeSelf == false &&
+                KoikatuInterpreter.CurrentScene > KoikatuInterpreter.SceneType.ActionScene;
         }
     }
 

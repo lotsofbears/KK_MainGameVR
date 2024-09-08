@@ -1,10 +1,13 @@
 ﻿using Illusion.Game;
 using KK_VR.Features.Extras;
+using KK_VR.Interpreters;
+using Manager;
 using System;
 using System.Collections.Generic;
 using System.Data.SqlTypes;
 using System.Linq;
 using System.Text;
+using UnityEngine;
 using static SaveData;
 using static UnityEngine.Experimental.Director.FrameData;
 using Random = UnityEngine.Random;
@@ -19,7 +22,8 @@ namespace KK_VR.Features
             Short
         }
         private static string Path = "sound/data/pcm/c**/";
-        private static readonly IDictionary<int, string> extraPersonalities = new Dictionary<int, string>()
+        private static readonly Dictionary<ChaControl, float> voiceCooldown = new Dictionary<ChaControl, float>();
+        private static readonly Dictionary<int, string> extraPersonalities = new Dictionary<int, string>()
         {
             { 30, "14" },
             { 31, "15" },
@@ -29,11 +33,16 @@ namespace KK_VR.Features
             { 35, "20" },
             { 36, "20" },
             { 37, "20" },
-            { 38, "50" },
-
+            { 38, "50" }
         };
-        public static void Play(VoiceType type, ChaControl chara, Heroine.HExperienceKind hExp)
+        public static void Play(VoiceType type, ChaControl chara)//, bool setCooldown)
         {
+            VRPlugin.Logger.LogDebug($"Voice:Play:{type}:{chara}");
+            // TODO try simultaneous play ?
+            //if (voiceCooldown.ContainsKey(chara) & voiceCooldown[chara] > Time.time)
+            //{
+            //    return;
+            //}
 
             var voiceList = GetVoiceList(type);
 
@@ -41,21 +50,23 @@ namespace KK_VR.Features
             {
                 return;
             }
+            var hExp = Game.Instance.HeroineList
+                .Where(h => h.chaCtrl == chara)
+                .Select(h => h.HExperience)
+                .FirstOrDefault();
 
             var personalityId = chara.fileParam.personality;
 
-
             if (hExp == Heroine.HExperienceKind.不慣れ)
             {
-                // They are often the the same.
+                // They often use the same asset.
                 // Hook for this? 
                 hExp = Heroine.HExperienceKind.初めて;
             }
             var bundle = Path + voiceList[Random.Range(0, voiceList.Count)];
 
-
             // Replace personality id.
-            bundle = bundle.Replace("**", personalityId.ToString());
+            bundle = bundle.Replace("**", (personalityId < 10 ? "0" : "") + personalityId.ToString());
 
             // Replace hExp if there is any.
             bundle = bundle.Replace("^", ((int)hExp).ToString());
@@ -82,6 +93,31 @@ namespace KK_VR.Features
             };
             //chara.ChangeMouthPtn(0, true);
             chara.SetVoiceTransform(Utils.Voice.OnecePlayChara(setting));
+
+            // Graceful treatment for original HVoice?
+
+            //if (setCooldown)
+            //{
+            //    if (!voiceCooldown.ContainsKey(chara))
+            //    {
+            //        voiceCooldown.Add(chara, Time.time + 1f);
+            //    }
+            //}
+            //if (KoikatuInterpreter.CurrentScene == KoikatuInterpreter.SceneType.HScene)
+            //{
+            //    if (HSceneInterpreter.lstChaControl[0] == chara)
+            //    {
+            //        HSceneInterpreter.hVoice.nowVoices[0].state = HVoiceCtrl.VoiceKind.breathShort;
+            //        HSceneInterpreter.hVoice.nowVoices[0].notOverWrite = HSceneInterpreter.hVoice.nowVoices[0].shortInfo.notOverwrite;
+            //        HSceneInterpreter.hVoice.nowVoices[0].voiceInfo.isPlay = true;
+            //    }
+            //    else if (HSceneInterpreter.lstChaControl.Count > 1 && HSceneInterpreter.lstChaControl[1] == chara)
+            //    {
+            //        HSceneInterpreter.hVoice.nowVoices[1].state = HVoiceCtrl.VoiceKind.breathShort;
+            //        HSceneInterpreter.hVoice.nowVoices[1].notOverWrite = HSceneInterpreter.hVoice.nowVoices[1].shortInfo.notOverwrite;
+            //        HSceneInterpreter.hVoice.nowVoices[1].voiceInfo.isPlay = true;
+            //    }
+            //}
         }
         private static string GetBundle(int id, bool hVoice)
         {
@@ -99,15 +135,12 @@ namespace KK_VR.Features
         }
         private static List<string> GetVoiceList(VoiceType type)
         {
-            switch (type)
+            return type switch
             {
-                case VoiceType.Laugh:
-                    return VoiceBundles.Laughs;
-                case VoiceType.Short:
-                    return VoiceBundles.Shorts;
-                default:
-                    return null;
-            }
+                VoiceType.Laugh => VoiceBundles.Laughs,
+                VoiceType.Short => VoiceBundles.Shorts,
+                _ => null
+            };
 
         }
     }

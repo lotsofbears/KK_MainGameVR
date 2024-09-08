@@ -150,7 +150,7 @@ namespace KK_VR.Settings
                 "Improve framerate and reduce stutter in H and Talk scenes inside Roaming. May cause visual glitches.");
             Tie(optimizeHInsideRoaming, v => settings.OptimizeHInsideRoaming = v);
 
-            var automaticTouching = config.Bind(SectionCaress, "Automatic touching", false,
+            var automaticTouching = config.Bind(SectionCaress, "Automatic touching", KoikatuSettings.SceneType.TalkScene,
                 "Touching the female's body with controllers triggers reaction");
             Tie(automaticTouching, v => settings.AutomaticTouching = v);
 
@@ -164,7 +164,7 @@ namespace KK_VR.Settings
 
             var automaticTouchingByHmd = config.Bind(SectionCaress, "Kiss body", true,
                 "Touch the female's body by moving your head");
-            Tie(automaticTouchingByHmd, v => settings.AutomaticTouchingByHmd = v);
+            Tie(automaticTouchingByHmd, v => settings.AutomaticTouchingByHeadset = v);
 
             var firstPersonADV = config.Bind(SectionEventScenes, "First person", true,
                 "Prefer first person view in event scenes");
@@ -234,17 +234,17 @@ namespace KK_VR.Settings
                     new AcceptableValueRange<float>(0.05f, 0.15f)));
             Tie(proximityKiss, v => settings.ProximityDuringKiss = v);
 
-            KeySetsConfig keySetsConfig = null;
+            //KeySetsConfig keySetsConfig = null;
 
-            void updateKeySets()
-            {
-                keySetsConfig.CurrentKeySets(out var keySets, out var hKeySets);
-                settings.KeySets = keySets;
-                settings.HKeySets = hKeySets;
-            }
+            //void updateKeySets()
+            //{
+            //    keySetsConfig.CurrentKeySets(out var keySets, out var hKeySets);
+            //    settings.KeySets = keySets;
+            //    settings.HKeySets = hKeySets;
+            //}
             
-            keySetsConfig = new KeySetsConfig(config, updateKeySets);
-            updateKeySets();
+            //keySetsConfig = new KeySetsConfig(config, updateKeySets);
+            //updateKeySets();
 
             // Fixed settings
             settings.ApplyEffects = false; // We manage effects ourselves.
@@ -259,108 +259,108 @@ namespace KK_VR.Settings
         }
     }
 
-    class KeySetsConfig
-    {
-        private readonly KeySetConfig _main;
-        private readonly KeySetConfig _main1;
-        private readonly KeySetConfig _h;
-        private readonly KeySetConfig _h1;
+    //class KeySetsConfig
+    //{
+    //    private readonly KeySetConfig _main;
+    //    private readonly KeySetConfig _main1;
+    //    private readonly KeySetConfig _h;
+    //    private readonly KeySetConfig _h1;
 
-        private readonly ConfigEntry<bool> _useMain1;
-        private readonly ConfigEntry<bool> _useH1;
+    //    private readonly ConfigEntry<bool> _useMain1;
+    //    private readonly ConfigEntry<bool> _useH1;
 
-        public KeySetsConfig(ConfigFile config, Action onUpdate)
-        {
-            const string sectionP = "2. Non-H button assignments (primary)";
-            const string sectionS = "2. Non-H button assignments (secondary)";
-            const string sectionHP = "3. H button assignments (primary)";
-            const string sectionHS = "3. H button assignments (secondary)";
+    //    public KeySetsConfig(ConfigFile config, Action onUpdate)
+    //    {
+    //        const string sectionP = "2. Non-H button assignments (primary)";
+    //        const string sectionS = "2. Non-H button assignments (secondary)";
+    //        const string sectionHP = "3. H button assignments (primary)";
+    //        const string sectionHS = "3. H button assignments (secondary)";
 
-            _main = new KeySetConfig(config, onUpdate, sectionP, isH: false, advanced: false);
-            _main1 = new KeySetConfig(config, onUpdate, sectionS, isH: false, advanced: true);
-            _h = new KeySetConfig(config, onUpdate, sectionHP, isH: true, advanced: false);
-            _h1 = new KeySetConfig(config, onUpdate, sectionHS, isH: true, advanced: true);
+    //        _main = new KeySetConfig(config, onUpdate, sectionP, isH: false, advanced: false);
+    //        _main1 = new KeySetConfig(config, onUpdate, sectionS, isH: false, advanced: true);
+    //        _h = new KeySetConfig(config, onUpdate, sectionHP, isH: true, advanced: false);
+    //        _h1 = new KeySetConfig(config, onUpdate, sectionHS, isH: true, advanced: true);
 
-            _useMain1 = config.Bind(sectionS, "Use secondary assignments", false,
-                new ConfigDescription("", null, new ConfigurationManagerAttributes { IsAdvanced = true }));
-            _useMain1.SettingChanged += (_, _1) => onUpdate();
-            _useH1 = config.Bind(sectionHS, "Use secondary assignments", false,
-                new ConfigDescription("", null, new ConfigurationManagerAttributes { IsAdvanced = true }));
-            _useH1.SettingChanged += (_, _1) => onUpdate();
-        }
+    //        _useMain1 = config.Bind(sectionS, "Use secondary assignments", false,
+    //            new ConfigDescription("", null, new ConfigurationManagerAttributes { IsAdvanced = true }));
+    //        _useMain1.SettingChanged += (_, _1) => onUpdate();
+    //        _useH1 = config.Bind(sectionHS, "Use secondary assignments", false,
+    //            new ConfigDescription("", null, new ConfigurationManagerAttributes { IsAdvanced = true }));
+    //        _useH1.SettingChanged += (_, _1) => onUpdate();
+    //    }
 
-        public void CurrentKeySets(out List<KeySet> keySets, out List<KeySet> hKeySets)
-        {
-            keySets = new List<KeySet>();
-            keySets.Add(_main.CurrentKeySet());
-            if (_useMain1.Value)
-            {
-                keySets.Add(_main1.CurrentKeySet());
-            }
+    //    public void CurrentKeySets(out List<KeySet> keySets, out List<KeySet> hKeySets)
+    //    {
+    //        keySets = new List<KeySet>();
+    //        keySets.Add(_main.CurrentKeySet());
+    //        if (_useMain1.Value)
+    //        {
+    //            keySets.Add(_main1.CurrentKeySet());
+    //        }
 
-            hKeySets = new List<KeySet>();
-            hKeySets.Add(_h.CurrentKeySet());
-            if (_useH1.Value)
-            {
-                hKeySets.Add(_h1.CurrentKeySet());
-            }
-        }
-    }
+    //        hKeySets = new List<KeySet>();
+    //        hKeySets.Add(_h.CurrentKeySet());
+    //        if (_useH1.Value)
+    //        {
+    //            hKeySets.Add(_h1.CurrentKeySet());
+    //        }
+    //    }
+    //}
 
-    class KeySetConfig
-    {
-        private readonly ConfigEntry<AssignableFunction> _trigger;
-        private readonly ConfigEntry<AssignableFunction> _grip;
-        private readonly ConfigEntry<AssignableFunction> _up;
-        private readonly ConfigEntry<AssignableFunction> _down;
-        private readonly ConfigEntry<AssignableFunction> _right;
-        private readonly ConfigEntry<AssignableFunction> _left;
-        private readonly ConfigEntry<AssignableFunction> _center;
+    //class KeySetConfig
+    //{
+    //    private readonly ConfigEntry<AssignableFunction> _trigger;
+    //    private readonly ConfigEntry<AssignableFunction> _grip;
+    //    private readonly ConfigEntry<AssignableFunction> _up;
+    //    private readonly ConfigEntry<AssignableFunction> _down;
+    //    private readonly ConfigEntry<AssignableFunction> _right;
+    //    private readonly ConfigEntry<AssignableFunction> _left;
+    //    private readonly ConfigEntry<AssignableFunction> _center;
 
-        public KeySetConfig(ConfigFile config, Action onUpdate, string section, bool isH, bool advanced)
-        {
-            int order = -1;
-            ConfigEntry<AssignableFunction> create(string name, AssignableFunction def)
-            {
-                var entry = config.Bind(section, name, def, new ConfigDescription("", null,
-                    new ConfigurationManagerAttributes { Order = order, IsAdvanced = advanced }));
-                entry.SettingChanged += (_, _1) => onUpdate();
-                order -= 1;
-                return entry;
-            }
-            if (isH)
-            {
-                _trigger = create("Trigger", AssignableFunction.LBUTTON);
-                _grip = create("Grip", AssignableFunction.GRAB);
-                _up = create("Up", AssignableFunction.SCROLLUP);
-                _down = create("Down", AssignableFunction.SCROLLDOWN);
-                _left = create("Left", AssignableFunction.NONE);
-                _right = create("Right", AssignableFunction.RBUTTON);
-                _center = create("Center", AssignableFunction.MBUTTON);
-            }
-            else
-            {
-                _trigger = create("Trigger", AssignableFunction.WALK);
-                _grip = create("Grip", AssignableFunction.GRAB);
-                _up = create("Up", AssignableFunction.F3);
-                _down = create("Down", AssignableFunction.F1);
-                _left = create("Left", AssignableFunction.LROTATION);
-                _right = create("Right", AssignableFunction.RROTATION);
-                _center = create("Center", AssignableFunction.RBUTTON);
-            }
-        }
+    //    public KeySetConfig(ConfigFile config, Action onUpdate, string section, bool isH, bool advanced)
+    //    {
+    //        int order = -1;
+    //        ConfigEntry<AssignableFunction> create(string name, AssignableFunction def)
+    //        {
+    //            var entry = config.Bind(section, name, def, new ConfigDescription("", null,
+    //                new ConfigurationManagerAttributes { Order = order, IsAdvanced = advanced }));
+    //            entry.SettingChanged += (_, _1) => onUpdate();
+    //            order -= 1;
+    //            return entry;
+    //        }
+    //        if (isH)
+    //        {
+    //            _trigger = create("Trigger", AssignableFunction.LBUTTON);
+    //            _grip = create("Grip", AssignableFunction.GRAB);
+    //            _up = create("Up", AssignableFunction.SCROLLUP);
+    //            _down = create("Down", AssignableFunction.SCROLLDOWN);
+    //            _left = create("Left", AssignableFunction.NONE);
+    //            _right = create("Right", AssignableFunction.RBUTTON);
+    //            _center = create("Center", AssignableFunction.MBUTTON);
+    //        }
+    //        else
+    //        {
+    //            _trigger = create("Trigger", AssignableFunction.WALK);
+    //            _grip = create("Grip", AssignableFunction.GRAB);
+    //            _up = create("Up", AssignableFunction.F3);
+    //            _down = create("Down", AssignableFunction.F1);
+    //            _left = create("Left", AssignableFunction.LROTATION);
+    //            _right = create("Right", AssignableFunction.RROTATION);
+    //            _center = create("Center", AssignableFunction.RBUTTON);
+    //        }
+    //    }
 
-        public KeySet CurrentKeySet()
-        {
-            return new KeySet(
-                trigger: _trigger.Value,
-                grip: _grip.Value,
-                Up: _up.Value,
-                Down: _down.Value,
-                Right: _right.Value,
-                Left: _left.Value,
-                Center: _center.Value);
-        }
+    //    public KeySet CurrentKeySet()
+    //    {
+    //        return new KeySet(
+    //            trigger: _trigger.Value,
+    //            grip: _grip.Value,
+    //            Up: _up.Value,
+    //            Down: _down.Value,
+    //            Right: _right.Value,
+    //            Left: _left.Value,
+    //            Center: _center.Value);
+    //    }
 
-    }
+    //}
 }

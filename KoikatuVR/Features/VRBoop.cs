@@ -4,6 +4,7 @@ using HarmonyLib;
 using UnityEngine;
 using VRGIN.Core;
 using VRGIN.Controls;
+using System.Linq;
 
 namespace KK_VR.Features
 {
@@ -14,31 +15,102 @@ namespace KK_VR.Features
     /// </summary>
     public static class VRBoop
     {
-        internal const string LeftColliderName = "Left_Boop_Collider";
-        internal const string RightColliderName = "Right_Boop_Collider";
-
-        private static DynamicBoneCollider _leftCollider;
-        private static DynamicBoneCollider _rightCollider;
-
-        public static void Initialize(Controller controller, int controllerSide)
+        private static readonly List<DynamicBoneCollider> _colliderList = new List<DynamicBoneCollider>();
+        internal struct DynBoneParam
         {
-            VRLog.Debug($"VRBoop: Initialize");
+            public float m_Radius;
+            public DynamicBoneCollider.Direction m_Direction;
+            public float m_Height;
+            public Vector3 m_Center;
+        }
+        internal static readonly Dictionary<string, DynBoneParam> _colliderParams = new Dictionary<string, DynBoneParam>()
+        {
+            {
+                "cf_j_middle02_", new DynBoneParam
+                {
+                    m_Radius = 0.008f,
+                    m_Direction = DynamicBoneCollider.Direction.X,
+                    m_Height = 0.05f,
+                    m_Center = new Vector3(0f, -0.0025f, 0f)
+                }
+            },
+            {
+                "cf_j_index02_", new DynBoneParam
+                {
+                    m_Radius = 0.007f,
+                    m_Direction = DynamicBoneCollider.Direction.X,
+                    m_Height = 0.05f,
+                    m_Center = new Vector3(0f, -0.0015f, 0f)
+                }
+            },
+            {
+                "cf_j_ring02_", new DynBoneParam
+                {
+                    m_Radius = 0.0065f,
+                    m_Direction = DynamicBoneCollider.Direction.X,
+                    m_Height = 0.05f,
+                    m_Center = new Vector3(0f, -0.001f, 0f)
+                }
+            },
+            {
+                "cf_j_thumb02_", new DynBoneParam
+                {
+                    m_Radius = 0.007f,
+                    m_Direction = DynamicBoneCollider.Direction.X,
+                    m_Height = 0.07f,
+                    m_Center = new Vector3(0f, -0.001f, 0f)
+                }
+            },
+            {
+                "cf_s_hand_L", new DynBoneParam
+                {
+                    m_Radius = 0.017f,
+                    m_Direction = DynamicBoneCollider.Direction.Z,
+                    m_Height = 0.05f,
+                    m_Center = new Vector3(-0.01f, -0.005f, 0.005f)
+                }
+            },
+            {
+                "cf_s_hand_R", new DynBoneParam
+                {
+                    m_Radius = 0.017f,
+                    m_Direction = DynamicBoneCollider.Direction.Z,
+                    m_Height = 0.05f,
+                    m_Center = new Vector3(0.01f, -0.005f, 0.005f)
+                }
+            }
+        };
+        public static void Initialize(List<GameObject> gameObjectList)
+        {
+            VRLog.Debug($"VRBoop: Initialize:{gameObjectList.Count}");
             // Hooks in here don't get patched by the whole assembly PatchAll since the class has no HarmonyPatch attribute
             Harmony.CreateAndPatchAll(typeof(VRBoop), typeof(VRBoop).FullName);
-
-            switch (controllerSide)
-            {
-                case 0:
-                    _leftCollider = GetOrAttachCollider(controller.gameObject, LeftColliderName);
-                    break;
-                case 1:
-                    _rightCollider = GetOrAttachCollider(controller.gameObject, RightColliderName);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(controllerSide), controllerSide, null);
-            }
+            GetOrAttachCollider(gameObjectList);
         }
+        public static void RefreshDynamicBones(bool inactive)
+        {
+            // Hooks don't give us BetterPenetration dynamic bones.
+            var charas = UnityEngine.Object.FindObjectsOfType<ChaControl>();
+            foreach (var chara in charas)
+            {
+                var colliderList = chara.GetComponentsInChildren<DynamicBone>();
+                foreach (var collider in colliderList)
+                {
+                    AttachControllerColliders(GetColliderList(collider));
+                }
+                var colliderList01 = chara.GetComponentsInChildren<DynamicBone_Ver01>();
+                foreach (var collider in colliderList01)
+                {
+                    AttachControllerColliders(GetColliderList(collider));
+                }
+                var colliderList02 = chara.GetComponentsInChildren<DynamicBone_Ver02>();
+                foreach (var collider in colliderList02)
+                {
+                    AttachControllerColliders(GetColliderList(collider));
+                }
+            }
 
+        }
         [HarmonyPostfix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(DynamicBone), nameof(DynamicBone.SetupParticles))]
@@ -55,6 +127,7 @@ namespace KK_VR.Features
         // [HarmonyPatch(typeof(ChaControl), nameof(ChaControl.LoadCharaFbxDataNoAsync))] // unnecessary, the collider array is reset before the SetupParticles hook
         private static void OnClothesChanged(ref Action<GameObject> actObj)
         {
+
             // This action is called with the loaded object after the colliders on it are set up
             // This needs to be done despite the SetupParticles hook because LoadCharaFbxData resets the collider list
             actObj += newObj =>
@@ -80,10 +153,24 @@ namespace KK_VR.Features
         {
             if (colliderList == null) throw new ArgumentNullException(nameof(colliderList));
 
-            if (_leftCollider && !colliderList.Contains(_leftCollider))
-                colliderList.Add(_leftCollider);
-            if (_rightCollider && !colliderList.Contains(_rightCollider))
-                colliderList.Add(_rightCollider);
+            foreach (var ourCollider in _colliderList)
+            {
+                if (!colliderList.Contains(ourCollider))
+                {
+                    colliderList.Add(ourCollider);
+                }
+            }
+            //if (_colliderList.Count != 0 && !colliderList.Contains(_colliderList[0]))  //!colliderList.Any(c => _colliderList.Contains(c)))
+            //{
+            //    _colliderList.ForEach(c => colliderList.Add(c));
+            //}
+
+            //if (_leftCollider && !colliderList.Contains(_leftCollider))
+            //    colliderList.Add(_leftCollider);
+            //if (_rightCollider && !colliderList.Contains(_rightCollider))
+            //    colliderList.Add(_rightCollider);
+            //if (_testHand &&  !colliderList.Contains(_testHand))
+            //    colliderList.Add(_testHand);
         }
 
         private static List<DynamicBoneCollider> GetColliderList(MonoBehaviour dynamicBone)
@@ -97,42 +184,52 @@ namespace KK_VR.Features
                 _ => throw new ArgumentException(@"Not a DynamicBone - " + dynamicBone.GetType(), nameof(dynamicBone)),
             };
         }
-
-        private static DynamicBoneCollider GetOrAttachCollider(GameObject controllerGameObject, string colliderName)
+        
+        private static void GetOrAttachCollider(List<GameObject> gameObjectList)
         {
-            if (controllerGameObject == null) throw new ArgumentNullException(nameof(controllerGameObject));
-            if (colliderName == null) throw new ArgumentNullException(nameof(colliderName));
+            if (gameObjectList == null) throw new ArgumentNullException(nameof(gameObjectList));
 
             //Check for existing DB collider that may have been attached earlier
-            var existingCollider = controllerGameObject.GetComponentInChildren<DynamicBoneCollider>();
-            if (existingCollider == null)
+            foreach (var gameObject in gameObjectList)
             {
-                //Add a DB collider to the controller
-                //return AddDbCollider(controllerGameObject, colliderName);
-                return AddDbCollider(controllerGameObject, colliderName, 0.03f, 0f, new Vector3(0f, -0.015f, -0.06f));
+                var existingCollider = gameObject.GetComponentInChildren<DynamicBoneCollider>();
+                if (existingCollider == null)
+                {
+                    var param = _colliderParams
+                        .Where(kv => gameObject.name.StartsWith(kv.Key, StringComparison.Ordinal))
+                        .Select(kv => kv.Value)
+                        .FirstOrDefault();
+                    var colliderObject = new GameObject("DynamicBoneCollider");
+                    var collider = colliderObject.AddComponent<DynamicBoneCollider>();
+
+                    collider.m_Radius = param.m_Radius;
+                    collider.m_Height = param.m_Height;
+                    collider.m_Center = param.m_Center;
+                    collider.m_Direction = param.m_Direction;
+                    colliderObject.transform.SetParent(gameObject.transform, worldPositionStays: false);
+                    _colliderList.Add(collider);
+                }
+            }
+            {
+                ////Add a DB collider to the controller
+                ////return AddDbCollider(controllerGameObject, colliderName);
+                //return AddDbCollider(controllerGameObject, colliderName, 0.03f, 0f, new Vector3(0f, -0.015f, -0.06f));
             }
 
-            return existingCollider;
+            //return existingCollider;
         }
-
-        private static DynamicBoneCollider AddDbCollider(GameObject controllerGameObject, string colliderName,
-            float colliderRadius = 0.05f, float collierHeight = 0f, Vector3 colliderCenter = new Vector3(), DynamicBoneCollider.Direction colliderDirection = default)
-        {
-            //Build the dynamic bone collider
-            var colliderObject = new GameObject(colliderName);
-            var collider = colliderObject.AddComponent<DynamicBoneCollider>();
-            collider.m_Radius = colliderRadius;
-            collider.m_Height = collierHeight;
-            collider.m_Center = colliderCenter;
-            collider.m_Direction = colliderDirection;
-            colliderObject.transform.SetParent(controllerGameObject.transform, false);
-            //var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            //sphere.transform.SetParent(controllerGameObject.transform, false);
-            //sphere.transform.localScale = new Vector3(0.06f, 0.06f, 0.06f);
-            //sphere.transform.localPosition = new Vector3(0f, -0.015f, -0.06f);
-            //sphere.GetComponent<Collider>().enabled = false;
-            //sphere.GetComponent<Renderer>().material.color = new Color(1, 0, 0, 0.5f);
-            return collider;
-        }
+        //private static DynamicBoneCollider AddDbCollider(GameObject controllerGameObject, string colliderName,
+        //    float colliderRadius = 0.05f, float collierHeight = 0f, Vector3 colliderCenter = new Vector3(), DynamicBoneCollider.Direction colliderDirection = default)
+        //{
+        //    //Build the dynamic bone collider
+        //    var colliderObject = new GameObject(colliderName);
+        //    var collider = colliderObject.AddComponent<DynamicBoneCollider>();
+        //    collider.m_Radius = colliderRadius;
+        //    collider.m_Height = collierHeight;
+        //    collider.m_Center = colliderCenter;
+        //    collider.m_Direction = colliderDirection;
+        //    colliderObject.transform.SetParent(controllerGameObject.transform, false);
+        //    return collider;
+        //}
     }
 }

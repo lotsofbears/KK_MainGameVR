@@ -19,7 +19,6 @@ namespace VRGIN.Controls.Tools
         protected Controller Owner;
         protected Controller Neighbor;
 
-
         public abstract Texture2D Image
         {
             get;
@@ -39,10 +38,6 @@ namespace VRGIN.Controls.Tools
             Neighbor = VR.Mode.Left == Owner ? VR.Mode.Right : VR.Mode.Left;
             VRLog.Info(Neighbor ? "Got my neighbor!" : "No neighbor");
         }
-
-        protected abstract void OnDestroy();
-
-
         /// <summary>
         /// Gets whether or not the attached controlller is tracking.
         /// </summary>

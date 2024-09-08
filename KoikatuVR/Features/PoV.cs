@@ -49,10 +49,6 @@ namespace KK_VR.Features
         private enum POV_Mode
         {
             Eyes,
-
-            // Okay even if there are outliers that would use this, we simply don't have a hotkey for it. Keyboard for VR? Big fat NO.
-            // Fine we may add grip or trigger as modifiers for long press of touchpad(joystick). Still shady hotkey though.
-            // Scroll through all modes? That's even worse then keyboard.
             Head,
             Disable
         }
@@ -66,7 +62,6 @@ namespace KK_VR.Features
         private Controller _device;
         private Controller _device1;
         private float _moveSpeed;
-        private Scene _scene;
         private bool _newAttachPoint;
         private Vector3 _offsetPosition;
         private Quaternion _offsetRotation;
@@ -78,15 +73,15 @@ namespace KK_VR.Features
         private bool _precisionPoint;
 
         private bool IsClimax => HSceneInterpreter.hFlag.nowAnimStateName.EndsWith("_Loop", System.StringComparison.Ordinal);
-        public void Initialize(HSceneProc proc)
+        public void Initialize()
         {
             Instance = this;
             settings = VR.Context.Settings as KoikatuSettings;
-            _chaControls = Traverse.Create(proc).Field("lstFemale").GetValue<List<ChaControl>>();
             _device = FindObjectOfType<Controller>();
             _device1 = _device.Other;
         }
 
+        // Rearrange this mess.
         public bool IsGripPress() => _device.Input.GetPress(Grip) || _device1.Input.GetPress(Grip);
         public bool IsGripPressUp() => _device.Input.GetPressUp(Grip) || _device1.Input.GetPressUp(Grip);
         public bool IsTouchpadPressDown() => _device.Input.GetPressDown(Touchpad) || _device1.Input.GetPressDown(Touchpad);
@@ -276,37 +271,37 @@ namespace KK_VR.Features
             }
             var rotSpeed = angleDelta / (distance / step);
             var moveToward = Vector3.MoveTowards(head.position, targetPos, step);
-            origin.rotation = Quaternion.RotateTowards(origin.rotation, targetRot, 1f * rotSpeed);
+            origin.rotation = Quaternion.RotateTowards(origin.rotation, targetRot, rotSpeed);
             origin.position += moveToward - head.position;
         }
         public void OnSpotChange()
         {
             _newAttachPoint = false;
         }
-        public void OnPoseChange()
-        {
-            // VRMoverH does it.
-            StartPov();
-        }
+        //public void OnPoseChange()
+        //{
+        //    // VRMoverH does it.
+        //    StartPov();
+        //}
         private void ResetRotation()
         {
             var oldPos = VR.Camera.Head.position;
             VR.Camera.Origin.rotation = Quaternion.Euler(0f, VR.Camera.Origin.rotation.eulerAngles.y, 0f);
             VR.Camera.Origin.position = oldPos - VR.Camera.Head.position;
         }
-        public Vector3 GetDestination()
-        {
-            if (_targetEyes != null)
-            {
-                return GetEyesPosition();
-            }
-            else
-            {
-                return Vector3.zero;
-            }
-        }
-        public void SetMoveSpeed(float speed) => _moveSpeed = speed;
-        public Quaternion GetRotation() => _targetEyes.rotation;
+        //public Vector3 GetDestination()
+        //{
+        //    if (_targetEyes != null)
+        //    {
+        //        return GetEyesPosition();
+        //    }
+        //    else
+        //    {
+        //        return Vector3.zero;
+        //    }
+        //}
+        //public void SetMoveSpeed(float speed) => _moveSpeed = speed;
+        //public Quaternion GetRotation() => _targetEyes.rotation;
         private Vector3 GetEyesPosition() => _targetEyes.TransformPoint(new Vector3(0f, settings.PositionOffsetY, settings.PositionOffsetZ));
         /// <summary>
         /// Stub.
@@ -379,6 +374,7 @@ namespace KK_VR.Features
         //{
         //    return Quaternion.Euler(_rotation.eulerAngles.x, _rotation.eulerAngles.y, 0f);
         //}
+
         private int GetCurrentCharaIndex(List<ChaControl> _chaControls)
         {
             if (_target != null)
@@ -434,6 +430,7 @@ namespace KK_VR.Features
             CameraIsFarAndBusy();
             UpdateSettings();
         }
+
         private void NewPosition()
         {
             // Most likely a bad idea to kiss/lick when detached from the head but still inheriting all movements.
@@ -497,6 +494,7 @@ namespace KK_VR.Features
             _newAttachPoint = false;
             VRMouth.NoActionAllowed = false;
         }
+
         protected override void OnUpdate()
         {
             if (!settings.EnablePOV)
@@ -512,6 +510,7 @@ namespace KK_VR.Features
                 SetPOV();
             }
         }
+
         protected override void OnLateUpdate()
         {
             if (settings.HideHeadInPOV && Active && _target != null)
@@ -519,6 +518,7 @@ namespace KK_VR.Features
                 HideHead();
             }
         }
+
         private void HideHead()
         {
             // We hide it lazily by default, and start proper check if we use custom position or currently moving to impersonate.
@@ -542,6 +542,7 @@ namespace KK_VR.Features
                 _target.fileStatus.visibleHeadAlways = VRMouth.Instance.IsKiss;
             }
         }
+         
         private IEnumerator GetButtonA(float timer = 1f)
         {
             buttonA = true;

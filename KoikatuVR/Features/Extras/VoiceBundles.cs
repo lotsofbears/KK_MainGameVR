@@ -8,8 +8,8 @@ namespace KK_VR.Features.Extras
     public static class VoiceBundles
     {
 
-        // ** - Stand-in for personality Id.
-        // ^  - Stand-in for experience level.
+        // ** is a Stand-in for personality Id.
+        // ^  is a Stand-in for experience level.
         public static List<string> Shorts = new List<string>
         {
             "H/h_ko_**_0^_005_00",

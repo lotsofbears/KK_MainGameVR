@@ -72,7 +72,7 @@ namespace VRGIN.Controls.Tools
             SetVisibility(false);
         }
 
-        protected override void OnDestroy()
+        private void OnDestroy()
         {
             if (VR.Quitting)
             {

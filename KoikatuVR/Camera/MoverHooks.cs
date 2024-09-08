@@ -112,7 +112,6 @@ namespace KK_VR.Camera
             }
             UpdateVRCamera(__instance, ___lstFemale, null);
             HSceneInterpreter.OnPoseChange(_nextAinmInfo);
-            
         }
 
         //[HarmonyPatch("ChangeCategory")]
@@ -130,7 +129,7 @@ namespace KK_VR.Camera
             {
                 PoV.Instance.OnSpotChange();
             }
-
+            HSceneInterpreter.OnSpotChange();
             UpdateVRCamera(__instance, ___lstFemale, null);// __state);
         }
         [HarmonyPatch(nameof(HSceneProc.GotoPointMoveScene))]

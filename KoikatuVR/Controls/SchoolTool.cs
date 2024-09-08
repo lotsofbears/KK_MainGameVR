@@ -13,345 +13,207 @@ using System.ComponentModel;
 using KK_VR.Settings;
 using static KK_VR.Interpreters.HSceneInterpreter;
 using Valve.VR;
+using ADV.Commands.Camera;
+using System.Diagnostics;
 
 namespace KK_VR.Controls
 {
     public class SchoolTool : Tool
     {
-        public static SchoolTool Instance;
-        private KoikatuInterpreter _Interpreter;
-        private KoikatuSettings _Settings;
-        private KeySet _KeySet;
-        private int _KeySetIndex = 0;
-        private bool _InHScene = false;
-        private Controller.Lock _lock = VRGIN.Controls.Controller.Lock.Invalid;
+        //private KoikatuSettings _Settings;
+        //private KeySet _KeySet;
+        //private int _KeySetIndex = 0;
+        private int _index;
+        private Controller.Lock _lock;
 
-        private Controller.TrackpadDirection? _touchDirection;
-        private Controller.TrackpadDirection? _lastPressDirection;
-
-        // When eneabled, exactly one of the below is non-null.
-        private ButtonsSubtool _buttonsSubtool;
+        private Controller.TrackpadDirection _lastDirection;
+        //private Controller.TrackpadDirection? _lastPressDirection;
         private GrabAction _grab;
+        public bool IsGrab => _grab != null;
+        public override Texture2D Image => _image;
+        private readonly Texture2D _image = new Texture2D(512, 512);
+        private readonly Texture2D _schoolTexture = UnityHelper.LoadImage("icon_school.png");
+        //private readonly Texture2D _school1Texture = UnityHelper.LoadImage("icon_school_1.png");
+        // readonly Texture2D _school2Texture = UnityHelper.LoadImage("icon_school_2.png");
+        private readonly Texture2D _handTexture = UnityHelper.LoadImage("icon_hand.png");
+        //private readonly Texture2D _hand1Texture = UnityHelper.LoadImage("icon_hand_1.png");
+        //private readonly Texture2D _hand2Texture = UnityHelper.LoadImage("icon_hand_2.png");
 
-        
-        private void ChangeKeySet()
+
+        //private void ChangeKeySet()
+        //{
+        //    List<KeySet> keySets = KeySets();
+
+        //    _KeySetIndex = (_KeySetIndex + 1) % keySets.Count;
+        //    _KeySet = keySets[_KeySetIndex];
+        //    UpdateIcon();
+        //}
+
+        //private List<KeySet> KeySets()
+        //{
+        //    return _InHScene ? _Settings.HKeySets : _Settings.KeySets;
+        //}
+
+        //private void ResetKeys()
+        //{
+        //    SetScene();
+        //}
+
+
+        private void SetScene()
         {
-            List<KeySet> keySets = KeySets();
-
-            _KeySetIndex = (_KeySetIndex + 1) % keySets.Count;
-            _KeySet = keySets[_KeySetIndex];
-            UpdateIcon();
-        }
-
-        private List<KeySet> KeySets()
-        {
-            return _InHScene ? _Settings.HKeySets : _Settings.KeySets;
-        }
-
-        private void ResetKeys()
-        {
-            SetScene(_InHScene);
-        }
-
-        private void SetScene(bool inHScene)
-        {
-            if (_buttonsSubtool != null)
-            {
-                _buttonsSubtool.Destroy();
-                _buttonsSubtool = new ButtonsSubtool(_Interpreter, _Settings);
-            }
-            _InHScene = inHScene;
-            var keySets = KeySets();
-            _KeySetIndex = 0;
-            _KeySet = keySets[0];
+            //_InHScene = inHScene;
+            //var keySets = KeySets();
+            //KeySetIndex = 0;
+            //_KeySet = keySets[0];
             UpdateIcon();
         }
 
         private void UpdateIcon()
         {
             Texture2D icon =
-                _InHScene
-                    ? _Settings.HKeySets.Count > 1
-                        ? _KeySetIndex == 0
-                            ? _hand1Texture
-                            : _hand2Texture
-                        : _handTexture
-                    : _Settings.KeySets.Count > 1
-                        ? _KeySetIndex == 0
-                            ? _school1Texture
-                            : _school2Texture
-                        : _schoolTexture;
+                KoikatuInterpreter.CurrentScene == KoikatuInterpreter.SceneType.HScene ? _handTexture : _schoolTexture;
             Graphics.CopyTexture(icon, _image);
         }
 
-        public override Texture2D Image => _image;
-        private readonly Texture2D _image = new Texture2D(512, 512);
-        private readonly Texture2D _schoolTexture = UnityHelper.LoadImage("icon_school.png");
-        private readonly Texture2D _school1Texture = UnityHelper.LoadImage("icon_school_1.png");
-        private readonly Texture2D _school2Texture = UnityHelper.LoadImage("icon_school_2.png");
-        private readonly Texture2D _handTexture = UnityHelper.LoadImage("icon_hand.png");
-        private readonly Texture2D _hand1Texture = UnityHelper.LoadImage("icon_hand_1.png");
-        private readonly Texture2D _hand2Texture = UnityHelper.LoadImage("icon_hand_2.png");
 
         protected override void OnStart()
         {
             base.OnStart();
-            Instance = this;
-            _Settings = (VR.Context.Settings as KoikatuSettings);
-            SetScene(inHScene: false);
-            _Settings.AddListener("KeySets", (_, _1) => ResetKeys());
-            _Settings.AddListener("HKeySets", (_, _1) => ResetKeys());
+
+            // Actual controller/handler indexes:
+            // 0 - Headset;
+            // 1 - Left controller;
+            // 2 - Right controller;
+            // But for clarity of button interpretation, as there is no buttons on headset to interpret, we shift them to -1;
+            // Headset still has it's own handler(s), so conversion when calling handlers has to be accounted for.
+
+            _index = (int)Controller.index - 1;
+            SetScene();
+
+            //_Settings = (KoikatuSettings)VR.Context.Settings;
+            //_Settings.AddListener("KeySets", (_, _1) => ResetKeys());
+            //_Settings.AddListener("HKeySets", (_, _1) => ResetKeys());
         }
 
         protected override void OnDisable()
         {
-            _buttonsSubtool?.Destroy();
-            _buttonsSubtool = null;
-            _grab?.Destroy();
-            _grab = null;
-            if (_lock.IsValid)
-            {
-                _lock.Release();
-            }
-            _touchDirection = null;
-            _lastPressDirection = null;
+            DestroyGrab();
             base.OnDisable();
-        }
-        protected override void OnDestroy()
-        {
-
         }
 
         protected override void OnEnable()
         {
             base.OnEnable();
-            _Interpreter = VR.Interpreter as KoikatuInterpreter;
-            _buttonsSubtool = new ButtonsSubtool(_Interpreter, _Settings);
         }
         protected override void OnUpdate()
         {
-            base.OnUpdate();
-
-            UpdateLock();
-
-            var inHScene = _Interpreter.CurrentScene == KoikatuInterpreter.SceneType.HScene;
-            if (inHScene != _InHScene)
-            {
-                SetScene(inHScene);
-            }
-
             if (_grab != null)
             {
                 if (_grab.HandleGrabbing() != GrabAction.Status.Continue)
                 {
-                    _grab.Destroy();
-                    _grab = null;
-                    _buttonsSubtool = new ButtonsSubtool(_Interpreter, _Settings);
+                    DestroyGrab();
                 }
             }
-            else if (_buttonsSubtool != null)
+            else
             {
                 HandleButtons();
             }
         }
-
-        private void UpdateLock()
+        public void DestroyGrab()
         {
-            bool wantLock = _grab != null || _buttonsSubtool?.WantLock() == true;
-            if (wantLock && !_lock.IsValid)
-            {
-                _lock = Owner.AcquireFocus(keepTool: true);
-            }
-            else if(!wantLock && _lock.IsValid)
-            {
-                _lock.Release();
-            }
+            _grab?.Destroy();
+            _grab = null;
+            _lock?.Release();
+            _lock = null;
         }
+        //private void UpdateLock()
+        //{
+        //    //bool wantLock = _grab != null || _buttonsSubtool?.WantLock() == true;
+        //    if (_grab != null)
+        //    {
+        //        if (_lock == null)
+        //        {
+        //            Owner.TryAcquireFocus(out _lock, keepTool: true); // AcquireFocus(keepTool: true);
+        //        }
+        //    }
+        //    else if (_lock != null)
+        //    {
+        //        _lock.Release();
+        //        _lock = null;
+        //    }
+        //}
+
         private void HandleButtons()
         {
-            var device = this.Controller;
+            // Degrees are handled separately when needed by the handlers.
+            var direction = Owner.GetTrackpadDirection();
 
-            if (device.GetPressDown(ButtonMask.Trigger))
+            if (Controller.GetPressDown(ButtonMask.Trigger))
             {
-                _Interpreter.SceneInterpreter.OnButtonDown(EVRButtonId.k_EButton_SteamVR_Trigger);
-                InputDown(_KeySet.Trigger, ButtonMask.Trigger);
+                KoikatuInterpreter.SceneInterpreter.OnButtonDown(EVRButtonId.k_EButton_SteamVR_Trigger, direction, _index);
             }
 
-            if (device.GetPressUp(ButtonMask.Trigger))
+            else if (Controller.GetPressUp(ButtonMask.Trigger))
             {
-                InputUp(_KeySet.Trigger);
+                KoikatuInterpreter.SceneInterpreter.OnButtonUp(EVRButtonId.k_EButton_SteamVR_Trigger, direction, _index);
             }
 
-            if (device.GetPressDown(ButtonMask.Grip))
+            if (Controller.GetPressDown(ButtonMask.Grip))
             {
-                if (!_Interpreter.SceneInterpreter.OnButtonDown(EVRButtonId.k_EButton_Grip))
+                if (!KoikatuInterpreter.SceneInterpreter.OnButtonDown(EVRButtonId.k_EButton_Grip, direction, _index))
                 {
-                    InputDown(_KeySet.Grip, ButtonMask.Grip);
+                    Owner.TryAcquireFocus(out _lock, keepTool: true);
+                    _grab = new GrabAction(Owner, Controller, ButtonMask.Grip);
                 }
             }
-
-            if (device.GetPressUp(ButtonMask.Grip))
+            else if (Controller.GetPressUp(ButtonMask.Grip))
             {
-                InputUp(_KeySet.Grip);
+                KoikatuInterpreter.SceneInterpreter.OnButtonUp(EVRButtonId.k_EButton_SteamVR_Trigger, direction, _index);
             }
 
-            if (device.GetPressDown(ButtonMask.Touchpad))
+            if (Controller.GetPressDown(ButtonMask.Touchpad))
             {
-                var dir = Owner.GetTrackpadDirection();
-                var fun = GetTrackpadFunction(dir);
-                bool requiresPress = RequiresPress(fun);
+                KoikatuInterpreter.SceneInterpreter.OnButtonDown(EVRButtonId.k_EButton_SteamVR_Touchpad, Owner.GetTrackpadDirection(), _index);
+            }
+            else if (Controller.GetPressUp(ButtonMask.Touchpad))
+            {
+                KoikatuInterpreter.SceneInterpreter.OnButtonDown(EVRButtonId.k_EButton_SteamVR_Touchpad, Owner.GetTrackpadDirection(), _index);
+            }
 
-                _Interpreter.SceneInterpreter.OnButtonDown(dir, EVRButtonId.k_EButton_SteamVR_Touchpad);
-                if (requiresPress)
+            if (_lastDirection != direction)
+            {
+                if (_lastDirection != VRGIN.Controls.Controller.TrackpadDirection.Center)
                 {
-                    InputDown(fun, ButtonMask.Touchpad);
+                    KoikatuInterpreter.SceneInterpreter.OnDirectionUp(_lastDirection, _index);
                 }
-            }
-            if (_buttonsSubtool == null)
-            {
-                return;
-            }
-
-            // 上げたときの位置によらず、押したボタンを離す
-            if (device.GetPressUp(ButtonMask.Touchpad) && _lastPressDirection is Controller.TrackpadDirection dirP)
-            {
-                _Interpreter.SceneInterpreter.OnButtonUp(dirP);
-
-                InputUp(GetTrackpadFunction(dirP));
-                _lastPressDirection = null;
-            }
-
-            var newTouchDirection =
-                device.GetTouch(ButtonMask.Touchpad) ? (Controller.TrackpadDirection?)Owner.GetTrackpadDirection() : null;
-
-            if (_touchDirection != newTouchDirection)
-            {
-                if (_touchDirection is Controller.TrackpadDirection oldDir &&
-                    GetTrackpadFunction(oldDir) is var oldFun)
+                if (direction != VRGIN.Controls.Controller.TrackpadDirection.Center)
                 {
-                    _Interpreter.SceneInterpreter.OnButtonUp(oldDir);
-
-                    if (!RequiresPress(oldFun))
-                    {
-                        InputUp(oldFun);
-                    }
-
+                    KoikatuInterpreter.SceneInterpreter.OnDirectionDown(direction, _index);
                 }
-
-                if (newTouchDirection is Controller.TrackpadDirection newDir &&
-                    GetTrackpadFunction(newDir) is var newFun)
-                {
-                    _Interpreter.SceneInterpreter.OnButtonDown(newDir);
-
-                    if (!RequiresPress(newFun))
-                    {
-                        InputDown(newFun, ButtonMask.Touchpad);
-                    }
-                }
-                _touchDirection = newTouchDirection;
-            }
-
-            _buttonsSubtool.Update();
-        }
-
-        private AssignableFunction GetTrackpadFunction(Controller.TrackpadDirection dir)
-        {
-            switch (dir)
-            {
-                case VRGIN.Controls.Controller.TrackpadDirection.Up:
-                    return _KeySet.Up;
-                case VRGIN.Controls.Controller.TrackpadDirection.Down:
-                    return _KeySet.Down;
-                case VRGIN.Controls.Controller.TrackpadDirection.Left:
-                    return _KeySet.Left;
-                case VRGIN.Controls.Controller.TrackpadDirection.Right:
-                    return _KeySet.Right;
-                default:
-                    return _KeySet.Center;
+                _lastDirection = direction;
             }
         }
 
-        /// <summary>
-        /// When this function is assigned to trackpad, does it require a press
-        /// or does a touch suffice?
-        /// </summary>
-        /// <param name="fun"></param>
-        /// <returns></returns>
-        private bool RequiresPress(AssignableFunction fun)
-        {
-            switch (fun)
-            {
-                case AssignableFunction.SCROLLDOWN:
-                case AssignableFunction.SCROLLUP:
-                case AssignableFunction.LROTATION:
-                case AssignableFunction.RROTATION:
-                    return false;
-                default:
-                    return true;
-            }
-        }
-        // TODO Separate inputs for canvas/outside of it. Clicking scene exit by mistake is my personal nightmare.
-        private void InputDown(AssignableFunction fun, ulong buttonMask)
-        {
-            switch (fun)
-            {
-                case AssignableFunction.NEXT:
-                    break;
-                case AssignableFunction.GRAB:
-                    _buttonsSubtool.Destroy();
-                    _buttonsSubtool = null;
-                    _grab = new GrabAction(Owner, Controller, buttonMask);
-                    break;
-                case AssignableFunction.SCROLLUP:
-                case AssignableFunction.SCROLLDOWN:
-                case AssignableFunction.LBUTTON:
-                case AssignableFunction.MBUTTON:
-                    // Move the cursor to the bottom right corner so buttons/scrolling affect the H speed control
-                    // Extremely fiddly but what can you do
-                    //if (_InHScene) VR.Input.Mouse.MoveMouseBy(Screen.width - 10, Screen.height - 10);
 
-                    // Force focus the window here so the cursor doesn't go off into the desktop or click the window that's currently on top of the game window
-                    //WindowTools.BringWindowToFront();
-                    goto default;
-                default:
-                    _buttonsSubtool.ButtonDown(fun);
-                    break;
-            }
-        }
+        //public override List<HelpText> GetHelpTexts()
+        //{
+        //    return new List<HelpText>(new[] {
+        //        ToolUtil.HelpTrigger(Owner, DescriptionFor(_KeySet.Trigger)),
+        //        ToolUtil.HelpGrip(Owner, DescriptionFor(_KeySet.Grip)),
+        //        ToolUtil.HelpTrackpadCenter(Owner, DescriptionFor(_KeySet.Center)),
+        //        ToolUtil.HelpTrackpadLeft(Owner, DescriptionFor(_KeySet.Left)),
+        //        ToolUtil.HelpTrackpadRight(Owner, DescriptionFor(_KeySet.Right)),
+        //        ToolUtil.HelpTrackpadUp(Owner, DescriptionFor(_KeySet.Up)),
+        //        ToolUtil.HelpTrackpadDown(Owner, DescriptionFor(_KeySet.Down)),
+        //    }.Where(x => x != null));
+        //}
 
-        private void InputUp(AssignableFunction fun)
-        {
-            switch (fun)
-            {
-                case AssignableFunction.NEXT:
-                    ChangeKeySet();
-                    break;
-                case AssignableFunction.GRAB:
-                    break;
-                default:
-                    _buttonsSubtool.ButtonUp(fun);
-                    break;
-            }
-        }
-
-        public override List<HelpText> GetHelpTexts()
-        {
-            return new List<HelpText>(new[] {
-                ToolUtil.HelpTrigger(Owner, DescriptionFor(_KeySet.Trigger)),
-                ToolUtil.HelpGrip(Owner, DescriptionFor(_KeySet.Grip)),
-                ToolUtil.HelpTrackpadCenter(Owner, DescriptionFor(_KeySet.Center)),
-                ToolUtil.HelpTrackpadLeft(Owner, DescriptionFor(_KeySet.Left)),
-                ToolUtil.HelpTrackpadRight(Owner, DescriptionFor(_KeySet.Right)),
-                ToolUtil.HelpTrackpadUp(Owner, DescriptionFor(_KeySet.Up)),
-                ToolUtil.HelpTrackpadDown(Owner, DescriptionFor(_KeySet.Down)),
-            }.Where(x => x != null));
-        }
-
-        private static string DescriptionFor(AssignableFunction fun)
-        {
-            var member = typeof(AssignableFunction).GetMember(fun.ToString()).FirstOrDefault();
-            var descr = member?.GetCustomAttributes(typeof(DescriptionAttribute), false).Cast<DescriptionAttribute>().FirstOrDefault()?.Description;
-            return descr ?? fun.ToString();
-        }
+        //private static string DescriptionFor(AssignableFunction fun)
+        //{
+        //    var member = typeof(AssignableFunction).GetMember(fun.ToString()).FirstOrDefault();
+        //    var descr = member?.GetCustomAttributes(typeof(DescriptionAttribute), false).Cast<DescriptionAttribute>().FirstOrDefault()?.Description;
+        //    return descr ?? fun.ToString();
+        //}
     }
 }

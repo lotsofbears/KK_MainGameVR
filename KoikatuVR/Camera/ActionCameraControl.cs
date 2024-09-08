@@ -141,7 +141,7 @@ namespace KK_VR.Camera
         //}
         public static float GetPlayerHeight()
         {
-            return TalkSceneInterpreter.Height != 0f ? TalkSceneInterpreter.Height : 1.4f;
+            return TalkSceneInterpreter.height != 0f ? TalkSceneInterpreter.height : 1.4f;
         }
         public static bool HeadIsAwayFromPosition(Vector3 targetPosition)
         {
