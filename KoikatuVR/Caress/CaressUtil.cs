@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using HarmonyLib;
+using KK_VR.Interpreters;
 using VRGIN.Core;
 
 namespace KK_VR.Caress
@@ -46,7 +47,7 @@ namespace KK_VR.Caress
             HandCtrlHooks.InjectMouseButtonDown(0, () => consumed = true);
             while (!consumed)
             {
-                VRPlugin.Logger.LogDebug($"ClickCo:Clicking");
+                VRPlugin.Logger.LogDebug($"ClickCo:Clicking:{HSceneInterpreter.handCtrl.selectKindTouch}");
                 yield return null;
             }
             HandCtrlHooks.InjectMouseButtonUp(0);

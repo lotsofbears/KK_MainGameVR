@@ -40,7 +40,7 @@ namespace KK_VR.Camera
                 // camera anyway in that case.
                 return;
             }
-            VRMover.Instance.MaybeMoveADV(__instance, backTrans.position, backTrans.rotation, keepHeight: false);
+            VRMover.Instance.MaybeMoveADV(__instance, backTrans.position, backTrans.rotation);
         }
     }
 

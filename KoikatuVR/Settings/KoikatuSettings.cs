@@ -143,6 +143,7 @@ namespace KK_VR.Settings
         public float ProximityDuringKiss { get; set; }
         public bool ContinuousRotation { get; set; }
         public HeadsetType HeadsetSpecifications { get; set; }
+        public bool ForceShowMaleHeadInAdv { get; set; }
         public enum HeadsetType
         {
             None,

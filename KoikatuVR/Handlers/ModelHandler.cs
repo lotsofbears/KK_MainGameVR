@@ -1,15 +1,25 @@
 ﻿using ADV.Commands.Base;
+using ADV.Commands.Chara;
+using BepInEx;
+using Illusion.Game;
 using IllusionUtility.GetUtility;
 using KK_VR.Features;
+using KK_VR.Interpreters;
+using Manager;
 using RootMotion.FinalIK;
 using SceneAssist;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
+using UnityEngineInternal;
+using VRGIN.Controls;
 using VRGIN.Core;
 using static HandCtrl;
 using static UnityEngine.UI.Image;
@@ -18,259 +28,175 @@ namespace KK_VR.Handlers
 {
     internal class ModelHandler
     {
-        private static Dictionary<int, AibuItem> aibuItemList = new Dictionary<int, AibuItem>();
-        private static Dictionary<int, List<ItemType>> controllersDic = new Dictionary<int, List<ItemType>>();
-        private int[] _itemIndex = new int[3];
+        // There currently a bug that doesn't let every second chosen 'Finger hand" to scale.
+        // Initially asset has component that does exactly this (EliminateScale), but we remove it during initialization.
+        // Yet once parented every !second! time, 'Finger hand' freezes it's own local scale at Vec.one;
+        // At that moment no components 'EliminateScale' are present in runtime, no clue what can it be.
+
+        private static readonly Dictionary<int, AibuItem> aibuItemList = new Dictionary<int, AibuItem>();
+        private static readonly Dictionary<int, List<ItemType>> controllersDic = new Dictionary<int, List<ItemType>>();
+        private readonly int[]  _currentItemIndex = new int[3];
+        private readonly List<ItemType> _currentlyActive = new List<ItemType>();
+        private static readonly List<Transform> _sfxTransforms = new List<Transform>();
 
         internal ModelHandler()
         {
             Load();
             SetItems();
+            PopulateDic();
         }
-        // God help those who decide to adjust those for different controllers.
-        // A heads up => start from ground zero i.e. zero offset/rotation.
-        // .. and figure out how to organize it all.
-        private List<List<AnimationParameters>> defaultAnimParams = new List<List<AnimationParameters>>()
-        {
-            // 0 - Hand
-            new List<AnimationParameters>()
-            {
-                new AnimationParameters
-                {
-                    // Base Layer
-                    layerId = 0,
-                    //rotation = Quaternion.Euler(0f, 0f, -30f),
-                    offset = new Vector3(0f, -0.02f, -0.07f)
-                },
-                new AnimationParameters
-                {
-                    // Active
-                    // Te_mune_sawari_L
-                    layerId = 1,
-                    //rotation = Quaternion.Euler(-90f, 0f, 180),
-                    offset = new Vector3(0f, -0.02f, -0.07f)
-                },
-                new AnimationParameters
-                {
-                    // Static
-                    // Te_mune_C_momu_L
-                    layerId = 2,
-                    //rotation = Quaternion.Euler(-90f, 0f, 180f)
-                },
-                new AnimationParameters
-                {
-                    // Semi-active
-                    // Te_mune_D_momu_L
-                    layerId = 3,
-                    //rotation = Quaternion.Euler(-90f, 0f, 180f)
-                },
-                new AnimationParameters
-                {
-                    // Active
-                    // Te_kokan_sawari_L
-                    layerId = 4,
-                    //rotation = Quaternion.Euler(-30f, 210f, -75f),
-                    offset = new Vector3(0f, -0.02f, -0.07f),
-                    rotationOffsetZ = 180f
-                },
-                new AnimationParameters
-                {
-                    // Static
-                    // Te_kokan_C_kosuru_L
-                    layerId = 5,
-                    //rotation = Quaternion.Euler(-40f, 180f, -90f)
-                },
-                new AnimationParameters
-                {
-                    // Semi-active
-                    // Te_kokan_D_kosuru_L
-                    layerId = 6,
-                    //rotation = Quaternion.Euler(-40f, 180f, -90f)
-                },
-                new AnimationParameters
-                {
-                    // Active
-                    // Te_anal_sawari_L
-                    layerId = 7,
-                    //rotation = Quaternion.Euler(-60f, -15f, -160f),
-                    offset = new Vector3(0.01f, -0.01f, -0.065f)
-                },
-                new AnimationParameters
-                {
-                    // Static
-                    // Te_anal_C_ijiru_L
-                    layerId = 8,
-                    //rotation = Quaternion.Euler(-60f, -15f, -160f),
-                    offset = new Vector3(0.01f, -0.01f, -0.065f)
-                },
-                new AnimationParameters
-                {
-                    // Semi-active
-                    // Te_anal_D_Kosuru_L
-                    layerId = 9,
-                    //rotation = Quaternion.Euler(-80f, 0f, 0f)
-                },
-                new AnimationParameters
-                {
-                    // Static
-                    // Te_siri_sawari_L
-                    layerId = 10,
-                    //rotation = Quaternion.Euler(90f, 0f, 0f),
-                    offset = new Vector3(0f, -0.02f, -0.07f)
-                },
-                new AnimationParameters
-                {
-                    // Static
-                    // Te_siriC_momu_L
-                    layerId = 11,
-                    //rotation = Quaternion.Euler(-90f, 0f, 0f)
-                },
-                new AnimationParameters
-                {
-                    // Static
-                    // Te_siri_D_momu_L
-                    layerId = 11,
-                    //rotation = Quaternion.Euler(-90f, 0f, 0f)
-                }
-            },
-            // 1 - Finger
-            new List<AnimationParameters>
-            {
-                new AnimationParameters
-                {
-                    // Base Layer
-                    layerId = 0,
-                   // rotation = Quaternion.identity,
-                    offset = new Vector3(0f, -0.02f, -0.07f)
-                },
-                new AnimationParameters
-                {
-                    // Active, Preparing to pull
-                    // yubi_mune_sawari_L
-                    layerId = 1,
-                    //rotation = Quaternion.Euler(-80f, 180f, 0f)
 
-                },
-                new AnimationParameters
-                {
-                    // Static
-                    // Yubi_mune_C_tutuku_L
-                    layerId = 2,
-                    //rotation = Quaternion.Euler(-80f, 180f, 0f)
-                },
-                new AnimationParameters
-                {
-                    // Semi-active, Pulling
-                    // Yubi_mune_D_hipparu_L
-                    layerId = 3,
-                    //rotation = Quaternion.Euler(-80f, 180f, 0f)
-                },
-                new AnimationParameters
-                {
-                    // Active, preparing to stick (1 finger);
-                    // Yubi_kokan_sawari_L
-                    layerId = 4,
-                    //rotation = Quaternion.Euler(-60f, 180f, 0f)
-                },
-                new AnimationParameters
-                {
-                    // Static
-                    // yubi_kokan_C_ireru_L
-                    layerId = 5,
-                    //rotation = Quaternion.Euler(-60f, 180f, 0f)
-                },
-                new AnimationParameters
-                {
-                    // Semi-active, sticking (2 finger);
-                    // Yubi_kokan_D_kakimawasu_L
-                    layerId = 6,
-                    //rotation = Quaternion.Euler(-60f, 180f, 0f)
-                },
-                new AnimationParameters
-                {
-                    // Almost static, preparing to ?? (bent finger)
-                    // Yubi_anal_sawari_L
-                    layerId = 7,
-                    //rotation = Quaternion.Euler(-80f, 0f, 0f)
-                },
-                new AnimationParameters
-                {
-                    // Static
-                    // Yubi_anal_C_ireru_L
-                    layerId = 8,
-                    //rotation = Quaternion.Euler(-80f, 0f, 0f)
-                },
-                new AnimationParameters
-                {
-                    // Almost static, straight finger
-                    // Yubi_anal_C_kakimawasu_L
-                    layerId = 9,
-                    //rotation = Quaternion.Euler(-80f, 0f, 0f)
-                }
+        // tongue { 7, 9
+        private readonly List<AnimationParameter> defaultAnimParamList = new List<AnimationParameter>()
+        {
+            new AnimationParameter
+            {
+                // Hand
+                offset = new Vector3(0f, -0.02f, -0.07f),
+                availableLayers = new int[] { 4, 7, 10 },
+                movingPartName = "cf_j_handroot_",
+                handlerParentName = "cf_j_handroot_",
+
+                rotationOffset = Quaternion.identity
+            },
+            new AnimationParameter
+            {
+                // Finger
+                offset = new Vector3(0f, -0.02f, -0.07f),
+                availableLayers = new int[] { 1, 3, 9, 4, 6 },
+                movingPartName = "cf_j_handroot_",
+                handlerParentName = "cf_j_handroot_",
+                rotationOffset = Quaternion.identity
+            },
+            new AnimationParameter
+            {
+                // Massager
+                offset = new Vector3(0f, 0f, -0.05f),
+                availableLayers = new int[] { 0, 1 },
+                movingPartName = "N_massajiki_",
+                handlerParentName = "_head_00",
+                rotationOffset = Quaternion.Euler(-90f, 180f, 0f)
+            },
+            new AnimationParameter
+            {
+                // Vibrator
+                offset = new Vector3(0f, 0f, -0.1f),
+                availableLayers = new int[] { 0, 1 },
+                movingPartName = "N_vibe_Angle",
+                handlerParentName = "J_vibe_03",
+                rotationOffset = Quaternion.Euler(-90f, 180f, 0f)
+            },
+            new AnimationParameter
+            {
+                // Tongue
+                /*
+                 *  21, 16, 18, 19   - licking haphazardly
+                 *      7 - at lower angle 
+                 *      9 - at lower angle very slow
+                 *      10 - at higher angle
+                 *      12 - at higher angle very slow 
+                 *      
+                 *  13 - very high angle, flopping
+                 *  
+                 *  15 - very high angle, back forth
+                 *  1, 3, 4, 6,   - licking 
+                 */
+                offset = new Vector3(0f, -0.04f, 0.05f),
+                availableLayers = new int[] { 1, 7, 9, 10, 12, 13, 15, 16 },
+                movingPartName = "cf_j_tang_01", // cf_j_tang_01 / cf_j_tangangle
+                handlerParentName = "cf_j_tang_03",
+                rotationOffset = Quaternion.identity, // Quaternion.Euler(-90f, 0f, 0f)
             }
         };
-        class ItemType
+
+        public class ItemType
         {
             public AibuItem aibuItem;
+            public MonoBehaviour handler;
+
+            public GameObject handlerParent;
             public Transform anchorPoint;
-            public List<AnimationParameters> animParamList;
+            public Transform rootPoint;
+            public Transform movingPoint;
+            public Quaternion rotationOffset;
+            public Vector3 positionOffset;
             public int layer;
             public bool enabled;
-            public GameObject handlerParent;
-            public Vector3 anchorOffset;
+            public int[] availableLayers;
 
+            public Rigidbody rigidBody;
+            public Transform controller;
+
+            public Transform audioTransform;
+            public AudioSource audioSource;
         }
 
-        class AnimationParameters
+        class AnimationParameter
         {
-            public int layerId;
+            //public int layerId;
             //public Quaternion rotation;
-            public float rotationOffsetZ;
+            //public float rotationOffsetZ;
             public Vector3 offset;
+            public int[] availableLayers;
+            public string movingPartName;
+            public string handlerParentName;
+            public Quaternion rotationOffset;
         }
+
         public static void DestroyHandlerComponent<T>()
-            where T : Component
+            where T : MonoBehaviour
         {
-            for (var  i = 1; i < 3;  i++)
-            {
-                foreach (var item in controllersDic[i])
-                {
-                    var component = item.handlerParent.GetComponent<T>();
-                    if (component != null)
-                    {
-                        GameObject.Destroy(component);
-                    }
-                }
-            }
-        }
-        public static List<T> AddHandlerComponent<T>()
-            where T : Component
-        {
-            var components = new List<T>();
             for (var i = 1; i < 3; i++)
             {
                 foreach (var item in controllersDic[i])
                 {
-                    var component = item.handlerParent.GetComponent<T>();
-                    if (component == null)
+
+                    if (item.handler != null)
                     {
-                        components.Add(item.handlerParent.AddComponent<T>());
+                        GameObject.Destroy(item.handler);
                     }
-                    else
-                        throw new Exception("AddHandlerComponent:Component is already present");
                 }
             }
-            return components;
+        }
+        public static void AddHandlerComponent<T>()
+            where T : MonoBehaviour
+        {
+            for (var i = 1; i < 3; i++)
+            {
+                foreach (var item in controllersDic[i])
+                {
+                    if (item.handler == null)
+                    {
+                        item.handler = item.handlerParent.AddComponent<T>();
+                    }
+                    else
+                    {
+                        VRPlugin.Logger.LogError($"Attempt to add already existing component {typeof(T)}");
+                    }
+                }
+            }
         }
         /// <param name="index">0 - headset, left - 1, right - 2</param>
-        public static T GetActiveHandler<T>(int index)
-            where T : Component
+        public static MonoBehaviour GetActiveHandler(int index)
         {
-            VRPlugin.Logger.LogDebug($"Model:GetHandler:{index}");
-            foreach(var item in controllersDic[index])
+            //VRPlugin.Logger.LogDebug($"Model:GetHandler:{index}");
+            foreach (var item in controllersDic[index])
             {
-                if (item.enabled)
-                    return item.handlerParent.GetComponent<T>();
+                if (item.enabled) return item.handler;
+            }
+            return null;
+        }
+        public static ItemType GetItem(MonoBehaviour monoBehaviour)
+        {
+            for (var i = 0; i < 3; i++)
+            {
+                foreach (var item in controllersDic[i])
+                {
+                    if (item.handler == monoBehaviour)
+                    {
+                        return item;
+                    }
+                }
             }
             return null;
         }
@@ -310,7 +236,6 @@ namespace KK_VR.Handlers
                         aibuItem.renderBody = aibuItem.objBody.GetComponent<SkinnedMeshRenderer>();
                         if (flag)
                         {
-                            VRPlugin.Logger.LogInfo($"ModelHandler:AddMaterial:{aibuItem.objBody}");
                             aibuItem.mHand = aibuItem.renderBody.material;
 
                         }
@@ -333,13 +258,20 @@ namespace KK_VR.Handlers
                 aibuItem.SetIdUse(num2);
                 if (aibuItem.obj)
                 {
-                    EliminateScale[] componentsInChildren = aibuItem.obj.GetComponentsInChildren<EliminateScale>(true);
-                    if (componentsInChildren != null && componentsInChildren.Length != 0)
+                    //EliminateScale[] componentsInChildren = aibuItem.obj.GetComponentsInChildren<EliminateScale>(true);
+                    //if (componentsInChildren != null && componentsInChildren.Length != 0)
+                    //{
+                    //    componentsInChildren[componentsInChildren.Length - 1].LoadList(aibuItem.id);
+                    //}
+                    var components = aibuItem.obj.transform.GetComponentsInChildren<EliminateScale>(true);
+                    foreach (var component in components)
                     {
-                        componentsInChildren[componentsInChildren.Length - 1].LoadList(aibuItem.id);
+                        //component.enabled = false;
+                        UnityEngine.Component.Destroy(component);
                     }
                     aibuItem.SetAnm(aibuItem.obj.GetComponent<Animator>());
-                    aibuItem.obj.SetActive(false);
+                    //aibuItem.obj.SetActive(false);
+                    //aibuItem.obj.transform.SetParent(VR.Manager.transform, false);
                 }
                 aibuItem.pathSEAsset = array[i, num++];
                 aibuItem.nameSEFile = array[i, num++];
@@ -347,6 +279,7 @@ namespace KK_VR.Handlers
                 aibuItem.isVirgin = (array[i, num++] == "1");
             }
         }
+        private readonly int[] _itemIDs = { 0, 2, 5, 7 };
         private void SetItems()
         {
             var controller = VR.Mode.Left.gameObject.transform;
@@ -354,198 +287,432 @@ namespace KK_VR.Handlers
             for (var i = 0; i < 3; i++)
             {
                 controllersDic.Add(i, new List<ItemType>());
-            }
 
-            //_aibuItems[4].obj.transform.SetParent(VR.Camera.Origin, false);
-            //var dic = controllersDic[0];
-            //dic.Add(cont)
-            for (var i = 0; i < 2; i++)
+                var gameObj = new GameObject("SfxSource");
+                gameObj.transform.SetParent(VR.Manager.transform, false);
+                gameObj.AddComponent<AudioSource>();
+                _sfxTransforms.Add(gameObj.transform);
+            }
+            InitTongue();
+            for (var i = 0; i < _itemIDs.Length; i++)
             {
                 InitHand(i, 0, controller);
                 InitHand(i, 1, other);
             }
             AddDynamicBones();
+            //ActivateItem(controllersDic[0][0]);
+            ActivateItem(controllersDic[1][0]);
+            ActivateItem(controllersDic[2][0]);
 
-            StartHand(0);
-            StartHand(1);
+            ChangeLayer(controllerIndex: 1, increase: false, skipTransition: true);
+            ChangeLayer(controllerIndex: 2, increase: false, skipTransition: true);
+
+            VR.Mode.Right.Model.gameObject.SetActive(false);
+            VR.Mode.Left.Model.gameObject.SetActive(false);
         }
-        private readonly int[] _itemIDs = { 0, 2 };//, 5, 7 }; 
-        private void InitHand(int i, int index, Transform parent)
+        private void InitHand(int i, int index, Transform controller)
         {
-            aibuItemList[_itemIDs[i] + index].obj.transform.SetParent(VR.Camera.Origin, false);
+
+            //aibuItemList[_itemIDs[i] + index].obj.transform.SetParent(VR.Camera.Origin, false);
             controllersDic[1 + index].Add(new ItemType());
             var item = controllersDic[1 + index][i];
-            item.animParamList = defaultAnimParams[i];
+            var animParam = defaultAnimParamList[i];
             item.aibuItem = aibuItemList[_itemIDs[i] + index];
+            item.rootPoint = item.aibuItem.obj.transform;
+
+            item.audioTransform = _sfxTransforms[1 + index];
+            item.audioSource = item.audioTransform.GetComponent<AudioSource>();
+
+            item.anchorPoint = new GameObject("ModelMover").transform;
+            //item.offsetHolder = new GameObject("OffsetHolder").transform;
+            item.rootPoint.transform.SetParent(item.anchorPoint, false);
+            //item.offsetHolder.SetParent(item.anchorPoint, false);
+            item.anchorPoint.SetParent(VR.Manager.transform, false);
+            item.rigidBody = item.anchorPoint.gameObject.AddComponent<Rigidbody>();
+            item.rigidBody.useGravity = false;
+            item.rigidBody.freezeRotation = true;
+            item.controller = controller;
+
+            item.positionOffset = animParam.offset;
+            item.rotationOffset = animParam.rotationOffset;
+            item.availableLayers = animParam.availableLayers;
+            item.movingPoint = item.rootPoint.GetComponentsInChildren<Transform>()
+                .Where(t => t.name.StartsWith(animParam.movingPartName, StringComparison.Ordinal))
+                .FirstOrDefault();
+
+            // A part to which we attach collider.
+            item.handlerParent = item.rootPoint.GetComponentsInChildren<Transform>()
+                .Where(t => t.name.StartsWith(animParam.handlerParentName, StringComparison.Ordinal)
+                || t.name.EndsWith(animParam.handlerParentName, StringComparison.Ordinal))
+                .FirstOrDefault().gameObject;
+
+            SetCollider(item, i);
+            SetItemState(item, false);
+        }
+        private void InitTongue()
+        {
+            controllersDic[0].Add(new ItemType());
+            var item = controllersDic[0][0];
+            var animParam = defaultAnimParamList[4];
+            item.aibuItem = aibuItemList[4];
+            item.rootPoint = item.aibuItem.obj.transform;
+
+            item.audioTransform = _sfxTransforms[0];
+            item.audioSource = item.audioTransform.GetComponent<AudioSource>();
+
+            VRPlugin.Logger.LogDebug($"InitTongue:1");
+            item.anchorPoint = new GameObject("ModelMover").transform;
+            item.rootPoint.transform.SetParent(item.anchorPoint, false);
+            item.anchorPoint.SetParent(VR.Manager.transform, false);
+
+            VRPlugin.Logger.LogDebug($"InitTongue:2");
+            item.rigidBody = item.anchorPoint.gameObject.AddComponent<Rigidbody>();
+            item.rigidBody.useGravity = false;
+            item.rigidBody.freezeRotation = true;
+            item.controller = VR.Camera.transform;
+
+            item.positionOffset = animParam.offset;
+            item.rotationOffset = animParam.rotationOffset;
+            item.availableLayers = animParam.availableLayers;
+            item.movingPoint = item.rootPoint.GetComponentsInChildren<Transform>()
+                .Where(t => t.name.StartsWith(animParam.movingPartName, StringComparison.Ordinal))
+                .FirstOrDefault();
+
+            item.handlerParent = item.rootPoint.GetComponentsInChildren<Transform>()
+                .Where(t => t.name.StartsWith(animParam.handlerParentName, StringComparison.Ordinal)
+                || t.name.EndsWith(animParam.handlerParentName, StringComparison.Ordinal))
+                .FirstOrDefault().gameObject;
             item.aibuItem.renderSilhouette.enabled = false;
-            item.anchorPoint = parent;
-            //item.aibuItem.obj.layer = 4;
-            //var nestedObj = item.aibuItem.obj.transform.GetComponentsInChildren<Transform>();
-            //foreach (var obj in nestedObj)
-            //{
-            //    obj.gameObject.layer = 4;
-            //}
-            //item.aibuItem.obj.AddComponent<Rigidbody>().isKinematic = true;
-            item.aibuItem.SetHandColor(new Color(0.960f, 0.887f, 0.864f, 1.000f));
-            //var colliderObject = new GameObject("VRHandCollider");
-            item.handlerParent = item.aibuItem.obj.transform.GetComponentsInChildren<Transform>()
-                .Where(t => t.name.StartsWith("cf_j_handroot_", StringComparison.Ordinal))
-                .Select(t => t.gameObject)
-                .FirstOrDefault();
-            var collider = item.handlerParent.AddComponent<BoxCollider>();
-            collider.size = new Vector3(0.08f, 0.04f, 0.13f);
-            collider.isTrigger = true;
-            var rigidBody = item.handlerParent.AddComponent<Rigidbody>();
-            rigidBody.isKinematic = true;
-            //if (colliderParent == null) throw new NullReferenceException(nameof(item.aibuItem.obj));
-            //colliderObject.transform.SetParent(item.handlerParent.transform, false);
+
+            SetCollider(item, 4);
+            SetItemState(item, false);
+        }
+        private void SetTongueCollider()
+        {
+
+        }
+        private void SetCollider(ItemType item, int i)
+        {
+            // Apparently in this unity version, collider center uses global orientation.
+            // Or perhaps built in animation is to blame?
+            // Dynamic bone though uses local.
+
+            if (i < 2)
+            {
+                // Hands
+
+                // RigidBody on anchor point.
+                var parent = item.anchorPoint.gameObject;
+                var collider1 = parent.AddComponent<SphereCollider>();
+                collider1.radius = 0.015f;
+
+                // Trigger on moving point.
+                var collider2 = item.handlerParent.AddComponent<BoxCollider>();
+                collider2.size = new Vector3(0.08f, 0.05f, 0.13f);
+                collider2.isTrigger = true;
+
+                //var sphere1 = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                //sphere1.transform.localScale = new Vector3(0.03f, 0.03f, 0.03f);
+                ////sphere1.transform.localScale = new Vector3(0.08f, 0.04f, 0.13f);
+                //sphere1.transform.SetParent(item.anchorPoint, false);
+                //sphere1.GetComponent<Renderer>().material.color = Color.blue;
+
+                //collider.size = new Vector3(0.08f, 0.02f, 0.13f);
+                // Implement Keep color TRACK!
+                item.aibuItem.SetHandColor(new Color(0.960f, 0.887f, 0.864f, 1.000f));
+                item.aibuItem.renderSilhouette.enabled = false;
+            }
+            else if (i == 2)
+            {
+                // Add 2 non kinematic jointed rigidBodies for handle and tip ?
+
+                // Massager
+                var parent = item.handlerParent;
+                var collider = parent.AddComponent<CapsuleCollider>();
+                collider.radius = 0.045f;
+                collider.height = 0.1f;
+                collider.isTrigger = true;
+                var rigidBody = parent.AddComponent<Rigidbody>();
+                rigidBody.isKinematic = true;
+            }
+            else if (i == 3)
+            {
+                // Vibrator
+                var parent = item.handlerParent;
+                var collider = parent.AddComponent<CapsuleCollider>();
+                collider.radius = 0.03f;
+                collider.height = 0.17f;
+                collider.direction = 1;
+                collider.isTrigger = true;
+                var rigidBody = parent.AddComponent<Rigidbody>();
+                rigidBody.isKinematic = true;
+            }
+            else // i == 4
+            {
+                var parent = item.anchorPoint.gameObject;
+                var collider1 = parent.AddComponent<CapsuleCollider>();
+                collider1.radius = 0.01f;
+                collider1.height = 0.025f;
+                collider1.direction = 2;
+
+                //var sphere1 = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                //sphere1.transform.localScale = new Vector3(0.01f, 0.01f, 0.05f);
+                ////sphere1.transform.localScale = new Vector3(0.08f, 0.04f, 0.13f);
+                //sphere1.transform.SetParent(item.anchorPoint, false);
+                //sphere1.GetComponent<Renderer>().material.color = Color.blue;
+
+                // Trigger on moving point.
+                var collider2 = item.handlerParent.AddComponent<BoxCollider>();
+                collider2.size = new Vector3(0.08f, 0.05f, 0.13f);
+                collider2.isTrigger = true;
+            }
+        }
+        public static void SetHandColor(ChaControl chara)
+        {
+            // Different something (material, shader?) so the colors wont match from the get go.
+            var color = chara.fileBody.skinMainColor;
+            for (var i = 0; i < 4; i++)
+            {
+                aibuItemList[i].SetHandColor(color);
+            }
+        }
+        private void ActivateItem(ItemType item)
+        {
+            item.anchorPoint.SetPositionAndRotation(item.controller.position, item.controller.rotation);
+            //item.offsetHolder.localPosition = item.positionOffset;
+            //item.rootPoint.localPosition = item.positionOffset; 
+            SetItemState(item, true);
+
+            // Assign this one on basis of player's character scale?
+            // No clue where ChaFile hides the height.
+            item.rootPoint.localScale = Divide(Vector3.Scale(Vector3.one, item.rootPoint.localScale), item.rootPoint.lossyScale);
+
+            _currentlyActive.Add(item);
+        }
+        public static Vector3 Divide(Vector3 a, Vector3 b) => new Vector3(a.x / b.x, a.y / b.y, a.z / b.z);
+        private void DeactivateItem(ItemType item)
+        {
+            SetItemState(item, false);
+
+            item.aibuItem.anm.SetLayerWeight(item.layer, 0f);
+            item.layer = 0;
+            item.anchorPoint.SetParent(VR.Manager.transform, false);
+            //item.anchorPoint.localPosition = Vector3.zero;
+            _currentlyActive.Remove(item);
+        }
+        private void SetItemState(ItemType item, bool state)
+        {
+            item.enabled = state;
+            item.anchorPoint.gameObject.SetActive(state);
         }
 
-        private void StartHand(int index)
+        internal void OnLateUpdate()
         {
-            var item = controllersDic[1 + index][1];
-            item.enabled = true;
-            var obj = item.aibuItem.obj;
-            obj.transform.SetParent(item.anchorPoint, false);
-            obj.transform.SetPositionAndRotation(obj.transform.position + item.animParamList[1].offset, Quaternion.identity);// item.animParamList[0].rotation);
-            var movingPart = obj.transform.GetComponentsInChildren<Transform>()
-                .Where(t => t.name.StartsWith(movingPartList[1], StringComparison.Ordinal))
-                .FirstOrDefault();
-            item.anchorOffset = item.anchorPoint.InverseTransformPoint(movingPart.position);
-            obj.SetActive(true);
+            foreach (var item in _currentlyActive)
+            {
+                HoldItem(item);
+            }
+        }
+        // RigidBody = AnchorPoint
+        internal void OnFixedUpdate()
+        {
+            foreach (var item in _currentlyActive)
+            {
+                item.rigidBody.MoveRotation(item.controller.rotation);
+                //item.rigidBody.MovePosition(item.controller.position);
+                item.rigidBody.MovePosition(item.controller.TransformPoint(item.positionOffset));
+            }
+        }
+        private Vector3 _testVec = new Vector3(0f, -0.01f, 0f);
+        private void HoldItem(ItemType item)
+        {
+            // We have an animated item, attached to 'rootPoint', on animation change it rotates heavily
+            // which we compensate.
+
+            item.rootPoint.rotation = item.anchorPoint.rotation * item.rotationOffset * Quaternion.Inverse(item.movingPoint.rotation) * item.rootPoint.rotation;
+            //item.rootPoint.position = item.rootPoint.position + (item.anchorPoint.TransformPoint(item.positionOffset) - item.movingPoint.position);
+            //item.rootPoint.position = item.rootPoint.position + (item.anchorPoint.position - item.movingPoint.position);
+            item.rootPoint.position += item.anchorPoint.TransformPoint(_testVec) - item.movingPoint.position;
+
+            // As I understand unity changes position of child transform(overrides suggested global position from compound assignment), when we attempt to adjust it's global rotation.
+            // This renders compound PosRot assignment quite useless, as unity attempts to help us with "corrected" position, which more often then not is off.
+            // This changes however when we assign !localRotation! through it.
+            // Which is done quite straightforwardly, but yet to work on me. So we stick with a good old one.
+
+            //item.rootPoint.SetPositionAndRotation(
+            //    item.rootPoint.position + (item.anchorPoint.TransformPoint(item.anchorOffset) - item.movingPoint.position),
+            //    item.anchorPoint.rotation * item.rotationOffset * Quaternion.Inverse(item.movingPoint.rotation) * item.rootPoint.rotation);
         }
 
-        //private void ScrollItem(int index, bool increase)
-        //{
-        //    _controllerItems[index][_itemIndex[index]].obj.SetActive(false);
-        //    //foreach (var item in _controllerItems[index])
-        //    //{
-        //    //    item.obj.SetActive(false);
-        //    //}
-        //    var count = _controllerItems.Count;
-        //    if (increase)
-        //    {
-        //        _itemIndex[index] = (_itemIndex[index] + 1) % count;
-        //    }
-        //    else
-        //    {
-        //        if (_itemIndex[index] <= 0)
-        //        {
-        //            _itemIndex[index] = count - 1;
-        //        }
-        //        else
-        //        {
-        //            _itemIndex[index] -= 1;
-        //        }
-        //    }
-        //    _controllerItems[index][_itemIndex[index]].obj.SetActive(true);
-        //    _controllerItems[index][_itemIndex[index]].renderSilhouette.enabled = false;
-        //}
-        //private void StopLayers(int index)
-        //{
-        //    var item = _controllerItems[index][_itemIndex[index]];
-        //    for (var i = 0; i < item.anm.layerCount; i++)
-        //    {
-        //        item.anm.SetLayerWeight(i, 0f);
-        //    }
-        //}
-        //private int[] _testNumbers = { 0, 1, 4, 7 }; // Finger
-        private int[] _testNumbers = { 0, 1, 4 }; // Hand
-        private int _currentIndex = 0;
-
-        private List<string> movingPartList = new List<string>()
+        // Due to scarcity of good hotkeys, we'll go with increase only.
+        internal void ChangeItem(int controllerIndex, bool increase)
         {
-            // StartsWith.
+            var index = _currentItemIndex[controllerIndex];
+            var controller = controllersDic[controllerIndex];
+            StopSE(controller[index]);
+            DeactivateItem(controller[index]);
+            if (increase)
+            {
+                _currentItemIndex[controllerIndex] = (index + 1) % controller.Count;
+            }
+            else
+            {
+                if (index == 0) index = controller.Count;
+                _currentItemIndex[controllerIndex] = index - 1;
+            }
+            ActivateItem(controller[_currentItemIndex[controllerIndex]]);
+        }
 
-            "cf_j_handroot_",
-            "cf_j_handroot_"
-        };
-        /*"cf_j_handroot_"
-         * cf_j_handangle_
-         * cf_s_hand_
-         */
-        public IEnumerator AnimChange(int index)
+        private void PlaySE(ItemType item)
         {
-            var itemIndex = 1;
-
-            var item = controllersDic[index][itemIndex];
             var aibuItem = item.aibuItem;
-            var anchor = item.anchorPoint;
-            var movingPart = aibuItem.obj.transform.GetComponentsInChildren<Transform>()
-                .Where(t => t.name.StartsWith(movingPartList[itemIndex], StringComparison.Ordinal))
-                .FirstOrDefault();
+            if (aibuItem.pathSEAsset == null) return;
 
+            if (aibuItem.transformSound == null)
+            {
+                var se = new Utils.Sound.Setting
+                {
+                    type = Manager.Sound.Type.GameSE3D,
+                    assetBundleName = aibuItem.pathSEAsset,
+                    assetName = aibuItem.nameSEFile,
+                };
+                aibuItem.transformSound = Utils.Sound.Play(se);
+                aibuItem.transformSound.GetComponent<AudioSource>().loop = true;
+                aibuItem.transformSound.SetParent(item.movingPoint, false);
+            }
+            else
+            {
+                aibuItem.transformSound.GetComponent<AudioSource>().Play();
+            }
+        }
+        private void StopSE(ItemType item)
+        {
+            var aibuItem = item.aibuItem;
+            if (aibuItem.transformSound == null) return;
+            aibuItem.transformSound.GetComponent <AudioSource>().Stop();
+        }
+        public void TestLayer(bool increase, bool skipTransition = false)
+        {
+            var item = controllersDic[0][0];
+
+            var anm = item.aibuItem.anm;
             var oldLayer = item.layer;
-            var oldStatic = oldLayer == 0 ? 0 : oldLayer + 1;
-            //var oldOffset = item.animParamList[oldLayer].offset;
-            _currentIndex++;
-            var newLayer = _testNumbers[_currentIndex % _testNumbers.Length];
-            var newStatic = newLayer == 0 ? 0 : newLayer + 1;
-            //var newOffset = item.animParamList[newLayer].offset;
+            var oldIndex = Array.IndexOf(item.availableLayers, oldLayer);
+            var newIndex = increase ? (oldIndex + 1) % item.availableLayers.Length : oldIndex <= 0 ? item.availableLayers.Length - 1 : oldIndex - 1;
+            var newLayer = item.availableLayers[newIndex];
+
+            //var newRotationOffset = newLayer == 13 || newLayer == 15 ? Quaternion.Euler(0f, 0f, 180f) : Quaternion.identity;// Quaternion.Euler(-90f, 0f, 0f);
+
+            if (skipTransition)
+            {
+                anm.SetLayerWeight(newLayer, 1f);
+                anm.SetLayerWeight(oldLayer, 0f);
+                item.layer = newLayer;
+            }
+            else
+            {
+                KoikatuInterpreter.Instance.StartCoroutine(ChangeTongueCo(item, anm, oldLayer, newLayer));
+            }
+            VRPlugin.Logger.LogDebug($"TestLayer:{newLayer}");
+
+        }
+        private IEnumerator ChangeTongueCo(ItemType item, Animator anm, int oldLayer, int newLayer)
+        {
             var timer = 0f;
             var stop = false;
+            //var initRotOffset = item.rotationOffset;
             while (!stop)
             {
-                // There is a small position glitch when transition finishes if we adjust position after setting the final layer weights.
-                // No clue why, but atleast it can be helped.
-
-                timer += Time.deltaTime;
+                timer += Time.deltaTime * 2f;
                 if (timer > 1f)
                 {
                     timer = 1f;
                     stop = true;
                 }
-                //var angleDelta = Quaternion.Angle(movingPart.rotation, targetRot);
-                //var rotSpeed = angleDelta / ((1f - timer) / step);
-
-
-                aibuItem.anm.SetLayerWeight(oldLayer, 1f - timer);
-                aibuItem.anm.SetLayerWeight(newLayer, timer);
-
-                //var targetRot = item.anchorPoint.rotation * item.animParamList[newLayer].rotation;
-
-                //var targetRotEx = Quaternion.AngleAxis(Mathf.Lerp(item.animParamList[oldLayer].rotationOffsetZ, item.animParamList[newLayer].rotationOffsetZ, timer),
-                //    anchor.up);
-                // item.anchorPoint.rotation * item.animParamList[newLayer].rotation;
-
-                //var deltaRot = anchor.rotation * Quaternion.Inverse(movingPart.rotation);
-
-                //aibuItem.obj.transform.rotation = Quaternion.RotateTowards(aibuItem.obj.transform.rotation, targetRot, rotSpeed);
-
-                //aibuItem.obj.transform.SetPositionAndRotation(anchor.position +  - movingPart.position, //
-                //    Quaternion.Lerp(aibuItem.obj.transform.rotation, targetRot, timer));
-                //aibuItem.obj.transform.rotation = Quaternion.Lerp(aibuItem.obj.transform.rotation, targetRot, timer);
-                //aibuItem.obj.transform.position += anchor.TransformPoint(newOffset * timer + oldOffset * (1f - timer)) - movingPart.position;
-                //aibuItem.obj.transform.SetPositionAndRotation(aibuItem.obj.transform.position + (anchor.position - movingPart.position), //(anchor.TransformPoint(Vector3.Lerp(oldOffset, newOffset, timer))
-                //    deltaRot * aibuItem.obj.transform.rotation);
-                aibuItem.obj.transform.rotation = anchor.rotation * Quaternion.Inverse(movingPart.rotation) * aibuItem.obj.transform.rotation;
-                aibuItem.obj.transform.position += anchor.TransformPoint(item.anchorOffset) - movingPart.position;
-
+                //item.rotationOffset = Quaternion.Lerp(initRotOffset, newRotationOffset, timer);
+                anm.SetLayerWeight(newLayer, timer);
+                anm.SetLayerWeight(oldLayer, 1f - timer);
                 yield return null;
             }
-            //aibuItem.obj.transform.SetPositionAndRotation(aibuItem.obj.transform.position + (anchor.TransformPoint(item.anchorOffset) - movingPart.position),
-            //        (anchor.rotation * Quaternion.Inverse(movingPart.rotation)) * aibuItem.obj.transform.rotation);
-
             item.layer = newLayer;
-
         }
-        private List<string> _colliderParentList = new List<string>()
+        public void ChangeLayer(int controllerIndex, bool increase, bool skipTransition = false)
+        {
+            //TestLayer(increase, skipTransition);
+            var itemIndex = _currentItemIndex[controllerIndex];
+
+            var item = controllersDic[controllerIndex][itemIndex];
+            StopSE(item);
+
+            var anm = item.aibuItem.anm;
+            var oldLayer = item.layer;
+
+            var oldIndex = Array.IndexOf(item.availableLayers, oldLayer);
+            var newIndex = increase ? (oldIndex + 1) % item.availableLayers.Length : oldIndex <= 0 ? item.availableLayers.Length - 1 : oldIndex - 1;
+            //VRPlugin.Logger.LogDebug($"oldIndex:{oldIndex}:newIndex:{newIndex}");
+            var newLayer = item.availableLayers[newIndex];
+
+            //VRPlugin.Logger.LogDebug($"Model:Change:Layer:From[{oldLayer}]:To[{newLayer}]");
+
+            if (skipTransition)
+            {
+                anm.SetLayerWeight(newLayer, 1f);
+                anm.SetLayerWeight(oldLayer, 0f);
+                item.layer = newLayer;
+            }
+            else
+            {
+                KoikatuInterpreter.Instance.StartCoroutine(ChangeLayerCo(item, anm, oldLayer, newLayer));
+            }
+
+            if (newLayer != 0 && item.aibuItem.pathSEAsset != null)
+            {
+                PlaySE(item);
+            }
+        }
+        private IEnumerator ChangeLayerCo(ItemType item, Animator anm, int oldLayer, int newLayer)
+        {
+            var timer = 0f;
+            var stop = false;
+            while (!stop)
+            {
+                timer += Time.deltaTime * 2f;
+                if (timer > 1f)
+                {
+                    timer = 1f;
+                    stop = true;
+                }
+                anm.SetLayerWeight(newLayer, timer);
+                anm.SetLayerWeight(oldLayer, 1f - timer);
+                yield return null;
+            }
+            item.layer = newLayer;
+        }
+        private List<string> _colliderParentListStartsWith = new List<string>()
         {
             "cf_j_middle02_",
             "cf_j_index02_",
             "cf_j_ring02_",
             "cf_j_thumb02_",
-            "cf_s_hand_"
+            "cf_s_hand_",
+        };
+        private List<string> _colliderParentListEndsWith = new List<string>()
+        {
+            "_head_00",
+            "J_vibe_02",
+            "J_vibe_05",
+            "cf_j_tang_04"
         };
         private void AddDynamicBones()
         {
             var gameObjectList = new List<GameObject>();
-            for (var i = 1; i < 3; i++)
+            for (var i = 0; i < 3; i++)
             {
                 foreach (var item in controllersDic[i])
                 {
                     var transforms = item.aibuItem.obj.GetComponentsInChildren<Transform>(includeInactive: true)
-                        .Where(t => _colliderParentList.Any(c =>  t.name.StartsWith(c)))
+                        .Where(t => _colliderParentListStartsWith.Any(c => t.name.StartsWith(c, StringComparison.Ordinal)) 
+                        || _colliderParentListEndsWith.Any(c => t.name.EndsWith(c, StringComparison.Ordinal)))
                         .ToList();
                     transforms?.ForEach(t => gameObjectList.Add(t.gameObject));
                 }
@@ -558,6 +725,132 @@ namespace KK_VR.Handlers
             foreach (var item in aibuItemList.Values)
             {
                 item.SetHandColor(color);
+            }
+        }
+
+        internal static void PlaySfx(ItemType item, float volume, Transform transform, Sfx sfxType, Object objectType, Intensity intensity)
+        {
+            var audioSource = item.audioSource;
+            if (audioSource.isPlaying) return;
+
+            var audioClipList = sfxDic[(int)sfxType][(int)objectType][(int)intensity];
+            VRPlugin.Logger.LogDebug($"AttemptToPlay:{volume}");
+            if (audioClipList.Count > 0)
+            {
+                item.audioTransform.SetParent(transform,false);
+                audioSource.volume = Mathf.Clamp01(volume);
+                audioSource.pitch = 0.9f + UnityEngine.Random.value * 0.2f;
+                //audioSource.pitch = 1f;
+                audioSource.clip = audioClipList[UnityEngine.Random.Range(0, audioClipList.Count)];
+                audioSource.Play();
+            }
+        }
+        public enum Sfx
+        {
+            Tap,
+            Slap,
+            Traverse,
+            Undress
+        }
+        public enum Object
+        {
+            Skin,
+            Cloth,
+            SkinCloth,
+            Hair,
+            Hard
+        }
+        public enum Intensity
+        {
+            // Think about:
+            //     Soft as something smallish and soft and on slower side of things, like boobs or ass.
+            //     Rough as something flattish and big and at times intense, like tummy or thighs.
+            //     Wet as.. I yet to mix something proper for it. WIP.
+            Soft,
+            Rough,
+            Wet
+        }
+        private static readonly Dictionary<int, List<List<List<AudioClip>>>> sfxDic = new Dictionary<int, List<List<List<AudioClip>>>>();
+        private void InitDic()
+        {
+            for (var i = 0; i < Enum.GetNames(typeof(Sfx)).Length; i++)
+            {
+                sfxDic.Add(i, new List<List<List<AudioClip>>>());
+                for (var j = 0; j < Enum.GetNames(typeof(Object)).Length; j++)
+                {
+                    sfxDic[i].Add(new List<List<AudioClip>>());
+                    for (var k = 0; k < Enum.GetNames(typeof(Intensity)).Length; k++)
+                    {
+                        sfxDic[i][j].Add(new List<AudioClip>());
+                    }
+                }
+            }
+        }
+        private void PopulateDic()
+        {
+            InitDic();
+            for (var i = 0; i < sfxDic.Count; i++)
+            {
+                for (var j = 0; j < sfxDic[i].Count; j++)
+                {
+                    for (var k = 0; k < sfxDic[i][j].Count; k++)
+                    {
+                        var directory = BepInEx.Utility.CombinePaths(new string[]
+                            {
+                                Paths.PluginPath,
+                                "SFX",
+                                ((Sfx)i).ToString(),
+                                ((Object)j).ToString(),
+                                ((Intensity)k).ToString()
+                            });
+                        if (Directory.Exists(directory))
+                        {
+                            var dirInfo = new DirectoryInfo(directory);
+                            var clipNames = new List<string>();
+                            foreach (var file in dirInfo.GetFiles("*.wav"))
+                            {
+                                clipNames.Add(file.Name);
+                            }
+                            foreach (var file in dirInfo.GetFiles("*.ogg"))
+                            {
+                                clipNames.Add(file.Name);
+                            }
+                            //sfxDic[i][j][k] = new List<AudioClip>();
+                            if (clipNames.Count == 0) continue;
+                            KoikatuInterpreter.Instance.StartCoroutine(LoadAudioFile(directory, clipNames, sfxDic[i][j][k]));
+                        }
+                    }
+                }
+            }
+        }
+
+        private static IEnumerator LoadAudioFile(string path, List<string> clipNames, List<AudioClip> destination)
+        {
+            foreach (var name in clipNames)
+            {
+                UnityWebRequest audioFile;
+                if (name.EndsWith(".wav"))
+                {
+                    audioFile = UnityWebRequest.GetAudioClip(Path.Combine(path, name), AudioType.WAV);
+                }
+                else
+                {
+                    audioFile = UnityWebRequest.GetAudioClip(Path.Combine(path, name), AudioType.OGGVORBIS);
+                }
+                //VRPlugin.Logger.LogDebug(Path.Combine(path, name));
+                yield return audioFile.Send();//  SendWebRequest();
+                if (audioFile.isError)
+                {
+                    VRPlugin.Logger.LogDebug(audioFile.error);
+                    VRPlugin.Logger.LogDebug(Path.Combine(path, name));
+                }
+                else
+                {
+                    var clip = DownloadHandlerAudioClip.GetContent(audioFile);
+                    clip.name = name;
+                    destination.Add(clip);
+                    VRPlugin.Logger.LogDebug($"Loaded:SFX:{name}");
+                }
             }
         }
     }

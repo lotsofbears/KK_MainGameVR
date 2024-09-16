@@ -6,6 +6,7 @@ using VRGIN.Core;
 using HarmonyLib;
 using KK_VR.Camera;
 using KK_VR.Interpreters;
+using static ActionGame.VisibleController;
 
 namespace KK_VR.Features
 {
@@ -15,6 +16,7 @@ namespace KK_VR.Features
     class VRMale : ProtectedBehaviour
     {
         public static bool ForceHideHead { get; set; }
+        public static bool ForceShowHead { get; set; }
 
         private ChaControl _control;
 
@@ -29,8 +31,13 @@ namespace KK_VR.Features
             // Hide the head iff the VR camera is inside it.
             // This also essentially negates the effect of scenairo-controlled
             // head hiding, which is found in some ADV scenes.
-            var head = _control.objHead?.transform;
-            if (_control.objTop?.activeSelf == true && head != null)
+            if (ForceShowHead)
+            {
+                _control.fileStatus.visibleHeadAlways = true;
+                return;
+            }
+            var head = _control.objHead.transform;
+            if (_control.objTop.activeSelf == true && head != null)
             {
                 var wasVisible = _control.fileStatus.visibleHeadAlways;
                 var vrEye = VR.Camera.transform;

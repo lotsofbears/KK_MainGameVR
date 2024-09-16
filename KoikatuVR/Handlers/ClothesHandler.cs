@@ -87,7 +87,7 @@ namespace KK_VR.Handlers
                 if (decrease)
                 {
                     chara.SetClothesStateNext(slot);
-                    Play((VoiceType)UnityEngine.Random.Range(0, 2), chara);
+                    PlayVoice((VoiceType)UnityEngine.Random.Range(0, 2), chara);
                 }
                 else
                 {

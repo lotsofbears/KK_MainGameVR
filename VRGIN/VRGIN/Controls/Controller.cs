@@ -39,7 +39,6 @@ namespace VRGIN.Controls
                 _Controller.OnLock(keepTool);
                 KeepsTool = keepTool;
             }
-
             public void Release()
             {
                 if (IsValid)
@@ -87,7 +86,6 @@ namespace VRGIN.Controls
         private Canvas _Canvas;
         private Lock _Lock = Lock.Invalid;
         private GameObject _AlphaConcealer;
-
 
         public RumbleManager Rumble { get; private set; }
 
@@ -154,7 +152,6 @@ namespace VRGIN.Controls
                 //_AlphaConcealer.SetActive(false);
             }
         }
-
         protected virtual void OnUnlock(bool keepTool)
         {
             if (!keepTool)
@@ -351,11 +348,12 @@ namespace VRGIN.Controls
                 {
                     appButtonPressTime = Time.unscaledTime;
                 }
-                if (Input.GetPress(EVRButtonId.k_EButton_ApplicationMenu) && (Time.unscaledTime - appButtonPressTime) > APP_BUTTON_TIME_THRESHOLD)
-                {
-                    ShowHelp();
-                    appButtonPressTime = null;
-                }
+                // At current level of contextual hotkeys this will only confuse. 
+                //if (Input.GetPress(EVRButtonId.k_EButton_ApplicationMenu) && (Time.unscaledTime - appButtonPressTime) > APP_BUTTON_TIME_THRESHOLD)
+                //{
+                //    ShowHelp();
+                //    appButtonPressTime = null;
+                //}
                 if (Input.GetPressUp(EVRButtonId.k_EButton_ApplicationMenu))
                 {
                     if (helpShown)

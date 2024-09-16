@@ -12,6 +12,7 @@ using RootMotion;
 using System.Collections.Generic;
 using KK_VR.Handlers;
 using VRGIN.Controls;
+using KK_VR.Settings;
 
 namespace KK_VR.Interpreters
 {
@@ -31,6 +32,7 @@ namespace KK_VR.Interpreters
         public static SceneType CurrentScene { get; private set; }
         public static SceneInterpreter SceneInterpreter;
         public static float DeltaTime;
+        public static KoikatuSettings settings;
 
         private Mirror.Manager _mirrorManager;
         private int _kkapiCanvasHackWait;
@@ -41,6 +43,7 @@ namespace KK_VR.Interpreters
         private static bool _deltaSet;
         private List<float> _deltaTimes = new List<float>();
         private ModelHandler _modelHandler;
+        //private bool modelActive;
         protected override void OnAwake()
         {
             Instance = this;
@@ -51,42 +54,48 @@ namespace KK_VR.Interpreters
             SceneManager.sceneLoaded += OnSceneLoaded;
             _mirrorManager = new Mirror.Manager();
             VR.Camera.gameObject.AddComponent<VREffector>();
-            VR.Manager.ModeInitialized += AddModels;
+            //VR.Manager.ModeInitialized += AddModels;
+            settings = VR.Context.Settings as KoikatuSettings;
         }
         protected override void OnUpdate()
         {
             UpdateScene();
             SceneInterpreter.OnUpdate();
-            if (!_deltaSet && !_scene.IsNowLoadingFade)
-            {
-                if (_deltaTimes.Count < 100)
-                {
-                    if (Time.deltaTime < 0.05f && Time.frameCount % 5 == 0)
-                    {
-                        _deltaTimes.Add(Time.deltaTime);
-                    }
-                }
-                else
-                {
-                    var coef = 1f / _deltaTimes.Count;
-                    DeltaTime = 0f;
-                    foreach (var t in _deltaTimes)
-                    {
-                        DeltaTime += t * coef;
-                    }
-                    _deltaTimes.Clear();
-                    _deltaSet = true;
-                }
-            }
+            //if (!_deltaSet && !_scene.IsNowLoadingFade)
+            //{
+            //    if (_deltaTimes.Count < 100)
+            //    {
+            //        if (Time.deltaTime < 0.05f && Time.frameCount % 5 == 0)
+            //        {
+            //            _deltaTimes.Add(Time.deltaTime);
+            //        }
+            //    }
+            //    else
+            //    {
+            //        var coef = 1f / _deltaTimes.Count;
+            //        DeltaTime = 0f;
+            //        foreach (var t in _deltaTimes)
+            //        {
+            //            DeltaTime += t * coef;
+            //        }
+            //        _deltaTimes.Clear();
+            //        _deltaSet = true;
+            //    }
+            //}
         }
-        public void ChangeModelAnim(int index)
+        public void ChangeModelItem(int index, bool increase)
         {
-            StartCoroutine(_modelHandler.AnimChange(index));
+            _modelHandler.ChangeItem(index, increase);
         }
-        public void AddModels(object sender, ModeInitializedEventArgs e)
+        public void ChangeModelLayer(int index, bool increase)
         {
-            _modelHandler = new ModelHandler();
+            _modelHandler.ChangeLayer(index, increase);
         }
+        //public void AddModels(object sender, ModeInitializedEventArgs e)
+        //{
+        //    _modelHandler = new ModelHandler();
+        //    modelActive = true;
+        //}
         protected override void OnLateUpdate()
         {
             if (_kkSubtitlesCaption != null)
@@ -94,11 +103,21 @@ namespace KK_VR.Interpreters
                 FixupKkSubtitles();
             }
             SceneInterpreter.OnLateUpdate();
+            if (_modelHandler != null)
+                _modelHandler.OnLateUpdate();
         }
-
+        private void FixedUpdate()
+        {
+            if (_modelHandler != null)
+                _modelHandler.OnFixedUpdate();
+        }
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             VRLog.Info($"OnSceneLoaded {scene.name}");
+            if (_modelHandler == null && scene.name.Equals("Title"))
+            {
+                _modelHandler = new ModelHandler();
+            }
             foreach (var reflection in GameObject.FindObjectsOfType<MirrorReflection>())
             {
                 _mirrorManager.Fix(reflection);
@@ -293,7 +312,7 @@ namespace KK_VR.Interpreters
             else if (camera.GetComponent<CameraControl_Ver2>() != null)
             {
                 VRLog.Info("New main camera detected: moving to {0} {1}", camera.transform.position, camera.transform.eulerAngles);
-                Camera.VRMover.Instance.MoveTo(camera.transform.position, camera.transform.rotation, keepHeight: false);
+                Camera.VRMover.Instance.MoveTo(camera.transform.position, camera.transform.rotation);
                 VRLog.Info("moved to {0} {1}", VR.Camera.Head.position, VR.Camera.Head.eulerAngles);
                 VRLog.Info("Adding CameraControlControl");
                 camera.gameObject.AddComponent<Camera.CameraControlControl>();

@@ -167,7 +167,8 @@ namespace KK_VR.Controls
         {
             try
             {
-                var attachPosition = _controller.FindAttachPosition("tip");
+                //var attachPosition = _controller.FindAttachPosition("tip");
+                var attachPosition = _controller.transform;
 
                 if (!attachPosition)
                 {

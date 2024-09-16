@@ -169,6 +169,11 @@ namespace KK_VR.Settings
             var firstPersonADV = config.Bind(SectionEventScenes, "First person", true,
                 "Prefer first person view in event scenes");
             Tie(firstPersonADV, v => settings.FirstPersonADV = v);
+
+            var showMaleHeadInAdv = config.Bind(SectionEventScenes, "Show head in first person", true,
+                "Prefer first person view in event scenes");
+            Tie(showMaleHeadInAdv, v => settings.ForceShowMaleHeadInAdv = v);
+
             var headsetType = config.Bind(SectionGeneral, "Controller adjustments", KoikatuSettings.HeadsetType.None,
                 "Placeholder.\nEnables controller adjustments made for particular headset model.");
             Tie(headsetType, v => settings.HeadsetSpecifications = v);

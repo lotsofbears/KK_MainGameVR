@@ -63,7 +63,7 @@ namespace VRGIN.Controls.Handlers
                     VRLog.Error("Attach position not found for laser!");
                     attachPosition = transform;
                 }
-                Laser = new GameObject().AddComponent<LineRenderer>();
+                Laser = new GameObject("Laser pointer").AddComponent<LineRenderer>();
                 Laser.transform.SetParent(attachPosition, false);
                 Laser.material = new Material(Shader.Find("Sprites/Default"));
                 Laser.material.renderQueue += 5000;

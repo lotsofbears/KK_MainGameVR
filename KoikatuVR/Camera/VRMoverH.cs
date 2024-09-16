@@ -163,21 +163,21 @@ namespace KK_VR.Camera
             yield return null;
             yield return new WaitUntil(() => Time.deltaTime < 0.05f);
             yield return new WaitForEndOfFrame();
-            VRLog.Debug($"VRMoverH:FlyToPosition[{VR.Camera.transform.position}]");
+            VRLog.Debug($"VRMoverH:FlyToPosition:{position}:{rotation.eulerAngles}");
             var origin = VR.Camera.Origin;
             var head = VR.Camera.Head;
             VRMouth.NoActionAllowed = true;
-            var height = _eyes.transform.position.y;
+            var eyeLevel = _eyes.transform.position.y;
 
-            if (height - _chara.transform.position.y > 1f)
+            if (eyeLevel - _chara.transform.position.y > 1f)
             {
                 VRLog.Debug($"VRMoverH:FlyToPosition[height is high, resetting rotation]");
                 // Upright (probably) position, some of them have weird rotations.
                 rotation = Quaternion.Euler(0f, rotation.eulerAngles.y, 0f);
-                if (position.y < height)
+                if (position.y < eyeLevel)
                 {
                     VRLog.Debug($"VRMoverH:FlyToPosition[height is low, meeting eye level]");
-                    position.y = height;
+                    position.y = eyeLevel;
                 }
 
             }

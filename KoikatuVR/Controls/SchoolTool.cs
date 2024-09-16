@@ -161,10 +161,13 @@ namespace KK_VR.Controls
 
             if (Controller.GetPressDown(ButtonMask.Grip))
             {
+                // If particular interpreter doesn't want grip move right now, it will be blocked.
+                // We still want all the inputs tho, so locking controller is not an option.
                 if (!KoikatuInterpreter.SceneInterpreter.OnButtonDown(EVRButtonId.k_EButton_Grip, direction, _index))
                 {
                     Owner.TryAcquireFocus(out _lock, keepTool: true);
                     _grab = new GrabAction(Owner, Controller, ButtonMask.Grip);
+                    KoikatuInterpreter.SceneInterpreter.OnControllerLock(_index);
                 }
             }
             else if (Controller.GetPressUp(ButtonMask.Grip))
@@ -178,7 +181,7 @@ namespace KK_VR.Controls
             }
             else if (Controller.GetPressUp(ButtonMask.Touchpad))
             {
-                KoikatuInterpreter.SceneInterpreter.OnButtonDown(EVRButtonId.k_EButton_SteamVR_Touchpad, Owner.GetTrackpadDirection(), _index);
+                KoikatuInterpreter.SceneInterpreter.OnButtonUp(EVRButtonId.k_EButton_SteamVR_Touchpad, Owner.GetTrackpadDirection(), _index);
             }
 
             if (_lastDirection != direction)

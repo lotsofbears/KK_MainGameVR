@@ -22,40 +22,61 @@ namespace KK_VR.Handlers
     /// 
     /// This component is meant to remain disabled outside talk scenes.
     /// </summary>
-    class TalkSceneHandler : ProtectedBehaviour
+    class TalkSceneHandler : MonoBehaviour
     {
         private Controller _controller;
         private ColliderTracker _tracker;
         private static KoikatuSettings _settings;
+        private int _index;
+        private ModelHandler.ItemType _item;
+        private TravelDistanceRumble _travelRumble;
 
-        protected override void OnStart()
+        internal bool IsBusy => _tracker.IsBusy;
+        private bool _sleep;
+        private float _timer;
+        private Vector3 GetVelocity => _controller.Input.velocity;
+
+        private void Start()
         {
             _settings = (KoikatuSettings)VR.Context.Settings;
-            _controller = GetComponent<Controller>();
+            _item = ModelHandler.GetItem(this);
+            _controller = _item.controller.GetComponent<Controller>();
+            _index = (int)_controller.Tracking.index;
+            _sleep = true;
+            _travelRumble = new TravelDistanceRumble(1000, 0.075f, this.transform);
         }
 
-        protected void OnEnable()
+        private void OnEnable()
         {
             _tracker = new ColliderTracker();
         }
 
-        protected void OnDisable()
+        private void OnDisable()
         {
             _tracker = null;
         }
 
-        public bool DoUndress(bool decrease)
+        private void Update()
+        {
+            if (_sleep && _timer != 0f)
+            {
+                _timer = Mathf.Clamp01(_timer - Time.deltaTime);
+                _item.rigidBody.velocity *= _timer;
+            }
+
+        }
+        public bool DoUndress(bool decrease, out ChaControl chara)
         {
             if (!_tracker.IsBusy)
             {
-                //VRPlugin.Logger.LogDebug($"Handler:Undress:Tracker[{_tracker.IsBusy}]");
+                chara = null;
                 return false;
             }
-            var bodyKind = _tracker.GetUndressKind(out var chara);
-            //VRPlugin.Logger.LogDebug($"Handler:Undress:Part[{bodyKind}]");
+            chara = _tracker.chara;
+            var bodyKind = _tracker.GetUndressKind();
+            _controller.StartRumble(new RumbleImpulse(1000));
             if (bodyKind != ColliderTracker.Body.None && ClothesHandler.Undress(chara, bodyKind, decrease))
             {
-                _controller.StartRumble(new RumbleImpulse(1000));
                 return true;
             }
             return false;
@@ -63,30 +84,31 @@ namespace KK_VR.Handlers
 
         public bool DoReaction(bool triggerPress)
         {
-            if (!_tracker.IsBusy || (!triggerPress 
-                && (_settings.AutomaticTouching == KoikatuSettings.SceneType.Disabled || _settings.AutomaticTouching == KoikatuSettings.SceneType.HScene)))
+            if (!IsBusy
+                || (!triggerPress && ( _settings.AutomaticTouching == KoikatuSettings.SceneType.Disabled || _settings.AutomaticTouching == KoikatuSettings.SceneType.HScene)))
             {
-                //VRPlugin.Logger.LogDebug($"Handler:Reaction:Tracker[{_tracker.IsBusy}]");
                 return false;
             }
-            var aibuKind = _tracker.GetReactionKind(out var chara);
-            var adv = TalkSceneInterpreter.talkScene == null;
-            //VRPlugin.Logger.LogDebug($"Handler:Reaction:Part[{aibuKind}]:Tag[{tag}]");
             _controller.StartRumble(new RumbleImpulse(1000));
-            if (aibuKind[1] != 0 && !adv && !CrossFader.AdvHooks.Reaction && (triggerPress || UnityEngine.Random.value < 0.3f))
+            var suggestedKinds = _tracker.GetSuggestedKinds();
+            if (TalkSceneInterpreter.talkScene != null 
+                && suggestedKinds[1] != HandCtrl.AibuColliderKind.none 
+                && !CrossFader.AdvHooks.Reaction 
+                && _tracker.chara == TalkSceneInterpreter.talkScene.targetHeroine.chaCtrl
+                && (triggerPress || UnityEngine.Random.value < 0.3f))
             {
                 // TODO Null ref in adv. Mimic TouchFunc() in adv?
                 // Seems quite easy, we just need to grab corresponding assets.
-                TalkSceneInterpreter.talkScene.TouchFunc(ConvertReaction(aibuKind[1]), Vector3.zero);
+                TalkSceneInterpreter.talkScene.TouchFunc(TouchReaction(suggestedKinds[1]), Vector3.zero);
             }
             else
             {
-                TalkSceneInterpreter.HitReactionPlay(aibuKind[0], chara);
+                TalkSceneInterpreter.HitReactionPlay(suggestedKinds[0], _tracker.chara);
             }
             return true;
         }
 
-        private static string ConvertReaction(HandCtrl.AibuColliderKind colliderKind)
+        private string TouchReaction(HandCtrl.AibuColliderKind colliderKind)
         {
             return colliderKind switch
             {
@@ -102,16 +124,66 @@ namespace KK_VR.Handlers
         }
         protected void OnTriggerEnter(Collider other)
         {
-            if (_tracker.AddCollider(other, out _))
+            if (_tracker.AddCollider(other))
             {
-                DoReaction(triggerPress: false);
+                _sleep = false;
+                if (_tracker.reactionType > ColliderTracker.ReactionType.None)
+                {
+                    DoReaction(triggerPress: false);
+                }
+                if (_tracker.firstTrack)
+                {
+                    PlayFirstSfx();
+                    _controller.StartRumble(new RumbleImpulse(1000));
+                    _controller.StartRumble(_travelRumble);
+                }
+                //if (shouldReact)
+                //{
+                //    var velocity = GetVelocity.sqrMagnitude;
+                //    if (velocity > 1f)
+                //    {
+                //        ModelHandler.PlaySlap(_index, 0.4f + velocity * 0.1f, other.transform);
+                //        DoReaction(triggerPress: false);
+                //    }
+                //    else if (colliderKind[1] > 0 && colliderKind[1] < HandCtrl.AibuColliderKind.siriL)
+                //    {
+                //        DoReaction(triggerPress: false);
+                //    }
+                //    else
+                //    {
+                //        HSceneInterpreter.PlayShort(_tracker.GetChara());
+                //    }
+                //}
                 _controller.StartRumble(new RumbleImpulse(1000));
             }
         }
 
         protected void OnTriggerExit(Collider other)
         {
-            _tracker.RemoveCollider(other, out _);
+
+            if (_tracker.RemoveCollider(other))
+            {
+                if (!IsBusy)
+                {
+                    _sleep = true;
+                    _timer = 1f;
+                    _controller.StopRumble(_travelRumble);
+                    _travelRumble.Reset();
+                }
+            }
+        }
+        private void PlayFirstSfx()
+        {
+            var velocity = GetVelocity.sqrMagnitude;
+            var intensity = _tracker.bodyPart < ColliderTracker.Body.LowerBody ? ModelHandler.Intensity.Soft : ModelHandler.Intensity.Rough;
+            if (velocity > 1f)
+            {
+                ModelHandler.PlaySfx(_item, 0.4f + velocity * 0.2f, this.transform, ModelHandler.Sfx.Slap, ModelHandler.Object.Skin, intensity);
+            }
+            else
+            {
+                ModelHandler.PlaySfx(_item, 1f, this.transform, ModelHandler.Sfx.Tap, ModelHandler.Object.Skin, intensity);
+            }
         }
     }
 

@@ -48,12 +48,12 @@ namespace KK_VR.Camera
         /// <summary>
         /// Move the camera to the specified pose.
         /// </summary>
-        public void MoveTo(Vector3 position, Quaternion rotation, bool keepHeight, bool quiet = false)
+        public void MoveTo(Vector3 position, Quaternion rotation, bool quiet = false)
         {
             if (position.Equals(Vector3.zero))
             {
-                VRLog.Warn($"Prevented something from moving camera to pos={position} rot={rotation.eulerAngles} Trace:\n{new StackTrace(1)}");
-                Console.WriteLine();
+                //VRLog.Warn($"Prevented something from moving camera to pos={position} rot={rotation.eulerAngles} Trace:\n{new StackTrace(1)}");
+                //Console.WriteLine();
                 return;
             }
             if (!quiet)
@@ -63,10 +63,12 @@ namespace KK_VR.Camera
             _lastPosition = position;
             _lastRotation = rotation;
 
-            var trimmedRotation = Quaternion.Euler(0, rotation.eulerAngles.y, 0);
-            VR.Mode.MoveToPosition(position, trimmedRotation, keepHeight);
+            // We don't want to respect head rotations when we deal with text.
+            VR.Camera.Origin.rotation = Quaternion.Euler(0f, rotation.eulerAngles.y, 0f);
+            VR.Camera.Origin.position += position - VR.Camera.Head.position;
 
-            //VR.Mode.MoveToPosition(position, rotation, ignoreHeight: keepHeight);
+            //VR.Mode.MoveToPosition(position, rotation, keepHeight);
+
             OnMove?.Invoke();
         }
 
@@ -78,7 +80,7 @@ namespace KK_VR.Camera
         /// </summary>
         public void MaybeMoveTo(Vector3 position, Quaternion rotation, bool keepHeight)
         {
-            MoveWithHeuristics(position, rotation, keepHeight, pretendFading: false);
+            MoveWithHeuristics(position, rotation, pretendFading: false);
         }
 
         /// <summary>
@@ -89,14 +91,14 @@ namespace KK_VR.Camera
         //    var advFade = new Traverse(textScenario).Field<ADVFade>("advFade").Value;
         //    MoveWithHeuristics(position, rotation, keepHeight, pretendFading: !advFade.IsEnd);
         //}
-        public void MaybeMoveADV(ADV.TextScenario textScenario, Vector3 position, Quaternion rotation, bool keepHeight)
+        public void MaybeMoveADV(ADV.TextScenario textScenario, Vector3 position, Quaternion rotation)
         {
             VRLog.Debug("MaybeMoveADV");
             var advFade = textScenario.advFade;// new Traverse(textScenario).Field<ADVFade>("advFade").Value;
 
             var closerPosition = AdjustAdvPosition(textScenario, position, rotation);
 
-            MoveWithHeuristics(closerPosition, rotation, keepHeight, !advFade.IsEnd);
+            MoveWithHeuristics(closerPosition, rotation, !advFade.IsEnd);
         }
 
         private static Vector3 AdjustAdvPosition(TextScenario textScenario, Vector3 position, Quaternion rotation)
@@ -109,7 +111,7 @@ namespace KK_VR.Camera
             {
                 //var closerPosition = position + (rotation * Vector3.forward) * 1f;
 
-                var averageV = new Vector3(characterTransforms.Sum(x => x.x), characterTransforms.Sum(x => x.y), characterTransforms.Sum(x => x.z));
+                var averageV = new Vector3(characterTransforms.Sum(x => x.x), characterTransforms.Sum(x => x.y), characterTransforms.Sum(x => x.z)) / characterTransforms.Length;
 
                 var positionNoY = position;
                 positionNoY.y = 0;
@@ -127,11 +129,6 @@ namespace KK_VR.Camera
                     return closerPosition;
                 }
             }
-            if (Manager.Scene.Instance.AddSceneName.StartsWith("H", StringComparison.Ordinal))
-            {
-                // Trim rotations for H Results.
-                VRMoverH.Instance.MakeUpright();
-            }
             return position;
         }
         /// <summary>
@@ -147,10 +144,10 @@ namespace KK_VR.Camera
 
             if (_settings.FirstPersonADV &&
                 FindMaleToImpersonate(out var male) &&
-                male.objHead != null)
+                male.objHeadBone != null)
             {
                 VRLog.Debug("Maybe impersonating male");
-                male.StartCoroutine(ImpersonateCo(isFadingOut, male.objHead.transform));
+                male.StartCoroutine(ImpersonateCo(isFadingOut, male));
             }
             else if (ShouldApproachCharacter(textScenario, out var character))
             {
@@ -176,7 +173,6 @@ namespace KK_VR.Camera
                 MoveWithHeuristics(
                     new Vector3(cameraXZ.x, height, cameraXZ.z),
                     rotation,
-                    keepHeight: false,
                     pretendFading: isFadingOut);
             }
             else
@@ -190,7 +186,7 @@ namespace KK_VR.Camera
                 targetPosition = AdjustAdvPosition(textScenario, targetPosition, target.rotation);
 
                 if (ActionCameraControl.HeadIsAwayFromPosition(targetPosition))
-                    MoveWithHeuristics(targetPosition, targetRotation, false, isFadingOut);
+                    MoveWithHeuristics(targetPosition, targetRotation, isFadingOut);
             }
         }
 
@@ -203,25 +199,31 @@ namespace KK_VR.Camera
             return IsFadingOutSub(fade.front) || IsFadingOutSub(fade.back); 
         }
 
-        private IEnumerator ImpersonateCo(bool isFadingOut, Transform head)
+        private IEnumerator ImpersonateCo(bool isFadingOut, ChaControl chara)
         {
             // For reasons I don't understand, the male may not have a correct pose
             // until later in the update loop.
             yield return new WaitForEndOfFrame();
+            var eyes = chara.objHeadBone.transform
+                .Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz/cf_J_Eye_tz");
+            var position = eyes.TransformPoint(0f, _settings.PositionOffsetY, _settings.PositionOffsetZ);
+            if (KoikatuInterpreter.settings.ForceShowMaleHeadInAdv)
+            {
+                position += chara.transform.forward * 0.15f;
+            }
             MoveWithHeuristics(
-                head.TransformPoint(0, 0.15f, 0.15f),
-                head.rotation,
-                keepHeight: false,
+                position,
+                eyes.rotation,
                 pretendFading: isFadingOut);
         }
 
-        private void MoveWithHeuristics(Vector3 position, Quaternion rotation, bool keepHeight, bool pretendFading)
+        private void MoveWithHeuristics(Vector3 position, Quaternion rotation, bool pretendFading)
         {
             var fade = Manager.Scene.Instance.sceneFade;
             bool fadeOk = (fade._Fade == SimpleFade.Fade.Out) ^ fade.IsEnd;
             if (pretendFading || fadeOk || IsDestinationFar(position, rotation))
             {
-                MoveTo(position, rotation, keepHeight);
+                MoveTo(position, rotation);
             }
             else
             {
@@ -240,13 +242,10 @@ namespace KK_VR.Camera
         {
             male = null;
 
-            if (!Manager.Character.IsInstance())
-            {
-                return false;
-            }
+            if (!Manager.Character.IsInstance()) return false;
 
             var males = Manager.Character.Instance.dictEntryChara.Values
-                .Where(ch => ch.isActiveAndEnabled && ch.sex == 0 && ch.objTop?.activeSelf == true && ch.visibleAll)
+                .Where(ch => ch.isActiveAndEnabled && ch.sex == 0 && ch.objTop.activeSelf == true && ch.visibleAll)
                 .ToArray();
             if (males.Length == 1)
             {

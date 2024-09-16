@@ -12,6 +12,7 @@ using KK_VR.Handlers;
 using static VRGIN.Controls.Controller;
 using System.Collections.Generic;
 using KK_VR.Controls;
+using ADV.Commands.Object;
 
 namespace KK_VR.Interpreters
 {
@@ -55,6 +56,7 @@ namespace KK_VR.Interpreters
             //VRPlugin.Logger.LogWarning($"Interpreter:Action:Start:{height}");
             _handlers = AddControllerComponent<ActionSceneHandler>();
             //_modelHandler = new ModelHandler();
+            //ModelHandler.SetHandColor(Game.Instance.actScene.Player.chaCtrl);
         }
 
         public override void OnDisable()
@@ -100,7 +102,8 @@ namespace KK_VR.Interpreters
             switch (direction)
             {
                 case TrackpadDirection.Up:
-                    if (actionScene.Player.isGateHit || actionScene.Player.actionTarget != null)
+                    if (actionScene.Player.isGateHit || actionScene.Player.actionTarget != null
+                        || actionScene.Player.isActionPointHit)
                     {
                         VR.Input.Mouse.RightButtonDown();
                         _mouseState[1] = true;
@@ -346,7 +349,7 @@ namespace KK_VR.Interpreters
         public void MoveCameraToPlayer(bool onlyPosition = false, bool quiet = false)
         {
 
-            var headCam = VR.Camera.transform;
+            //var headCam = VR.Camera.transform;
 
             var pos = GetEyesPosition();
             if (!_settings.UsingHeadPos)
@@ -354,13 +357,14 @@ namespace KK_VR.Interpreters
                 var player = actionScene.Player;
                 pos.y = player.position.y + (_standing ? _settings.StandingCameraPos : _settings.CrouchingCameraPos);
             }
-
-            VRMover.Instance.MoveTo(
-                //pos + cf * 0.23f, // 首が見えるとうざいのでほんの少し前目にする
-                pos,
-                onlyPosition ? headCam.rotation : _eyes.rotation,
-                false,
-                quiet);
+            
+            VR.Mode.MoveToPosition(pos, onlyPosition ? Quaternion.Euler(0f, VR.Camera.transform.eulerAngles.y, 0f) : _eyes.rotation, false);
+            //VRMover.Instance.MoveTo(
+            //    //pos + cf * 0.23f, // 首が見えるとうざいのでほんの少し前目にする
+            //    pos,
+            //    onlyPosition ? headCam.rotation : _eyes.rotation,
+            //    false,
+            //    quiet);
         }
 
         private Vector3 GetEyesPosition()

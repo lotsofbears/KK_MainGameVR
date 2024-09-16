@@ -78,6 +78,42 @@ namespace KK_VR.Features
                     m_Height = 0.05f,
                     m_Center = new Vector3(0.01f, -0.005f, 0.005f)
                 }
+            },
+            {
+                "_head_00", new DynBoneParam
+                {
+                    m_Radius = 0.03f,
+                    m_Direction = DynamicBoneCollider.Direction.Y,
+                    m_Height = 0.035f,
+                    m_Center = new Vector3(0f, 0.025f, 0f)
+                }
+            },
+            {
+                "J_vibe_02", new DynBoneParam
+                {
+                    m_Radius = 0.018f,
+                    m_Direction = DynamicBoneCollider.Direction.Y,
+                    m_Height = 0.08f,
+                    m_Center = Vector3.zero
+                }
+            },
+            {
+                "J_vibe_05", new DynBoneParam
+                {
+                    m_Radius = 0.018f,
+                    m_Direction = DynamicBoneCollider.Direction.Y,
+                    m_Height = 0.05f,
+                    m_Center = Vector3.zero
+                }
+            },
+            {
+                "cf_j_tang_04", new DynBoneParam
+                {
+                    m_Radius = 0.005f,
+                    m_Direction = DynamicBoneCollider.Direction.Z,
+                    m_Height = 0.03f,
+                    m_Center = Vector3.zero
+                }
             }
         };
         public static void Initialize(List<GameObject> gameObjectList)
@@ -195,8 +231,10 @@ namespace KK_VR.Features
                 var existingCollider = gameObject.GetComponentInChildren<DynamicBoneCollider>();
                 if (existingCollider == null)
                 {
+                    VRPlugin.Logger.LogDebug($"AddDynBone:{gameObject.name}");
                     var param = _colliderParams
-                        .Where(kv => gameObject.name.StartsWith(kv.Key, StringComparison.Ordinal))
+                        .Where(kv => gameObject.name.StartsWith(kv.Key, StringComparison.Ordinal)
+                        || gameObject.name.EndsWith(kv.Key, StringComparison.Ordinal))
                         .Select(kv => kv.Value)
                         .FirstOrDefault();
                     var colliderObject = new GameObject("DynamicBoneCollider");

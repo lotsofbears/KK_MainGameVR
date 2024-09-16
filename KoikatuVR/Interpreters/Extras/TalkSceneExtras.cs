@@ -13,10 +13,12 @@ namespace KK_VR.Interpreters.Extras
     internal static class TalkSceneExtras
     {
         private static Transform _dirLight;
+        private static Transform _oldParent;
         internal static void RepositionDirLight(ChaControl chara)
         {
+            VRPlugin.Logger.LogDebug($"RepositionDirLight:{KoikatuInterpreter.CurrentScene}");
             // It doesn't use 'activeSelf'. Somehow only 'active' changes.
-            if (_dirLight == null || _dirLight.gameObject.active)
+            if (_dirLight == null || !_dirLight.gameObject.active)
             {
                 _dirLight = GameObject.FindObjectsOfType<Light>()
                     .Where(g => g.name.Equals("Directional Light") && g.gameObject.active)
@@ -27,11 +29,11 @@ namespace KK_VR.Interpreters.Extras
                     return;
                 }
             }
+            _oldParent = _dirLight.transform.parent;
             // We find rotation of vector from base of chara to the center of the scene (0,0,0).
             // Then we create rotation towards it from the chara for random degrees, and elevate it a bit.
             // And place our camera at chara head position + Vector.forward with above rotation.
-            // Consistent, doesn't defy logic too often, and is much better then camera directional light that in vr makes one question own eyes.
-            // TODO port to KK_VR.
+            // Consistent, doesn't defy logic too often, and is much better then camera directional light, that in vr makes one question own eyes.
 
             var lowHeight = (chara.objHeadBone.transform.position.y - chara.transform.position.y) < 0.5f;
             var yDeviation = Random.Range(15f, 45f);
@@ -42,7 +44,17 @@ namespace KK_VR.Interpreters.Extras
                 * Quaternion.Euler(-xDeviation, 0f, 0f) * Vector3.forward;
             _dirLight.rotation = Quaternion.LookRotation((lowHeight ? chara.objBody : chara.objHeadBone).transform.position - _dirLight.position);
         }
+        internal static void ReturnDirLight()
+        {
+            if (_oldParent == null || _dirLight == null)
+            {
+                VRPlugin.Logger.LogDebug($"ReturnDirLight:ButNoParent:{KoikatuInterpreter.CurrentScene}");
+                return;
+            }
 
+            VRPlugin.Logger.LogDebug($"ReturnDirLight:{KoikatuInterpreter.CurrentScene}");
+            _dirLight.SetParent(_oldParent, false);
+        }
         internal static void AddTalkColliders(ChaControl chara)
         {
             string[,] array = new string[3, 3];
@@ -64,14 +76,67 @@ namespace KK_VR.Interpreters.Extras
                 {
                     var collider = CommonLib.LoadAsset<GameObject>(array[i, 1], array[i, 2], true, string.Empty);
                     collider.transform.SetParent(target, false);
-                    VRPlugin.Logger.LogDebug($"Extras:Colliders:Add:{target.name}");
+                    VRPlugin.Logger.LogDebug($"Extras:Colliders:Talk:Add:{target.name}");
                 }
                 else
                 {
-                    VRPlugin.Logger.LogDebug($"Extras:Colliders:AlreadyHaveOne:{target.name}");
+                    VRPlugin.Logger.LogDebug($"Extras:Colliders:Talk:AlreadyHaveOne:{target.name}");
                 }
             }
-
+        }
+        internal static void AddHColliders(ChaControl chaCtrl)
+        {
+            var _strAssetFolderPath = "h/list/";
+            var _file = "parent_object_base_female";
+            var text = GlobalMethod.LoadAllListText(_strAssetFolderPath, _file, null);
+            if (text == string.Empty) return;
+            //string[,] array;
+            GlobalMethod.GetListString(text, out var array);
+            var length = array.GetLength(0);
+            var length2 = array.GetLength(1);
+            for (int i = 0; i < length; i++)
+            {
+                for (int j = 0; j < length2; j += 3)
+                {
+                    var parentName = array[i, j];
+                    var assetName = array[i, j + 1];
+                    var colliderName = array[i, j + 2];
+                    if (parentName.IsNullOrEmpty() && assetName.IsNullOrEmpty() && colliderName.IsNullOrEmpty())
+                    {
+                        break;
+                    }
+                    var parent = chaCtrl.objBodyBone.transform.FindLoop(parentName);
+                    if (parent.transform.Find(colliderName) != null)
+                    {
+                        VRPlugin.Logger.LogDebug($"Extras:Colliders:H:AlreadyHaveOne:{colliderName}");
+                        continue;
+                    }
+                    else
+                    {
+                        VRPlugin.Logger.LogDebug($"Extras:Colliders:H:Add:{colliderName}");
+                    }
+                    var collider = CommonLib.LoadAsset<GameObject>(assetName, colliderName, true, string.Empty);
+                    AssetBundleManager.UnloadAssetBundle(assetName, true, null, false);
+                    var componentsInChildren = collider.GetComponentsInChildren<EliminateScale>(true);
+                    foreach (var eliminateScale in componentsInChildren)
+                    {
+                        eliminateScale.chaCtrl = chaCtrl;
+                    }
+                    if (parent != null && collider != null)
+                    {
+                        collider.transform.SetParent(parent.transform, false);
+                    }
+                    //if (!this.dicObject.ContainsKey(text4))
+                    //{
+                    //    this.dicObject.Add(text4, gameObject2);
+                    //}
+                    //else
+                    //{
+                    //    UnityEngine.Object.Destroy(this.dicObject[text4]);
+                    //    this.dicObject[text4] = gameObject2;
+                    //}
+                }
+            }
         }
 
         internal static Dictionary<int, ReactionInfo> dicNowReactions = new Dictionary<int, ReactionInfo>

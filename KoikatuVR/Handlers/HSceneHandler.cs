@@ -14,6 +14,9 @@ using static SteamVR_Controller;
 using KK_VR.Fixes;
 using KK_VR.Features;
 using KK_VR.Controls;
+using RootMotion.FinalIK;
+using static HandCtrl;
+using KK_VR.Caress;
 
 namespace KK_VR.Handlers
 {
@@ -23,7 +26,7 @@ namespace KK_VR.Handlers
     ///
     /// This component is designed to exist only for the duration of an H scene.
     /// </summary>
-    class HSceneHandler : ProtectedBehaviour
+    class HSceneHandler : MonoBehaviour
     {
         // Basic plan:
         //
@@ -37,99 +40,207 @@ namespace KK_VR.Handlers
         private KoikatuSettings _settings;
         private Controller _controller;
         private ColliderTracker _tracker;
+        private ModelHandler.ItemType _item;
+        private TravelDistanceRumble _travelRumble;
+        private int _index;
+        private float _timer;
+        private float _anotherTimer;
+        private bool _sleep;
+        private Coroutine _clickCo;
+        private bool _triggerPress;
+        internal bool IsBusy => _tracker.IsBusy;
         private Vector3 GetVelocity => _controller.Input.velocity;
+        //private Vector3 GetAngVelocity => _controller.Input.angularVelocity;
 
-        protected override void OnAwake()
+        private void Start()
         {
             _settings = VR.Context.Settings as KoikatuSettings;
-            _controller = GetComponentInParent<Controller>();// GetComponent<Controller>(); 
-            
+            _item = ModelHandler.GetItem(this);
+            _controller = _item.controller.GetComponent<Controller>();
+            _index = (int)_controller.Tracking.index;
+            _sleep = true;
+
+            _travelRumble = new TravelDistanceRumble(1000, 0.075f, this.transform);
+            //_travelRumble.UseLocalPosition = true;
         }
 
-        protected void OnEnable()
+        private void OnEnable()
         {
             _tracker = new ColliderTracker();
         }
 
-        protected void OnDisable()
+        private void OnDisable()
         {
             _tracker = null;
+        }
+        private void Update()
+        {
+            if (_sleep && _timer != 0f)
+            {
+                _timer = Mathf.Clamp01(_timer - Time.deltaTime);
+                _item.rigidBody.velocity *= _timer;
+            }
+        }
+        private void PlayTraverseSfx()
+        {
+            if (!_item.audioSource.isPlaying)
+            {
+                if (GetVelocity.sqrMagnitude > 0.1f)
+                {
+                    ModelHandler.PlaySfx(_item, 1f, this.transform, ModelHandler.Sfx.Traverse, ModelHandler.Object.Skin, ModelHandler.Intensity.Soft);
+                }
+            }
+        }
+        // Starts GC like a clock.
+        //private void IncreaseButtBlush()
+        //{
+        //    var skinEffects = _tracker.chara.GetComponent<KK_SkinEffects.SkinEffectsController>();
+        //    if (skinEffects != null) skinEffects.ButtLevel++;
+        //}
+        private static bool AibuKindAllowed(AibuColliderKind kind, ChaControl chara)
+        {
+            if (KoikatuInterpreter.CurrentScene != KoikatuInterpreter.SceneType.HScene)
+            {
+                return true;
+            }
+            var heroine = HSceneInterpreter.hFlag.lstHeroine
+                .Where(h => h.chaCtrl == chara)
+                .FirstOrDefault();
+            if (heroine == null)
+            {
+                return true;
+            }
+            return kind switch
+            {
+                AibuColliderKind.mouth => heroine.isGirlfriend || heroine.isKiss || heroine.denial.kiss,
+                AibuColliderKind.anal => heroine.hAreaExps[3] > 0f || heroine.denial.anal,
+                _ => true
+            };
         }
 
         protected void OnTriggerEnter(Collider other)
         {
-            if (_tracker.AddCollider(other, out var colliderKind))
+            if (_tracker.AddCollider(other))
             {
-                //VRPlugin.Logger.LogDebug($"Handler:TriggerEnter:{other.name}");//:Velocity - {GetVelocity}");
-                DoReaction(triggerPress: false, colliderKind);
-                HSceneInterpreter.handCtrl.selectKindTouch = colliderKind[1] == HandCtrl.AibuColliderKind.none ? colliderKind[0] : colliderKind[1];
-                _controller.StartRumble(new RumbleImpulse(1000));
+                if (_tracker.reactionType > ColliderTracker.ReactionType.None)
+                {
+                    DoReaction();
+                }
+                if (_tracker.firstTrack)
+                {
+                    PlayFirstSfx();
+                    _controller.StartRumble(new RumbleImpulse(1000));
+                    _controller.StartRumble(_travelRumble);
+                }
+                //SetHandCtrl();
+                //VRPlugin.Logger.LogDebug($"Handler:TriggerEnter:{other.name}:{GetVelocity.sqrMagnitude}");//:{GetAngVelocity}");
             }
         }
+        private void PlayFirstSfx()
+        {
+            var velocity = GetVelocity.sqrMagnitude;
+            var intensity = _tracker.bodyPart < ColliderTracker.Body.LowerBody ? ModelHandler.Intensity.Soft : ModelHandler.Intensity.Rough;
+            if (velocity > 1f)
+            {
+                ModelHandler.PlaySfx(_item, 0.4f + velocity * 0.2f, this.transform, ModelHandler.Sfx.Slap, ModelHandler.Object.Skin, intensity);
+            }
+            else
+            {
+                ModelHandler.PlaySfx(_item, 1f, this.transform, ModelHandler.Sfx.Tap, ModelHandler.Object.Skin, intensity);
+            }
+        }
+        private void PlaySFX()
+        {
+            //ModelHandler.PlaySlap(_index, 1f, this.transform);
+            //var velocity = GetVelocity.sqrMagnitude;
+            //if (velocity > 1f)
+            //{
+            //    ModelHandler.PlaySlap(_index, 0.4f + velocity * 0.1f, other.transform);
+            //}
+            //else if (_tracker.firstTrack)
+            //{
 
+            //}
+            //if (colliderKind == AibuColliderKind.reac_head)
+            //{
+            //    // PlayHeadpat
+            //}
+        }
+        //private void SetHandCtrl() => HSceneInterpreter.handCtrl.selectKindTouch = _tracker.suggestedKind[1] == AibuColliderKind.none ? _tracker.suggestedKind[0] : _tracker.suggestedKind[1];
         protected void OnTriggerExit(Collider other)
         {
-            if (_tracker.RemoveCollider(other, out var colliderKind))
+            if (_tracker.RemoveCollider(other))
             {
                 //VRPlugin.Logger.LogDebug($"Handler:TriggerExit:{other.name}");
-                HSceneInterpreter.handCtrl.selectKindTouch = colliderKind[1] == HandCtrl.AibuColliderKind.none ? colliderKind[0] : colliderKind[1];
+                //SetHandCtrl();
+                if (!IsBusy)
+                {
+                    _timer = 1f;
+                    _controller.StopRumble(_travelRumble);
+                    _travelRumble.Reset();
+                }
             }
         }
         public bool DoUndress(bool decrease)
         {
             if (!_tracker.IsBusy)
             {
-                //VRPlugin.Logger.LogDebug($"Handler:Undress:Tracker[{_tracker.IsBusy}]");
                 return false;
             }
-            var bodyKind = _tracker.GetUndressKind(out var chara);
+            var bodyKind = _tracker.GetUndressKind();
             VRPlugin.Logger.LogDebug($"Handler:Undress:Part[{bodyKind}]");
-            if (bodyKind != ColliderTracker.Body.None && ClothesHandler.Undress(chara, bodyKind, decrease))
+            _controller.StartRumble(new RumbleImpulse(1000));
+            if (bodyKind != ColliderTracker.Body.None && ClothesHandler.Undress(_tracker.chara, bodyKind, decrease))
             {
-                _controller.StartRumble(new RumbleImpulse(1000));
                 return true;
             }
             return false;
 
         }
-
-        // We either don't have reaction(only touch option) for breast collider, or have a cooldown.
-        // Otherwise they bounce too much for tracking to be stable, thus resulting in reaction spam.
-        private float _lastReaction;
-        public bool DoReaction(bool triggerPress, HandCtrl.AibuColliderKind[] colliderKind)
+        public bool TriggerPress()
         {
-            if (!_tracker.IsBusy || (!triggerPress && (_settings.AutomaticTouching < KoikatuSettings.SceneType.HScene))) // _lastReaction > Time.time || 
+            if (!IsBusy) return false;
+            var suggestedKinds = _tracker.GetSuggestedKinds();
+            if (suggestedKinds[1] == AibuColliderKind.none || suggestedKinds[1] > AibuColliderKind.siriR)
             {
-                //VRPlugin.Logger.LogDebug($"Handler:Reaction:Tracker[{_tracker.IsBusy}]");
-                return false;
+                HSceneInterpreter.HitReactionPlay(suggestedKinds[0], _tracker.chara);
             }
-            //var aibuKind = _tracker.GetReactionKind(out var chara);
-            var chara = _tracker.GetChara();
-            VRPlugin.Logger.LogDebug($"Handler:Reaction:React[{colliderKind[0]}]:Touch[{colliderKind[1]}]");
-            if (colliderKind[1] !=  HandCtrl.AibuColliderKind.none && triggerPress && HSceneInterpreter.hFlag.lstHeroine[0].chaCtrl == chara)
+            else if (_tracker.chara == HSceneInterpreter.lstFemale[0])
             {
-                // Moved to the interpreter with native mouse clicks.
-                // There is no native implementation for 3p. Don't really care to look into it. In vr even one chara is a lot.
-                HSceneInterpreter.handCtrl.selectKindTouch = colliderKind[1];
-                StartCoroutine(Caress.CaressUtil.ClickCo(() => HSceneInterpreter.handCtrl.selectKindTouch = 0));
+                VRPlugin.Logger.LogDebug($"TriggerPress{suggestedKinds[1]}:{HSceneInterpreter.handCtrl.selectKindTouch}");
+                if (!VRMouth.NoActionAllowed && HSceneInterpreter.handCtrl.GetUseAreaItemActive() != -1)
+                {
+                    // If VRMouth isn't active but automatic caress is going.
+                    // Otherwise VRMouth has it's own hooks for trigger - halt (consolidate ?)
+                    CaressHelper.StopMoMiOnSensibleHSide();
+                }
+                else
+                {
+                    HSceneInterpreter.handCtrl.selectKindTouch = suggestedKinds[1];
+                    HandCtrlHooks.InjectMouseButtonDown(0);
+                    _triggerPress = true;
+                }
+                return true;
             }
-            else
+            return false;
+        }
+        public void TriggerRelease()
+        {
+            if (_triggerPress)
             {
-                HSceneInterpreter.HitReactionPlay(colliderKind[0], chara);
+                HSceneInterpreter.handCtrl.selectKindTouch = AibuColliderKind.none;
+                HandCtrlHooks.InjectMouseButtonUp(0);
+                _triggerPress = false;
             }
-            //_lastReaction = Time.time + 0.5f;
+        }
+        public bool DoReaction()
+        {
+            VRPlugin.Logger.LogDebug($"AttemptReaction:{IsBusy}");
+            if (!IsBusy || (_settings.AutomaticTouching < KoikatuSettings.SceneType.HScene)) return false;
+
+            HSceneInterpreter.HitReactionPlay(_tracker.GetSuggestedKinds()[0], _tracker.chara);
             _controller.StartRumble(new RumbleImpulse(1000));
             return true;
         }
-
-        //private void HandleToolChange()
-        //{
-        //    var device = _controller.Input; // SteamVR_Controller.Input((int)_controller.Tracking.index);
-        //    if (device.GetPressUp(ButtonMask.ApplicationMenu))
-        //    {
-        //        UpdateSelectKindTouch();
-        //        HandCtrlHooks.InjectMouseScroll(1f);
-        //    }
-        //}
     }
 }

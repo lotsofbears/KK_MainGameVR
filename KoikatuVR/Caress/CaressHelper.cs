@@ -70,9 +70,9 @@ namespace KK_VR.Caress
 
         private KoikatuSettings _settings;
 
-        private Action<HandCtrl.AibuColliderKind> MoMiOnLickStart;
-        private Action<HandCtrl.AibuColliderKind> MoMiOnKissStart;
-        private Action MoMiOnKissEnd;
+        private static Action<HandCtrl.AibuColliderKind> MoMiOnLickStart;
+        private static Action<HandCtrl.AibuColliderKind> MoMiOnKissStart;
+        private static Action MoMiOnKissEnd;
 
         /// <summary>
         /// State of disengagement of camera from action.
@@ -88,18 +88,21 @@ namespace KK_VR.Caress
             _device = FindObjectOfType<Controller>();
             _device1 = _device.Other;
             _settings = VR.Context.Settings as KoikatuSettings;
-            var type = AccessTools.TypeByName("KK_SensibleH.Caress.MoMiController");
-            //if (type != null)
-            //{
-            //_sensibleH = true;
-            //VRLog.Debug($"CaressHelper:Start[type = {type}]");
-            var lickCo = AccessTools.FirstMethod(type, m => m.Name.Equals("OnLickStart"));
-            var kissStart = AccessTools.FirstMethod(type, m => m.Name.Equals("OnKissStart"));
-            var kissEnd = AccessTools.FirstMethod(type, m => m.Name.Equals("OnKissEnd"));
-            MoMiOnLickStart = AccessTools.MethodDelegate<Action<HandCtrl.AibuColliderKind>>(lickCo);
-            MoMiOnKissStart = AccessTools.MethodDelegate<Action<HandCtrl.AibuColliderKind>>(kissStart);
-            MoMiOnKissEnd = AccessTools.MethodDelegate<Action>(kissEnd);
-            //}
+            if (MoMiOnKissStart == null)
+            {
+                var type = AccessTools.TypeByName("KK_SensibleH.Caress.MoMiController");
+                //if (type != null)
+                //{
+                //_sensibleH = true;
+                //VRLog.Debug($"CaressHelper:Start[type = {type}]");
+                var lickCo = AccessTools.FirstMethod(type, m => m.Name.Equals("OnLickStart"));
+                var kissStart = AccessTools.FirstMethod(type, m => m.Name.Equals("OnKissStart"));
+                var kissEnd = AccessTools.FirstMethod(type, m => m.Name.Equals("OnKissEnd"));
+
+                MoMiOnLickStart = AccessTools.MethodDelegate<Action<HandCtrl.AibuColliderKind>>(lickCo);
+                MoMiOnKissStart = AccessTools.MethodDelegate<Action<HandCtrl.AibuColliderKind>>(kissStart);
+                MoMiOnKissEnd = AccessTools.MethodDelegate<Action>(kissEnd);
+            }
             _chara = HSceneInterpreter.lstFemale[0];
             _eyes = _chara.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz/cf_J_Eye_tz");
             _head = _chara.objBodyBone.transform.Find("cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_j_neck/cf_j_head");
@@ -112,6 +115,7 @@ namespace KK_VR.Caress
 
         public bool IsGripPress() => _device.Input.GetPress(Grip) || _device1.Input.GetPress(Grip);
         public bool IsTriggerPressDown() => _device.Input.GetPressDown(Trigger) || _device1.Input.GetPressDown(Trigger);
+        public static void StopMoMiOnSensibleHSide() => MoMiOnKissEnd();
         internal void Halt(bool disengage = true, bool haltVRMouth = true)
         {
             VRPlugin.Logger.LogDebug($"CaressHelper:Halt\n" +

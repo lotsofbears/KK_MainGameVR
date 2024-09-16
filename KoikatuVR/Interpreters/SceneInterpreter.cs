@@ -47,8 +47,11 @@ namespace KK_VR.Interpreters
         {
             if (direction == Controller.TrackpadDirection.Left)
             {
-
-                KoikatuInterpreter.Instance.ChangeModelAnim(2);
+                KoikatuInterpreter.Instance.ChangeModelLayer(2, true);
+            }
+            if (direction == Controller.TrackpadDirection.Right)
+            {
+                KoikatuInterpreter.Instance.ChangeModelItem(2, true);
             }
             return false;
         }
@@ -78,6 +81,10 @@ namespace KK_VR.Interpreters
             Fraction,
             Half,
             Full
+        }
+        public virtual void OnControllerLock(int index)
+        {
+
         }
         protected static void DestroyControllerComponent<T>()
             where T: Component

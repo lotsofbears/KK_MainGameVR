@@ -3,11 +3,15 @@ using KK_VR.Features.Extras;
 using KK_VR.Interpreters;
 using Manager;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data.SqlTypes;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using UnityEngine;
+using UnityEngine.Networking;
 using static SaveData;
 using static UnityEngine.Experimental.Director.FrameData;
 using Random = UnityEngine.Random;
@@ -21,7 +25,7 @@ namespace KK_VR.Features
             Laugh,
             Short
         }
-        private static string Path = "sound/data/pcm/c**/";
+        private static string _path = "sound/data/pcm/c**/";
         private static readonly Dictionary<ChaControl, float> voiceCooldown = new Dictionary<ChaControl, float>();
         private static readonly Dictionary<int, string> extraPersonalities = new Dictionary<int, string>()
         {
@@ -35,14 +39,10 @@ namespace KK_VR.Features
             { 37, "20" },
             { 38, "50" }
         };
-        public static void Play(VoiceType type, ChaControl chara)//, bool setCooldown)
+        private static void Play(VoiceType type, ChaControl chara)//, bool setCooldown)
         {
+            // Preload assets?
             VRPlugin.Logger.LogDebug($"Voice:Play:{type}:{chara}");
-            // TODO try simultaneous play ?
-            //if (voiceCooldown.ContainsKey(chara) & voiceCooldown[chara] > Time.time)
-            //{
-            //    return;
-            //}
 
             var voiceList = GetVoiceList(type);
 
@@ -63,7 +63,7 @@ namespace KK_VR.Features
                 // Hook for this? 
                 hExp = Heroine.HExperienceKind.初めて;
             }
-            var bundle = Path + voiceList[Random.Range(0, voiceList.Count)];
+            var bundle = _path + voiceList[Random.Range(0, voiceList.Count)];
 
             // Replace personality id.
             bundle = bundle.Replace("**", (personalityId < 10 ? "0" : "") + personalityId.ToString());
@@ -118,6 +118,18 @@ namespace KK_VR.Features
             //        HSceneInterpreter.hVoice.nowVoices[1].voiceInfo.isPlay = true;
             //    }
             //}
+        }
+        public static void PlayVoice(VoiceType voiceType, ChaControl chara, bool voiceWait = true)
+        {
+            if (HSceneInterpreter.hFlag != null && voiceType == VoiceType.Short)
+            {
+                if (HSceneInterpreter.PlayShort(chara, voiceWait)) return;
+            }
+            // In H asVoice will be busy almost always ?
+            if (!voiceWait || chara.asVoice == null)
+            {
+                Play(voiceType, chara);
+            }
         }
         private static string GetBundle(int id, bool hVoice)
         {

@@ -8,7 +8,7 @@
 //{
 //	public partial class SetParent
 //	{
-//		private Dictionary<Side, GameObject> controllers = new Dictionary<Side, GameObject>();
+//		//private Dictionary<Side, GameObject> controllers = new Dictionary<Side, GameObject>();
 
 //		private FieldInfo f_device;
 

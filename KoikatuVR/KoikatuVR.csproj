@@ -106,6 +106,7 @@
     <Compile Include="Interpreters\Patches\ActionScenePatches.cs" />
     <Compile Include="Interpreters\Patches\HScenePatches.cs" />
     <Compile Include="Interpreters\Patches\TalkScenePatches.cs" />
+    <Compile Include="SetParent\TestParent.cs" />
     <Compile Include="SetParent\[skip]AnimSpeedController.cs" />
     <Compile Include="SetParent\FixBodyParts.cs" />
     <Compile Include="SetParent\Hooks.cs" />
