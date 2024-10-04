@@ -139,11 +139,12 @@ namespace KK_VR.Settings
         public bool HideHeadInPOV { get; set; }
         public MovementTypeH FlyInPov { get; set; }
         public bool AutoEnterPov { get; set; }
-        public float RotationFootprint { get; set; }
+        public float RotationStartThreshold { get; set; }
         public float ProximityDuringKiss { get; set; }
         public bool ContinuousRotation { get; set; }
         public HeadsetType HeadsetSpecifications { get; set; }
         public bool ForceShowMaleHeadInAdv { get; set; }
+        public float RotAdaptSpeed { get; set; }
         public enum HeadsetType
         {
             None,

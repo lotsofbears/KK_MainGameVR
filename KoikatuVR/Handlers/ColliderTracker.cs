@@ -16,7 +16,7 @@ namespace KK_VR.Handlers
 {
     class ColliderTracker
     {
-        public bool IsBusy => trackCount > 0;
+        public bool IsBusy => _colliderTrackingList.Count > 0;
 
         private readonly List<Collider> _colliderTrackingList = new List<Collider>();
         //private readonly List<Body> bodyList = new List<Body>();
@@ -26,7 +26,7 @@ namespace KK_VR.Handlers
         private float _lastTrack;
 
         internal Body bodyPart;
-        internal int trackCount;
+        //internal int trackCount;
         internal bool firstTrack;
         internal ReactionType reactionType;
         internal ChaControl chara;
@@ -34,21 +34,21 @@ namespace KK_VR.Handlers
         //internal Collider suggestedCollider;
         internal AibuColliderKind[] actualKind = new AibuColliderKind[2];
 
-        public static void Initialize(ChaControl chara, bool hScene)
+        public static void Initialize(ChaControl mainChara, bool hScene)
         {
             _activeColliders.Clear();
-            var colliders = chara.GetComponentsInChildren<Collider>(includeInactive: true);
+            var colliders = mainChara.GetComponentsInChildren<Collider>(includeInactive: true);
             foreach (var collider in colliders)
             {
                 if (allPossibleColliders.TryGetValue(collider.name, out var bodyBehavior))
                 {
                     _activeColliders.Add(collider.name, bodyBehavior);
                     EnableCollider(collider);
-                    VRPlugin.Logger.LogDebug($"Tracker:Start:Collider:Add:{collider.name}");
+                    //VRPlugin.Logger.LogDebug($"Tracker:Start:Collider:Add:{collider.name}");
                 }
                 else
                 {
-                    VRPlugin.Logger.LogDebug($"Tracker:Start:Collider:Skip:{collider.name}:{collider.gameObject.layer}");
+                    //VRPlugin.Logger.LogDebug($"Tracker:Start:Collider:Skip:{collider.name}:{collider.gameObject.layer}");
                 }
             }
             var charas = (hScene ? HSceneInterpreter.hFlag.lstHeroine : Game.Instance.HeroineList)
@@ -62,7 +62,7 @@ namespace KK_VR.Handlers
                 VRPlugin.Logger.LogDebug($"Tracker:Start:ExtraCharas:{charas.Count - 1}");
                 foreach (var c in charas)
                 {
-                    if (c == chara)
+                    if (c == mainChara)
                     {
                         continue;
                     }
@@ -81,9 +81,6 @@ namespace KK_VR.Handlers
         private void GetFamiliarity()
         {
             // Add exp/weak point influence?
-
-
-            chara = _colliderTrackingList[0].gameObject.GetComponentInParent<ChaControl>();
             SaveData.Heroine heroine = null;
             if (HSceneInterpreter.hFlag != null)
             {
@@ -119,16 +116,17 @@ namespace KK_VR.Handlers
             HitReaction
             // Slap Reaction? extra gotta modify reac dic for that 
         }
-        private void SetReaction()
+        private void SetReaction(Collider other)
         {
             if (!IsBusy)
             {
+                chara = other.gameObject.GetComponentInParent<ChaControl>();
+                GetFamiliarity();
                 // Start of track.
                 firstTrack = true;
-                GetFamiliarity();
                 if (_lastTrack + (2f * _familiarity) > Time.time)
                 {
-                    // Consecutive touch within ~2 seconds from the last touch.
+                    // Consecutive touch within up to 2 seconds from the last touch.
                     reactionType = Random.value < _familiarity - 0.5f ? ReactionType.Laugh : ReactionType.Short;
                 }
                 else
@@ -152,14 +150,17 @@ namespace KK_VR.Handlers
                 }
             }
         }
+
         private static void EnableCollider(Collider collider)
         {
             collider.enabled = true;
             collider.gameObject.layer = 10;
             collider.gameObject.SetActive(true);
         }
+
         private BodyBehavior GetSuggestedBehavior()
         {
+
             var bodyParts = _activeColliders
                     .Where(kv => _colliderTrackingList.Any(t => t.name.Equals(kv.Key)))
                     .Select(kv => kv.Value)
@@ -171,6 +172,7 @@ namespace KK_VR.Handlers
             }
             return touch;
         }
+
         internal AibuColliderKind[] GetSuggestedKinds()
         {
             var bodyParts = _activeColliders
@@ -194,16 +196,11 @@ namespace KK_VR.Handlers
         //}
         public bool AddCollider(Collider other)
         {
-            // Can't think of a better way to check visibility of ChaControl this collider is parented to.
-            if (_activeColliders.ContainsKey(other.name) && other.gameObject.GetComponentInParent<ChaControl>().visibleAll)
+            if (_activeColliders.ContainsKey(other.name))
             {
-                _colliderTrackingList.Add(other);
-
                 SetCurrentCollider(other);
-
-                //SetSuggestedKinds();
-                SetReaction();
-                trackCount++;
+                SetReaction(other);
+                _colliderTrackingList.Add(other);
                 return true;
             }
             return false;
@@ -220,9 +217,12 @@ namespace KK_VR.Handlers
         {
             if (_colliderTrackingList.Remove(other))
             {
-                trackCount--;
                 //VRPlugin.Logger.LogDebug($"Tracking:Remove:{other.name}:[{colliderTrackingList.Count}]");
-                if (trackCount == 0)
+                if (IsBusy)
+                {
+                    SetCurrentCollider(_colliderTrackingList.Last());
+                }
+                else
                 {
                     bodyPart = Body.None;
                     _reactOncePerTrack.Clear();
@@ -230,13 +230,6 @@ namespace KK_VR.Handlers
 
                     actualKind[0] = AibuColliderKind.none;
                     actualKind[1] = AibuColliderKind.none;
-                    //suggestedKind[0] = AibuColliderKind.none;
-                    //suggestedKind[1] = AibuColliderKind.none;
-                }
-                else
-                {
-                    SetCurrentCollider(_colliderTrackingList.Last());
-                    //SetSuggestedKinds();
                 }
                 return true;
             }
@@ -491,13 +484,14 @@ namespace KK_VR.Handlers
                     react = AibuColliderKind.reac_bodydown
                 }
             },
-            //{
-            //    "cf_hit_thigh02_L", new BodyBehavior
-            //    {
-            //        part = Body.LegL,
-            //        react = AibuColliderKind.reac_legL
-            //    }
-            //},
+            {
+                // Test
+                "cf_hit_thigh02_L", new BodyBehavior
+                {
+                    part = Body.LegL,
+                    react = AibuColliderKind.reac_legL
+                }
+            },
             //{
             //    "cf_hit_leg01_L", new BodyBehavior
             //    {
@@ -512,13 +506,14 @@ namespace KK_VR.Handlers
                     react = AibuColliderKind.reac_legL
                 }
             },
-            //{
-            //    "cf_hit_thigh02_R", new BodyBehavior
-            //    {
-            //        part = Body.LegR,
-            //        react = AibuColliderKind.reac_legR
-            //    }
-            //},
+            {
+                // Test
+                "cf_hit_thigh02_R", new BodyBehavior
+                {
+                    part = Body.LegR,
+                    react = AibuColliderKind.reac_legR
+                }
+            },
             //{
             //    "cf_hit_leg01_R", new BodyBehavior
             //    {

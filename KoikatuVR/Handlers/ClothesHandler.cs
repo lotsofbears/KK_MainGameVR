@@ -17,6 +17,41 @@ namespace KK_VR.Handlers
 {
     static class ClothesHandler
     {
+        public static bool IsBodyPartClothed(ChaControl chara, Body part)
+        {
+            var array = ConvertToSlot(part);
+            if (array == null) return false;
+            foreach (var item in array)
+            {
+                if (chara.IsClothes(item)) return true;
+            }
+            return false;
+        }
+        private static int[] ConvertToSlot(Body part)
+        {
+            switch (part)
+            {
+                case Body.MuneL:
+                case Body.MuneR:
+                    return new int[] { 0, 2 };
+                case Body.UpperBody:
+                    return new int[] { 0 };
+                case Body.LowerBody:
+                    return new int[] { 1, 5 };
+                case Body.ArmL:
+                case Body.ArmR:
+                    return new int[] { 0, 4 };
+                case Body.Groin:
+                case Body.Asoko:
+                    return new int[] { 1, 3, 5 };
+                case Body.Thigh:
+                case Body.LegL:
+                case Body.LegR:
+                    return new int[] { 5, 6 };
+                default:
+                    return null;
+            }
+        }
         public static bool Undress(ChaControl chara, Body part, bool decrease)
         {
 

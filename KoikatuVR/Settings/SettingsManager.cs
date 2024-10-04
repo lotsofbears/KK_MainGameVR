@@ -211,12 +211,12 @@ namespace KK_VR.Settings
                 "If not in PoV mode, on position change PoV mode will be automatically activated if there is a male.");
             Tie(autoEnter, v => settings.AutoEnterPov = v);
 
-            var RotationFootprint = config.Bind(SectionPov, "Lazy rotation", 0.1f,
+            var rotationStartThreshold = config.Bind(SectionPov, "Lazy rotation", 0.1f,
                 new ConfigDescription(
                     "Introduces lazy rotation when above 0. The higher the number, the lazier camera rotates in PoV mode.\n" +
                     "Changes take place after new impersonation.",
                     new AcceptableValueRange<float>(0f, 1f)));
-            Tie(RotationFootprint, v => settings.RotationFootprint = v);
+            Tie(rotationStartThreshold, v => settings.RotationStartThreshold = v);
 
             var flyInH = config.Bind(SectionCaress, "Transition H", true,
                 "On position (or location) change, instead of teleportation, transition smoothly to the new location.");
@@ -227,6 +227,12 @@ namespace KK_VR.Settings
                     "Speed of progressive movement of the camera.",
                     new AcceptableValueRange<float>(0.1f, 2f)));
             Tie(flightSpeed, v => settings.FlightSpeed = v);
+
+            var rotAdaptSpeed = config.Bind(SectionPov, "RotAdaptSpeed", 0.1f,
+                new ConfigDescription(
+                    "If lazy rotation is enabled, defines how fast rotation comes back in full swing after sleep.",
+                    new AcceptableValueRange<float>(0f, 1f)));
+            Tie(rotAdaptSpeed, v => settings.RotAdaptSpeed = v);
 
             var contRot = config.Bind(SectionRoaming, "Continuous rotation", false,
                     "Enable continuous rotation of camera in roaming mode instead of snap turn. Influenced by setting 'Rotation angle'.");

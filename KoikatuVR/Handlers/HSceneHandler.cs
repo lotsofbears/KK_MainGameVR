@@ -71,7 +71,8 @@ namespace KK_VR.Handlers
 
         private void OnDisable()
         {
-            _tracker = null;
+            _tracker = null; 
+            _controller.StopRumble(_travelRumble);
         }
         private void Update()
         {
@@ -122,13 +123,13 @@ namespace KK_VR.Handlers
         {
             if (_tracker.AddCollider(other))
             {
-                if (_tracker.reactionType > ColliderTracker.ReactionType.None)
+                if (CheckVelocity(out var velocity) || _tracker.reactionType > ColliderTracker.ReactionType.None)
                 {
-                    DoReaction();
+                    DoReaction(velocity);
                 }
+                PlaySfx(velocity);
                 if (_tracker.firstTrack)
                 {
-                    PlayFirstSfx();
                     _controller.StartRumble(new RumbleImpulse(1000));
                     _controller.StartRumble(_travelRumble);
                 }
@@ -136,36 +137,50 @@ namespace KK_VR.Handlers
                 //VRPlugin.Logger.LogDebug($"Handler:TriggerEnter:{other.name}:{GetVelocity.sqrMagnitude}");//:{GetAngVelocity}");
             }
         }
-        private void PlayFirstSfx()
+        private bool CheckVelocity(out float velocity)
         {
-            var velocity = GetVelocity.sqrMagnitude;
-            var intensity = _tracker.bodyPart < ColliderTracker.Body.LowerBody ? ModelHandler.Intensity.Soft : ModelHandler.Intensity.Rough;
-            if (velocity > 1f)
-            {
-                ModelHandler.PlaySfx(_item, 0.4f + velocity * 0.2f, this.transform, ModelHandler.Sfx.Slap, ModelHandler.Object.Skin, intensity);
-            }
-            else
-            {
-                ModelHandler.PlaySfx(_item, 1f, this.transform, ModelHandler.Sfx.Tap, ModelHandler.Object.Skin, intensity);
-            }
+            velocity = GetVelocity.sqrMagnitude;
+            if (velocity > 1f) return true;
+            return false;
         }
-        private void PlaySFX()
-        {
-            //ModelHandler.PlaySlap(_index, 1f, this.transform);
-            //var velocity = GetVelocity.sqrMagnitude;
-            //if (velocity > 1f)
-            //{
-            //    ModelHandler.PlaySlap(_index, 0.4f + velocity * 0.1f, other.transform);
-            //}
-            //else if (_tracker.firstTrack)
-            //{
 
-            //}
-            //if (colliderKind == AibuColliderKind.reac_head)
-            //{
-            //    // PlayHeadpat
-            //}
+        private void PlaySfx(float velocity)
+        {
+            var fast = velocity > 1f;
+            ModelHandler.PlaySfx(
+                _item,
+                fast ? 0.4f + velocity * 0.2f : 1f,
+                this.transform,
+                fast ? ModelHandler.Sfx.Slap : _tracker.firstTrack ? ModelHandler.Sfx.Tap : ModelHandler.Sfx.Traverse,
+                GetObjectType(_tracker.bodyPart),
+                _tracker.bodyPart < ColliderTracker.Body.LowerBody ? ModelHandler.Intensity.Soft : ModelHandler.Intensity.Rough
+                );
         }
+
+        private ModelHandler.Object GetObjectType(ColliderTracker.Body part)
+        {
+            if (part == ColliderTracker.Body.Head) return ModelHandler.Object.Hair;
+            if (ClothesHandler.IsBodyPartClothed(_tracker.chara, part)) return ModelHandler.Object.Cloth;
+            return ModelHandler.Object.Skin;
+        }
+
+        //private void PlaySFX()
+        //{
+        //    //ModelHandler.PlaySlap(_index, 1f, this.transform);
+        //    //var velocity = GetVelocity.sqrMagnitude;
+        //    //if (velocity > 1f)
+        //    //{
+        //    //    ModelHandler.PlaySlap(_index, 0.4f + velocity * 0.1f, other.transform);
+        //    //}
+        //    //else if (_tracker.firstTrack)
+        //    //{
+
+        //    //}
+        //    //if (colliderKind == AibuColliderKind.reac_head)
+        //    //{
+        //    //    // PlayHeadpat
+        //    //}
+        //}
         //private void SetHandCtrl() => HSceneInterpreter.handCtrl.selectKindTouch = _tracker.suggestedKind[1] == AibuColliderKind.none ? _tracker.suggestedKind[0] : _tracker.suggestedKind[1];
         protected void OnTriggerExit(Collider other)
         {
@@ -178,24 +193,52 @@ namespace KK_VR.Handlers
                     _timer = 1f;
                     _controller.StopRumble(_travelRumble);
                     _travelRumble.Reset();
+                    if (!VRMouth.NoActionAllowed) HSceneInterpreter.handCtrl.selectKindTouch = AibuColliderKind.none;
+
                 }
             }
         }
         public bool DoUndress(bool decrease)
         {
-            if (!_tracker.IsBusy)
+            if (!_tracker.IsBusy) return false;
+            if (decrease && HSceneInterpreter.handCtrl.IsItemTouch())
             {
-                return false;
+                var suggestedKinds = _tracker.GetSuggestedKinds();
+                if (IsAibuItemPresent(suggestedKinds[1]))
+                {
+                    HSceneInterpreter.handCtrl.DetachItemByUseAreaItem(suggestedKinds[1] - AibuColliderKind.muneL);
+                    HSceneInterpreter.hFlag.click = HFlag.ClickKind.de_muneL + (int)suggestedKinds[1] - 2;
+                    return true;
+                }
             }
             var bodyKind = _tracker.GetUndressKind();
             VRPlugin.Logger.LogDebug($"Handler:Undress:Part[{bodyKind}]");
             _controller.StartRumble(new RumbleImpulse(1000));
             if (bodyKind != ColliderTracker.Body.None && ClothesHandler.Undress(_tracker.chara, bodyKind, decrease))
             {
+                ModelHandler.PlaySfx(_item, 1f, this.transform, ModelHandler.Sfx.Undress, ModelHandler.Object.Cloth, ModelHandler.Intensity.Soft);
                 return true;
             }
             return false;
 
+        }
+        private bool IsAibuItemPresent(AibuColliderKind colliderKind)
+        {
+            if (colliderKind < AibuColliderKind.muneL || colliderKind > AibuColliderKind.siriR) return false;
+            return HSceneInterpreter.handCtrl.useAreaItems[colliderKind - AibuColliderKind.muneL] != null;
+        }
+        public bool ScrollItem()
+        {
+            if (!IsBusy) return false;
+            var suggestedKinds = _tracker.GetSuggestedKinds();
+            if (suggestedKinds[1] > AibuColliderKind.mouth 
+                && suggestedKinds[1] < AibuColliderKind.reac_head
+                && HSceneInterpreter.handCtrl.useAreaItems[suggestedKinds[1] - AibuColliderKind.muneL] != null)
+            {
+                HSceneInterpreter.handCtrl.selectKindTouch = suggestedKinds[1];
+                return true;
+            }
+            return false;
         }
         public bool TriggerPress()
         {
@@ -233,12 +276,33 @@ namespace KK_VR.Handlers
                 _triggerPress = false;
             }
         }
-        public bool DoReaction()
+        public bool DoReaction(float velocity)
         {
-            VRPlugin.Logger.LogDebug($"AttemptReaction:{IsBusy}");
-            if (!IsBusy || (_settings.AutomaticTouching < KoikatuSettings.SceneType.HScene)) return false;
-
-            HSceneInterpreter.HitReactionPlay(_tracker.GetSuggestedKinds()[0], _tracker.chara);
+            VRPlugin.Logger.LogDebug($"DoReaction:{_tracker.actualKind[1]}:{_tracker.reactionType}:{_tracker.chara}");
+            if (!IsBusy 
+                || _settings.AutomaticTouching < KoikatuSettings.SceneType.HScene
+                || !_tracker.chara.objTop.activeSelf 
+                || !_tracker.chara.visibleAll)
+            {
+                return false;
+            }
+            // Making sure that there is no aibu item attached to the place that triggered reaction.
+            if (velocity > 1f || (_tracker.reactionType == ColliderTracker.ReactionType.HitReaction 
+                && (_tracker.chara != HSceneInterpreter.lstFemale[0]
+                || _tracker.actualKind[1] < AibuColliderKind.muneL
+                || _tracker.actualKind[1] >  AibuColliderKind.siriR
+                || HSceneInterpreter.handCtrl.useAreaItems[_tracker.actualKind[1] - AibuColliderKind.muneL] == null)))
+            {
+                HSceneInterpreter.HitReactionPlay(_tracker.GetSuggestedKinds()[0], _tracker.chara);
+            }
+            else if (_tracker.reactionType == ColliderTracker.ReactionType.Short)
+            {
+                HSceneInterpreter.PlayShort(_tracker.chara, voiceWait: false);
+            }
+            else if (_tracker.reactionType == ColliderTracker.ReactionType.Laugh)
+            {
+                Features.LoadVoice.PlayVoice(Features.LoadVoice.VoiceType.Laugh, _tracker.chara, voiceWait: false);
+            }
             _controller.StartRumble(new RumbleImpulse(1000));
             return true;
         }

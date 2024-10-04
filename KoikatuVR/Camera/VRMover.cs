@@ -10,6 +10,7 @@ using System.Diagnostics;
 using ADV;
 using KK_VR.Interpreters;
 using KK_VR.Settings;
+using Manager;
 
 namespace KK_VR.Camera
 {
@@ -207,16 +208,22 @@ namespace KK_VR.Camera
             var eyes = chara.objHeadBone.transform
                 .Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz/cf_J_Eye_tz");
             var position = eyes.TransformPoint(0f, _settings.PositionOffsetY, _settings.PositionOffsetZ);
-            if (KoikatuInterpreter.settings.ForceShowMaleHeadInAdv)
-            {
-                position += chara.transform.forward * 0.15f;
-            }
+            //if (KoikatuInterpreter.settings.ForceShowMaleHeadInAdv)
+            //{
+            //    position += chara.transform.forward * 0.15f;
+            //}
             MoveWithHeuristics(
                 position,
                 eyes.rotation,
                 pretendFading: isFadingOut);
         }
-
+        public void Impersonate(ChaControl chara)
+        {
+            var eyes = chara.objHeadBone.transform
+                .Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz/cf_J_Eye_tz");
+            var position = eyes.TransformPoint(0f, _settings.PositionOffsetY, _settings.PositionOffsetZ);
+            MoveTo(position, eyes.rotation);
+        }
         private void MoveWithHeuristics(Vector3 position, Quaternion rotation, bool pretendFading)
         {
             var fade = Manager.Scene.Instance.sceneFade;

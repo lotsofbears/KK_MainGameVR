@@ -54,6 +54,7 @@ namespace KK_VR.Handlers
         private void OnDisable()
         {
             _tracker = null;
+            _controller.StopRumble(_travelRumble);
         }
 
         private void Update()

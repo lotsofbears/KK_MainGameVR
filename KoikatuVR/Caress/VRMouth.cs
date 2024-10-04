@@ -30,7 +30,7 @@ namespace KK_VR.Caress
     internal class VRMouth : ProtectedBehaviour
     {
         /// <summary>
-        /// To prevent accidental trigger when we are moving across HScene or moving to/from PoV.
+        /// To prevent an accidental trigger when we are moving across HScene or moving to/from PoV.
         /// Or when CaressHelper takes care of the process.
         /// </summary>
         internal static bool NoActionAllowed;
@@ -38,12 +38,12 @@ namespace KK_VR.Caress
         /// Indicates whether the currently running LickCo should end.
         /// null if LickCo is not running.
         /// </summary>
-        private bool? _lickCoShouldEnd;
+        private static bool? _lickCoShouldEnd;
         /// <summary>
         /// Indicates whether the currently running KissCo should end.
         /// null if KissCo is not running.
         /// </summary>
-        private bool? _kissCoShouldEnd;
+        private static bool? _kissCoShouldEnd;
 
 
         internal static VRMouth Instance;
@@ -70,9 +70,9 @@ namespace KK_VR.Caress
         private float _kissAttemptChance;
         private float _kissAttemptTimestamp;
 
-        public bool IsAction => _kissCoShouldEnd == false || _lickCoShouldEnd == false;
-        public bool IsKiss => _kissCoShouldEnd == false;
-        public bool IsLick => _lickCoShouldEnd == false;
+        public static bool IsAction => _kissCoShouldEnd == false || _lickCoShouldEnd == false;
+        public static bool IsKiss => _kissCoShouldEnd == false;
+        public static bool IsLick => _lickCoShouldEnd == false;
 
         protected override void OnAwake()
         {
@@ -135,7 +135,7 @@ namespace KK_VR.Caress
                 //    $":Angle - {Vector3.Angle(headPos - _shoulders.position, _shoulders.forward)}" +
                 //    $":DeltaAngle - {Mathf.Abs(Mathf.DeltaAngle(_shoulders.eulerAngles.y, _eyes.eulerAngles.y))}");
                 if (Random.value < _kissAttemptChance
-                    && IsIdleOutside
+                    && IsIdleOutside(hFlag.nowAnimStateName)
                     && Mathf.Abs(Mathf.DeltaAngle(_shoulders.eulerAngles.y, _eyes.eulerAngles.y)) < 30f
                     && Vector3.Distance(_eyes.position, headPos) < 0.55f
                     && Vector3.Angle(headPos - _shoulders.position, _shoulders.forward) < 30f)
@@ -198,7 +198,6 @@ namespace KK_VR.Caress
 
         private bool IsKissingAllowed()
         {
-            // I'd rather not deal with cross fading animation, too much edge cases to catch. || HSceneInterpreter.IsKissAnim))
             VRPlugin.Logger.LogDebug($"VRMouth:IsKissingAllowed");
             if (_proximityTimestamp < Time.time)
             {
@@ -334,7 +333,7 @@ namespace KK_VR.Caress
         /// </summary>
         private void StartKiss()
         {
-            VRPlugin.Logger.LogDebug($"VRMouth:StartKiss");
+            VRPlugin.Logger.LogDebug($"VRMouth:StartKiss:{_kissCoShouldEnd}:{handCtrl.IsKissAction()}:{handCtrl.selectKindTouch}");
             if (_kissCoShouldEnd != null || handCtrl.IsKissAction())
             {
                 // Already kissing.
@@ -354,19 +353,17 @@ namespace KK_VR.Caress
             HandCtrlHooks.InjectMouseButtonDown(0, () => messageDelivered = true);
             while (!messageDelivered)
             {
+                // As we don't lock controllers anymore, we can quite easy screw this 1 frame window.
+                handCtrl.selectKindTouch = AibuColliderKind.mouth;
                 yield return null;
             }
             yield return new WaitForEndOfFrame();
             CaressHelper.Instance.OnKissStart(AibuColliderKind.mouth);
-            // Try to restore the old value of selectKindTouch.
-            if (handCtrl.selectKindTouch == AibuColliderKind.mouth)
-            {
-                handCtrl.selectKindTouch = prevKindTouch;
-            }
             while (_kissCoShouldEnd == false && handCtrl.IsKissAction())
             {
-                yield return new WaitForSeconds(0.2f);
+                yield return new WaitForSeconds(0.5f);
             }
+            handCtrl.selectKindTouch = AibuColliderKind.none;
             HandCtrlHooks.InjectMouseButtonUp(0);
             _kissCoShouldEnd = null;
         }
@@ -378,7 +375,7 @@ namespace KK_VR.Caress
                 SetAttemptTimestamp(1f + Random.value * 2f);
             }
         }
-        private void StartLicking(HandCtrl.AibuColliderKind colliderKind, int layerNum)
+        private void StartLicking(AibuColliderKind colliderKind, int layerNum)
         {
             if (_kissCoShouldEnd != null || _lickCoShouldEnd != null)
             {
@@ -418,7 +415,7 @@ namespace KK_VR.Caress
                 }
                 else
                 {
-                    yield return new WaitForSeconds(0.2f);
+                    yield return new WaitForSeconds(0.5f);
                 }
             }
             _lickCoShouldEnd = null;

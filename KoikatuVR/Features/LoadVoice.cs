@@ -1,4 +1,6 @@
-﻿using Illusion.Game;
+﻿using BepInEx.Configuration;
+using HarmonyLib;
+using Illusion.Game;
 using KK_VR.Features.Extras;
 using KK_VR.Interpreters;
 using Manager;
@@ -25,6 +27,7 @@ namespace KK_VR.Features
             Laugh,
             Short
         }
+        private static Func<int> _maleBreathPersonality; 
         private static string _path = "sound/data/pcm/c**/";
         private static readonly Dictionary<ChaControl, float> voiceCooldown = new Dictionary<ChaControl, float>();
         private static readonly Dictionary<int, string> extraPersonalities = new Dictionary<int, string>()
@@ -39,9 +42,16 @@ namespace KK_VR.Features
             { 37, "20" },
             { 38, "50" }
         };
+        public static void Init()
+        {
+            var type = AccessTools.TypeByName("KK_MaleBreathVR.MaleBreath");
+            if (type == null) return;
+            var methodInfo = AccessTools.FirstMethod(type, m => m.Name.Equals("GetPlayerPersonality"));
+            _maleBreathPersonality = AccessTools.MethodDelegate<Func<int>>(methodInfo);
+        }
         private static void Play(VoiceType type, ChaControl chara)//, bool setCooldown)
         {
-            // Preload assets?
+            // Preload assets? First touch can get GC.
             VRPlugin.Logger.LogDebug($"Voice:Play:{type}:{chara}");
 
             var voiceList = GetVoiceList(type);
@@ -56,6 +66,7 @@ namespace KK_VR.Features
                 .FirstOrDefault();
 
             var personalityId = chara.fileParam.personality;
+            if (chara.sex == 0 && _maleBreathPersonality != null) personalityId = _maleBreathPersonality();
 
             if (hExp == Heroine.HExperienceKind.不慣れ)
             {
@@ -121,12 +132,7 @@ namespace KK_VR.Features
         }
         public static void PlayVoice(VoiceType voiceType, ChaControl chara, bool voiceWait = true)
         {
-            if (HSceneInterpreter.hFlag != null && voiceType == VoiceType.Short)
-            {
-                if (HSceneInterpreter.PlayShort(chara, voiceWait)) return;
-            }
-            // In H asVoice will be busy almost always ?
-            if (!voiceWait || chara.asVoice == null)
+            if (!voiceWait || chara.asVoice == null || chara.asVoice.name.StartsWith("h_ko_", StringComparison.Ordinal))
             {
                 Play(voiceType, chara);
             }

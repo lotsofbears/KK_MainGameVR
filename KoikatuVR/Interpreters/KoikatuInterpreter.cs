@@ -4,7 +4,6 @@ using System.Collections;
 using UnityEngine.SceneManagement;
 using KK_VR.Features;
 using KK_VR.Camera;
-using KoikatuVR.Camera;
 using Studio;
 using static KK_VR.Interpreters.KoikatuInterpreter;
 using System.Runtime.Remoting;
@@ -56,6 +55,7 @@ namespace KK_VR.Interpreters
             VR.Camera.gameObject.AddComponent<VREffector>();
             //VR.Manager.ModeInitialized += AddModels;
             settings = VR.Context.Settings as KoikatuSettings;
+            Features.LoadVoice.Init();
         }
         protected override void OnUpdate()
         {
@@ -122,6 +122,7 @@ namespace KK_VR.Interpreters
             {
                 _mirrorManager.Fix(reflection);
             }
+            
         }
 
         /// <summary>
