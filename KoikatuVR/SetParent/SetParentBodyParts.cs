@@ -58,117 +58,117 @@
 //			MaleRightFoot
 //		}
 
-//		/// <summary>
-//		/// Toggle for creating/destroying anchor objects for attaching the limbs onto
-//		/// </summary>
-//		/// <param name="limb">the limb to attach/detach</param>
-//		/// <param name="fix">flag to indicate whether limb should be automatically detached</param>
-//		internal void FixLimbToggle(Limb limb, bool fix = false)
-//		{
-//			if (!limb.AnchorObj)
-//			{
-//				limb.AnchorObj = new GameObject(limb.LimbPart.ToString() + "Anchor");
-//				limb.AnchorObj.transform.position = limb.Effector.bone.position;
-//				limb.AnchorObj.transform.rotation = limb.Effector.bone.rotation;
-//				limb.Effector.target = limb.AnchorObj.transform;
-//				limb.Fixed = fix;
-//				return;
-//			}
-//			UnityEngine.Object.Destroy(limb.AnchorObj);
-//			limb.Effector.target = limb.OrigTarget;
-//			limb.Fixed = false;
+//		///// <summary>
+//		///// Toggle for creating/destroying anchor objects for attaching the limbs onto
+//		///// </summary>
+//		///// <param name="limb">the limb to attach/detach</param>
+//		///// <param name="fix">flag to indicate whether limb should be automatically detached</param>
+//		//internal void FixLimbToggle(Limb limb, bool fix = false)
+//		//{
+//		//	if (!limb.AnchorObj)
+//		//	{
+//		//		limb.AnchorObj = new GameObject(limb.LimbPart.ToString() + "Anchor");
+//		//		limb.AnchorObj.transform.position = limb.Effector.bone.position;
+//		//		limb.AnchorObj.transform.rotation = limb.Effector.bone.rotation;
+//		//		limb.Effector.target = limb.AnchorObj.transform;
+//		//		limb.Fixed = fix;
+//		//		return;
+//		//	}
+//		//	UnityEngine.Object.Destroy(limb.AnchorObj);
+//		//	limb.Effector.target = limb.OrigTarget;
+//		//	limb.Fixed = false;
 
-//			//When the IK target is set to the anchor object and a motion change undergoes, the Basedata bone of the original target would be set to null due to some unknown reason,
-//			//causing the effector bone to not approach the target correctly.
-//			//This resets motionIK using the current animation to prevent bone target Basedata being set to null
-//			if (limb.TargetBone.bone == null)
-//				lstMotionIK.ForEach((MotionIK motionIK) => motionIK.Calc(hFlag.nowAnimStateName));
-//		}
+//		//	//When the IK target is set to the anchor object and a motion change undergoes, the Basedata bone of the original target would be set to null due to some unknown reason,
+//		//	//causing the effector bone to not approach the target correctly.
+//		//	//This resets motionIK using the current animation to prevent bone target Basedata being set to null
+//		//	if (limb.TargetBone.bone == null)
+//		//		lstMotionIK.ForEach(ik => ik.Calc(hFlag.nowAnimStateName));
+//		//}
 
-//		/// <summary>
-//		/// Release and attach male limbs based on the distance between the attaching target position and the default animation position
-//		/// </summary>
-//		private void MaleIKs()
-//		{
-//			bool hideGropeHands = setFlag && hFlag.mode != HFlag.EMode.aibu && GropeHandsDisplay.Value < HideHandMode.AlwaysShow;
+//		///// <summary>
+//		///// Release and attach male limbs based on the distance between the attaching target position and the default animation position
+//		///// </summary>
+//		//private void MaleIKs()
+//		//{
+//		//	bool hideGropeHands = setFlag && hFlag.mode != HFlag.EMode.aibu && GropeHandsDisplay.Value < HideHandMode.AlwaysShow;
 
-//			//Algorithm for the male hands
-//			for (int i = (int)LimbName.MaleLeftHand; i <= (int)LimbName.MaleRightHand; i++)
-//			{
-//				//If anchors exist for the male hands, that means they are following the controllers
-//				//Lower bendConstraint weight to allow rotation of the arm
-//				//Set chain pull weight to zero to avoid arms from pulling the body (may not be effective however)
-//				if (limbs[i].AnchorObj)
-//				{
-//					limbs[i].Effector.positionWeight = 1f;
-//					limbs[i].Effector.rotationWeight = 1f;
-//					limbs[i].Chain.bendConstraint.weight = 0.2f;
-//					limbs[i].Chain.pull = 0f;
+//		//	//Algorithm for the male hands
+//		//	for (int i = (int)LimbName.MaleLeftHand; i <= (int)LimbName.MaleRightHand; i++)
+//		//	{
+//		//		//If anchors exist for the male hands, that means they are following the controllers
+//		//		//Lower bendConstraint weight to allow rotation of the arm
+//		//		//Set chain pull weight to zero to avoid arms from pulling the body (may not be effective however)
+//		//		if (limbs[i].AnchorObj)
+//		//		{
+//		//			limbs[i].Effector.positionWeight = 1f;
+//		//			limbs[i].Effector.rotationWeight = 1f;
+//		//			limbs[i].Chain.bendConstraint.weight = 0.2f;
+//		//			limbs[i].Chain.pull = 0f;
 
-//					//Hide/unhide the additional hands that show up when groping, depending on config setting
-//					//If settings is set to auto (neither AlwaysShow or AlwaysHide), hide them only when the controller gets close
-//					if (hideGropeHands)
-//					{
-//						if (GropeHandsDisplay.Value == HideHandMode.AlwaysHide)
-//							itemHands[i - 4].enabled = false;
-//						else if ((itemHands[i - 4].transform.position - limbs[i].AnchorObj.transform.position).magnitude > 0.2f)
-//							itemHands[i - 4].enabled = true;
-//						else
-//							itemHands[i - 4].enabled = false;
-//					}
-//					continue;
-//				}
+//		//			//Hide/unhide the additional hands that show up when groping, depending on config setting
+//		//			//If settings is set to auto (neither AlwaysShow or AlwaysHide), hide them only when the controller gets close
+//		//			if (hideGropeHands)
+//		//			{
+//		//				if (GropeHandsDisplay.Value == HideHandMode.AlwaysHide)
+//		//					itemHands[i - 4].enabled = false;
+//		//				else if ((itemHands[i - 4].transform.position - limbs[i].AnchorObj.transform.position).magnitude > 0.2f)
+//		//					itemHands[i - 4].enabled = true;
+//		//				else
+//		//					itemHands[i - 4].enabled = false;
+//		//			}
+//		//			continue;
+//		//		}
 
-//				//Restore IK parameters to default if hands are not attached
-//				limbs[i].Chain.bendConstraint.weight = 1f;
-//				limbs[i].Chain.pull = 1f;
+//		//		//Restore IK parameters to default if hands are not attached
+//		//		limbs[i].Chain.bendConstraint.weight = 1f;
+//		//		limbs[i].Chain.pull = 1f;
 
-//				//To prevent excessive stretching or the hands being at a weird angle with the default IKs (e.g., grabing female body parts),
-//				//if rotation difference between the IK effector and original animation is beyond threshold, set IK weights to 0. 
-//				//Set IK weights to 1 if otherwise.
-//				float twist = Quaternion.Angle(limbs[i].Effector.target.rotation, limbs[i].AnimPos.rotation);
-//				if (twist > 45f)
-//				{
-//					limbs[i].Effector.positionWeight = 0f;
-//					limbs[i].Effector.rotationWeight = 0f;
-//				}
-//				else
-//				{
-//					limbs[i].Effector.positionWeight = 1f;
-//					limbs[i].Effector.rotationWeight = 1f;
-//				}
+//		//		//To prevent excessive stretching or the hands being at a weird angle with the default IKs (e.g., grabing female body parts),
+//		//		//if rotation difference between the IK effector and original animation is beyond threshold, set IK weights to 0. 
+//		//		//Set IK weights to 1 if otherwise.
+//		//		float twist = Quaternion.Angle(limbs[i].Effector.target.rotation, limbs[i].AnimPos.rotation);
+//		//		if (twist > 45f)
+//		//		{
+//		//			limbs[i].Effector.positionWeight = 0f;
+//		//			limbs[i].Effector.rotationWeight = 0f;
+//		//		}
+//		//		else
+//		//		{
+//		//			limbs[i].Effector.positionWeight = 1f;
+//		//			limbs[i].Effector.rotationWeight = 1f;
+//		//		}
 
-//				//Assign bone to male shoulder effectors and fix it in place to prevent hands from pulling the body
-//				//Does not run if male hands are in sync with controllers to allow further movement of the hands
-//				if (setFlag)
-//				{
-//					limbs[i].ParentJointBone.bone = limbs[i].ParentJointAnimPos;
-//					limbs[i].ParentJointEffector.positionWeight = 1f;
-//				}
-//			}
+//		//		//Assign bone to male shoulder effectors and fix it in place to prevent hands from pulling the body
+//		//		//Does not run if male hands are in sync with controllers to allow further movement of the hands
+//		//		if (setFlag)
+//		//		{
+//		//			limbs[i].ParentJointBone.bone = limbs[i].ParentJointAnimPos;
+//		//			limbs[i].ParentJointEffector.positionWeight = 1f;
+//		//		}
+//		//	}
 
-//			//Algorithm for the male feet
-//			for (int i = (int)LimbName.MaleLeftFoot; i <= (int)LimbName.MaleRightFoot; i++)
-//			{
-//				//Release the male feet from attachment if streched beyond threshold
-//				if (limbs[i].AnchorObj && !limbs[i].Fixed && (limbs[i].Effector.target.position - limbs[i].AnimPos.position).magnitude > 0.2f)
-//				{
-//					FixLimbToggle(limbs[i]);
-//				}
-//				else
-//				{
-//					limbs[i].Effector.positionWeight = 1f;
-//				}
-//			}
+//		//	//Algorithm for the male feet
+//		//	for (int i = (int)LimbName.MaleLeftFoot; i <= (int)LimbName.MaleRightFoot; i++)
+//		//	{
+//		//		//Release the male feet from attachment if streched beyond threshold
+//		//		if (limbs[i].AnchorObj && !limbs[i].Fixed && (limbs[i].Effector.target.position - limbs[i].AnimPos.position).magnitude > 0.2f)
+//		//		{
+//		//			FixLimbToggle(limbs[i]);
+//		//		}
+//		//		else
+//		//		{
+//		//			limbs[i].Effector.positionWeight = 1f;
+//		//		}
+//		//	}
 
-//			if (setFlag)
-//			{
-//				//Fix male hips to animation position to prevent male genital from drifting due to pulling from limb chains
-//				male_hips_bd.bone = male_cf_pv_hips;
-//				maleFBBIK.solver.bodyEffector.positionWeight = 1f;
-//				maleFBBIK.solver.bodyEffector.rotationWeight = 1f;
-//			}
-//		}
+//		//	if (setFlag)
+//		//	{
+//		//		//Fix male hips to animation position to prevent male genital from drifting due to pulling from limb chains
+//		//		male_hips_bd.bone = male_cf_pv_hips;
+//		//		maleFBBIK.solver.bodyEffector.positionWeight = 1f;
+//		//		maleFBBIK.solver.bodyEffector.rotationWeight = 1f;
+//		//	}
+//		//}
 
 //		/// <summary>
 //		/// Release and attach female limbs based on the distance between the attaching target position and the default animation position
@@ -345,55 +345,55 @@
 //			}
 //		}
 
-//		/// <summary>
-//		/// Initialize or disable male hands from anchoring to the controllers, depends on the passed parameter
-//		/// </summary>
-//		/// <param name="enable">To enable or disable the functionality</param>
-//		internal void SyncMaleHandsToggle(bool enable, Side side)
-//		{
-//			if (hFlag.mode <= HFlag.EMode.aibu || (hFlag.mode >= HFlag.EMode.masturbation && hFlag.mode <= HFlag.EMode.lesbian))
-//				return;
+//		///// <summary>
+//		///// Initialize or disable male hands from anchoring to the controllers, depends on the passed parameter
+//		///// </summary>
+//		///// <param name="enable">To enable or disable the functionality</param>
+//		//internal void SyncMaleHandsToggle(bool enable, Side side)
+//		//{
+//		//	if (hFlag.mode <= HFlag.EMode.aibu || (hFlag.mode >= HFlag.EMode.masturbation && hFlag.mode <= HFlag.EMode.lesbian))
+//		//		return;
 
-//			LimbName limb = side == Side.Left ? LimbName.MaleLeftHand : LimbName.MaleRightHand;
+//		//	LimbName limb = side == Side.Left ? LimbName.MaleLeftHand : LimbName.MaleRightHand;
 
-//			if (enable)
-//			{
-//				if (!limbs[(int)limb].AnchorObj)
-//					FixLimbToggle(limbs[(int)limb]);
+//		//	if (enable)
+//		//	{
+//		//		if (!limbs[(int)limb].AnchorObj)
+//		//			FixLimbToggle(limbs[(int)limb]);
 
-//				limbs[(int)limb].AnchorObj.transform.parent = controllers[side].transform;
+//		//		limbs[(int)limb].AnchorObj.transform.parent = controllers[side].transform;
 
-//				//Reposition anchor to align the male hand model to the controller
-//				limbs[(int)limb].AnchorObj.transform.localPosition = new Vector3(0, 0, -0.1f);
-//				limbs[(int)limb].AnchorObj.transform.localRotation = Quaternion.Euler(-90f, side == Side.Left ? 90f : -90f, 0f) * Quaternion.Euler(0, side == Side.Left ? -30f : 30f, 0f);
+//		//		//Reposition anchor to align the male hand model to the controller
+//		//		limbs[(int)limb].AnchorObj.transform.localPosition = new Vector3(0, 0, -0.1f);
+//		//		limbs[(int)limb].AnchorObj.transform.localRotation = Quaternion.Euler(-90f, side == Side.Left ? 90f : -90f, 0f) * Quaternion.Euler(0, side == Side.Left ? -30f : 30f, 0f);
 
-//				//Hide controller hand model
-//				foreach (SkinnedMeshRenderer mesh in controllers[side].transform.GetComponentsInChildren<SkinnedMeshRenderer>(true))
-//					mesh.enabled = false;
+//		//		//Hide controller hand model
+//		//		foreach (SkinnedMeshRenderer mesh in controllers[side].transform.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+//		//			mesh.enabled = false;
 
-//				//Restore male shoulder parameters to default as shoulder fixing will be disabled when hands are anchored to the controllers
-//				limbs[(int)limb].ParentJointBone.bone = null;
-//				limbs[(int)limb].ParentJointEffector.positionWeight = 0f;
+//		//		//Restore male shoulder parameters to default as shoulder fixing will be disabled when hands are anchored to the controllers
+//		//		limbs[(int)limb].ParentJointBone.bone = null;
+//		//		limbs[(int)limb].ParentJointEffector.positionWeight = 0f;
 
-//				//Enable collider for the hand that is being synced, no reason to hide it as it is now visible
-//				if (SetControllerCollider.Value)
-//					controllers[side].transform.Find("ControllerCollider").GetComponent<SphereCollider>().enabled = true;
-//			}
-//			else
-//			{
-//				if (limbs[(int)limb].AnchorObj)
-//					FixLimbToggle(limbs[(int)limb]);
+//		//		//Enable collider for the hand that is being synced, no reason to hide it as it is now visible
+//		//		if (SetControllerCollider.Value)
+//		//			controllers[side].transform.Find("ControllerCollider").GetComponent<SphereCollider>().enabled = true;
+//		//	}
+//		//	else
+//		//	{
+//		//		if (limbs[(int)limb].AnchorObj)
+//		//			FixLimbToggle(limbs[(int)limb]);
 
-//				if (GropeHandsDisplay.Value < HideHandMode.AlwaysShow)
-//					itemHands[(int)limb - 4].enabled = true;
+//		//		if (GropeHandsDisplay.Value < HideHandMode.AlwaysShow)
+//		//			itemHands[(int)limb - 4].enabled = true;
 
-//				foreach (SkinnedMeshRenderer mesh in controllers[side].transform.GetComponentsInChildren<SkinnedMeshRenderer>(true))
-//					mesh.enabled = true;
+//		//		foreach (SkinnedMeshRenderer mesh in controllers[side].transform.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+//		//			mesh.enabled = true;
 
-//				//Disable the collider if the controller model is currently hidden
-//				if (SetControllerCollider.Value && controllers[side].transform.Find("Model").gameObject.activeSelf == false)
-//					controllers[side].transform.Find("ControllerCollider").GetComponent<SphereCollider>().enabled = false;
-//			}
-//		}
+//		//		//Disable the collider if the controller model is currently hidden
+//		//		if (SetControllerCollider.Value && controllers[side].transform.Find("Model").gameObject.activeSelf == false)
+//		//			controllers[side].transform.Find("ControllerCollider").GetComponent<SphereCollider>().enabled = false;
+//		//	}
+//		//}
 //	}
 //}

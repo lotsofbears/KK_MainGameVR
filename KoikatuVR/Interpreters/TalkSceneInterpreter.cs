@@ -17,6 +17,7 @@ using KK_VR.Interpreters.Extras;
 using KK_VR.Handlers;
 using KK_VR.Features;
 using KK_VR.Camera;
+using KK_VR.Trackers;
 
 namespace KK_VR.Interpreters
 {
@@ -27,7 +28,7 @@ namespace KK_VR.Interpreters
         public static TalkScene talkScene;
         public static ADVScene advScene;
         internal static bool afterH;
-
+        private readonly List<HandHolder> _hands;
         private static HitReaction _hitReaction;
         private readonly static List<int> lstIKEffectLateUpdate = new List<int>();
         private static bool _lateHitReaction;
@@ -69,6 +70,7 @@ namespace KK_VR.Interpreters
             }
             advScene = Game.Instance.actScene.advScene;
             SetHeight();
+            _hands = HandHolder.GetHands();
         }
         private void SetHeight()
         {
@@ -93,7 +95,7 @@ namespace KK_VR.Interpreters
         //}
         public override void OnDisable()
         {
-            ModelHandler.DestroyHandlerComponent<TalkSceneHandler>();
+            HandHolder.DestroyHandlers();
             TalkSceneExtras.ReturnDirLight();
             VRMale.ForceShowHead = false;
         }
@@ -171,26 +173,25 @@ namespace KK_VR.Interpreters
             if (PlacePlayer(position, chara.transform.rotation * Quaternion.Euler(0f, 180f, 0f)))
                 VRMover.Instance.Impersonate(Game.Instance.actScene.Player.chaCtrl);
             //PlacePlayer(chara.transform.position + (chara.transform.forward * talkDistance), chara.transform.rotation * Quaternion.Euler(0f, 180f, 0f));
-            AddTalkColliders(chara);
-            AddHColliders(chara);
-            HitReactionInitialize(chara);
-
+            var charas = advScene.scenario.characters.GetComponentsInChildren<ChaControl>();
+            AddTalkColliders(charas);
+            AddHColliders(charas);
+            HitReactionInitialize(charas);
         }
         //public static void StartTalkScene(TalkScene scene)
         //{
         //    VRPlugin.Logger.LogDebug($"Interpreter:TalkScene:Start:TalkScene");
         //    TalkScene = scene;
         //}
-        private void HitReactionInitialize(ChaControl chara)
+        private void HitReactionInitialize(IEnumerable<ChaControl> charas)
         {
             if (_hitReaction == null)
             {
-                // ADV scene is turned off quite often, so we can't utilized native component.
+                // ADV scene is turned off quite often, so we can't utilized its native component.
                 _hitReaction = (HitReaction)Util.CopyComponent(advScene.GetComponent<HitReaction>(), Game.Instance.gameObject);
             }
-            _hitReaction.ik = chara.objAnim.GetComponent<FullBodyBipedIK>();
-            ColliderTracker.Initialize(chara, hScene: false);
-            ModelHandler.AddHandlerComponent<TalkSceneHandler>();
+            ControllerTracker.Initialize(charas);
+            HandHolder.UpdateHandlers<TalkSceneHandler>();
         }
         private void SynchronizeClothes(ChaControl chara)
         {
@@ -211,10 +212,7 @@ namespace KK_VR.Interpreters
             }
         }
         /// <param name="headset">Overrides index</param>
-        private TalkSceneHandler GetHandler(int index, bool headset = false)
-        {
-            return (TalkSceneHandler)ModelHandler.GetActiveHandler(headset ? 0 : index + 1);
-        }
+        private TalkSceneHandler GetHandler(int index) => (TalkSceneHandler)_hands[index].Handler;
         public static void HitReactionPlay(AibuColliderKind aibuKind, ChaControl chara)
         {
             VRPlugin.Logger.LogDebug($"TalkScene:Reaction:{aibuKind}:{chara}");
@@ -250,7 +248,7 @@ namespace KK_VR.Interpreters
             _waitTime[index] = duration;
             _waitTimestamp[index] = Time.time + duration;
         }
-        public override bool OnButtonDown(EVRButtonId buttonId, TrackpadDirection direction, int index)
+        public override bool OnButtonDown(int index, EVRButtonId buttonId, TrackpadDirection direction)
         {
             VRPlugin.Logger.LogDebug($"Interpreter:ButtonDown[{buttonId}]:Index[{index}]");
             switch (buttonId)
@@ -258,7 +256,7 @@ namespace KK_VR.Interpreters
                 case EVRButtonId.k_EButton_SteamVR_Trigger:
                     if (_hitReaction != null)
                     {
-                        GetHandler(index).DoReaction(triggerPress: true);
+                        GetHandler(index).TriggerPress();
                     }
                     _modifierList[index, 0]++;
                     break;
@@ -269,13 +267,13 @@ namespace KK_VR.Interpreters
                 case EVRButtonId.k_EButton_SteamVR_Touchpad:
                     if (_modifierList[index, 0] > 0)
                     {
-                        KoikatuInterpreter.Instance.ChangeModelItem(index + 1, increase: true);
+                        _hands[index].ChangeItem();
                     }
                     break;
             }
             return false;
         }
-        public override bool OnButtonUp(EVRButtonId buttonId, TrackpadDirection direction, int index)
+        public override void OnButtonUp(int index, EVRButtonId buttonId, TrackpadDirection direction)
         {
             switch (buttonId)
             {
@@ -286,9 +284,8 @@ namespace KK_VR.Interpreters
                     _modifierList[index, 1]--;
                     break;
             }
-            return false;
         }
-        public override bool OnDirectionDown(TrackpadDirection direction, int index)
+        public override bool OnDirectionDown(int index, TrackpadDirection direction)
         {
             VRPlugin.Logger.LogDebug($"Interpreter:DirDown[{direction}]:Index[{index}]");
             var adv = IsADV;
@@ -321,7 +318,7 @@ namespace KK_VR.Interpreters
                     //}
                     if (_modifierList[index, 0] > 0)
                     {
-                        KoikatuInterpreter.Instance.ChangeModelLayer(index + 1, direction == TrackpadDirection.Right);
+                        _hands[index].ChangeLayer(direction == TrackpadDirection.Right);
                     }
                     else
                     {
@@ -331,7 +328,7 @@ namespace KK_VR.Interpreters
             }
             return false;
         }
-        public override bool OnDirectionUp(TrackpadDirection direction, int index)
+        public override void OnDirectionUp(int index, TrackpadDirection direction)
         {
             VRPlugin.Logger.LogDebug($"Interpreter:DirUp[{direction}]:Index[{index}]");
             _waitForAction[index] = false;
@@ -350,7 +347,6 @@ namespace KK_VR.Interpreters
                     PickAction(Timing.Fraction, index);
                 }
             }
-            return false;
         }
         private void PickAction(Timing timing, int index)
         {
@@ -425,7 +421,11 @@ namespace KK_VR.Interpreters
             // An option to keep the head behind vr camera, allowing it to remain visible
             // so we don't see the shadow of a headless body.
 
-            PlacePlayer(headsetPos + (KoikatuInterpreter.settings.ForceShowMaleHeadInAdv ? gazeVec * 0.15f : Vector3.zero), reverseRot);
+            var charas = new List<ChaControl>() 
+            { 
+                chara, 
+                PlacePlayer(headsetPos + (_settings.ForceShowMaleHeadInAdv ? gazeVec * 0.15f : Vector3.zero), reverseRot) 
+            };
 
             var actScene = Game.Instance.actScene;
             var name = talkScene.targetHeroine.Name;
@@ -436,7 +436,11 @@ namespace KK_VR.Interpreters
                     // TODO Don't add/stop walking/running animation, and check why async cloth load hates us for this.
                     // It hates us always nowadays.
                     // Running: Sport5, Locomotion 0
-                    npc.SetActive(npc.mapNo == actScene.Map.no);
+                    if (npc.mapNo == actScene.Map.no)
+                    {
+                        npc.SetActive(true);
+                        charas.Add(chara);
+                    }
                     npc.Pause(false);
                     npc.charaData.SetRoot(npc.gameObject);
                     VRPlugin.Logger.LogDebug($"TalkScene:ExtraNPC:{npc.name}:{npc.motion.state}");
@@ -445,16 +449,16 @@ namespace KK_VR.Interpreters
             headsetPos.y = head.position.y;
             origin.rotation = reverseRot;
             origin.position += headsetPos - head.position;
-            AddHColliders(chara);
-            HitReactionInitialize(chara);
+            AddHColliders(charas);
+            HitReactionInitialize(charas);
             RepositionDirLight(chara);
         }
-        private bool PlacePlayer(Vector3 position, Quaternion rotation)
+        private ChaControl PlacePlayer(Vector3 position, Quaternion rotation)
         {
             if (Game.Instance.Player.chaCtrl == null)
             {
                 VRPlugin.Logger.LogDebug($"No player to place");
-                return false;
+                return null;
             }
             //if (talkScene == null)
             //{
@@ -464,7 +468,7 @@ namespace KK_VR.Interpreters
             if (player.chaCtrl.objTop.activeSelf)
             {
                 VRPlugin.Logger.LogDebug($"Player is already active");
-                return false;
+                return null;
             }
 
             player.SetActive(true);
@@ -476,7 +480,7 @@ namespace KK_VR.Interpreters
             //}
             player.position = position;
             VRPlugin.Logger.LogDebug($"Place player at:{player.position}:{player.eulerAngles}:{talkDistance}");
-            return true;
+            return player.chaCtrl;
         }
         //private void AdjustPosition()
         //{

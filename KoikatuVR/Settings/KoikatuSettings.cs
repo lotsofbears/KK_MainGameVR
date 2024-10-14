@@ -145,6 +145,10 @@ namespace KK_VR.Settings
         public HeadsetType HeadsetSpecifications { get; set; }
         public bool ForceShowMaleHeadInAdv { get; set; }
         public float RotAdaptSpeed { get; set; }
+        public bool DirectImpersonation { get; set; }
+        //public Color GuideObjectsColor { get; set; }
+        public bool AutoShowGuideObjects { get; set; }
+        public HandType HideHandOnUserInput { get; set; }
         public enum HeadsetType
         {
             None,
@@ -155,6 +159,13 @@ namespace KK_VR.Settings
             Disabled,
             Straight,
             Upright
+        }
+        public enum HandType
+        {
+            None,
+            ControllerItem,
+            CaressItem,
+            Both
         }
     }
 

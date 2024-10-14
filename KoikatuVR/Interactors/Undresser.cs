@@ -8,14 +8,14 @@ using HarmonyLib;
 
 using static ChaFileDefine;
 using KK_VR.Fixes;
-using static KK_VR.Handlers.ColliderTracker;
 using static KK_VR.Features.LoadVoice;
 using KK_VR.Controls;
 using KK_VR.Features;
+using static KK_VR.Trackers.Tracker;
 
-namespace KK_VR.Handlers
+namespace KK_VR.Interactors
 {
-    static class ClothesHandler
+    static class Undresser
     {
         public static bool IsBodyPartClothed(ChaControl chara, Body part)
         {
@@ -44,7 +44,8 @@ namespace KK_VR.Handlers
                 case Body.Groin:
                 case Body.Asoko:
                     return new int[] { 1, 3, 5 };
-                case Body.Thigh:
+                case Body.ThighL:
+                case Body.ThighR:
                 case Body.LegL:
                 case Body.LegR:
                     return new int[] { 5, 6 };
@@ -52,9 +53,24 @@ namespace KK_VR.Handlers
                     return null;
             }
         }
-        public static bool Undress(ChaControl chara, Body part, bool decrease)
+        private static Body ConvertToUndress(Body body)
         {
-
+            return body switch
+            {
+                Body.Head => Body.None,
+                Body.HandR => Body.HandL,
+                Body.ArmR => Body.ArmL,
+                Body.MuneR => Body.MuneL,
+                Body.Groin => Body.Asoko,
+                Body.ThighR => Body.ThighL,
+                Body.ForearmL => Body.ArmL,
+                Body.ForearmR => Body.ArmL,
+                _ => body
+            };
+        }
+        public static bool Undress(Body part, ChaControl chara, bool decrease)
+        {
+            part = ConvertToUndress(part);
             //if (part == InteractionBodyPart.Crotch && IsWearingSkirt(female))
             //{
             //    //VRLog.Debug($"WearingSkirt");
@@ -168,7 +184,7 @@ namespace KK_VR.Handlers
                 }
             },
             {
-                Body.Thigh, new List<SlotState>
+                Body.ThighL, new List<SlotState>
                 {
                     new SlotState { slot = 5, state = 0 },
                     new SlotState { slot = 6, state = 0 },
@@ -250,7 +266,7 @@ namespace KK_VR.Handlers
                 }
             },
             {
-                Body.Thigh, new List<SlotState>
+                Body.ThighL, new List<SlotState>
                 {
                     new SlotState { slot = 5, state = 1 },
                     new SlotState { slot = 5, state = 0 },

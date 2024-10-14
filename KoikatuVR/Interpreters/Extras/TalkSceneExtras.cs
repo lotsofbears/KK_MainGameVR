@@ -56,36 +56,59 @@ namespace KK_VR.Interpreters.Extras
             VRPlugin.Logger.LogDebug($"ReturnDirLight:{KoikatuInterpreter.CurrentScene}");
             _dirLight.SetParent(_oldParent, false);
         }
-        internal static void AddTalkColliders(ChaControl chara)
+        private static readonly string[,] _talkCollidersArray =
         {
-            string[,] array = new string[3, 3];
-            array[0, 0] = "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_L/cf_j_shoulder_L/cf_j_arm00_L/cf_j_forearm01_L/cf_j_hand_L";
-            array[0, 1] = "communication/hit_00.unity3d";
-            array[0, 2] = "com_hit_hand_L";
-            array[1, 0] = "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_R/cf_j_shoulder_R/cf_j_arm00_R/cf_j_forearm01_R/cf_j_hand_R";
-            array[1, 1] = "communication/hit_00.unity3d";
-            array[1, 2] = "com_hit_hand_R";
-            array[2, 0] = "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_j_neck/cf_j_head";
-            array[2, 1] = "communication/hit_00.unity3d";
-            array[2, 2] = "com_hit_head";
-
-            var chaForm = chara.objBodyBone.transform;
-            for (var i = 0; i < 3; i++)
             {
-                var target = chaForm.Find(array[i, 0]);
-                if (target.Find(array[i, 2]) == null)
+                "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_L/cf_j_shoulder_L/cf_j_arm00_L/cf_j_forearm01_L/cf_j_hand_L",
+                "communication/hit_00.unity3d",
+                "com_hit_hand_L"
+            },
+            {
+                "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_R/cf_j_shoulder_R/cf_j_arm00_R/cf_j_forearm01_R/cf_j_hand_R",
+                "communication/hit_00.unity3d",
+                "com_hit_hand_R"
+            },
+            {
+                "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_j_neck/cf_j_head",
+                "communication/hit_00.unity3d",
+                "com_hit_head"
+            }
+        };
+        internal static void AddTalkColliders(IEnumerable<ChaControl> charas)
+        {
+            // From DNSpy.
+
+            //string[,] array = new string[3, 3];
+            //array[0, 0] = "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_L/cf_j_shoulder_L/cf_j_arm00_L/cf_j_forearm01_L/cf_j_hand_L";
+            //array[0, 1] = "communication/hit_00.unity3d";
+            //array[0, 2] = "com_hit_hand_L";
+            //array[1, 0] = "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_R/cf_j_shoulder_R/cf_j_arm00_R/cf_j_forearm01_R/cf_j_hand_R";
+            //array[1, 1] = "communication/hit_00.unity3d";
+            //array[1, 2] = "com_hit_hand_R";
+            //array[2, 0] = "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_j_neck/cf_j_head";
+            //array[2, 1] = "communication/hit_00.unity3d";
+            //array[2, 2] = "com_hit_head";
+            foreach (var chara in charas)
+            {
+                if (chara == null) continue;
+                for (var i = 0; i < 3; i++)
                 {
-                    var collider = CommonLib.LoadAsset<GameObject>(array[i, 1], array[i, 2], true, string.Empty);
-                    collider.transform.SetParent(target, false);
-                    VRPlugin.Logger.LogDebug($"Extras:Colliders:Talk:Add:{target.name}");
-                }
-                else
-                {
-                    VRPlugin.Logger.LogDebug($"Extras:Colliders:Talk:AlreadyHaveOne:{target.name}");
+                    var target = chara.objBodyBone.transform.Find(_talkCollidersArray[i, 0]);
+                    if (target.Find(_talkCollidersArray[i, 2]) == null)
+                    {
+                        var collider = CommonLib.LoadAsset<GameObject>(_talkCollidersArray[i, 1], _talkCollidersArray[i, 2], true, string.Empty);
+                        collider.transform.SetParent(target, false);
+                        //VRPlugin.Logger.LogDebug($"Extras:Colliders:Talk:Add:{target.name}");
+                    }
+                    //else
+                    //{
+                    //    VRPlugin.Logger.LogDebug($"Extras:Colliders:Talk:AlreadyHaveOne:{target.name}");
+                    //}
                 }
             }
+            
         }
-        internal static void AddHColliders(ChaControl chaCtrl)
+        internal static void AddHColliders(IEnumerable<ChaControl> charas)
         {
             var _strAssetFolderPath = "h/list/";
             var _file = "parent_object_base_female";
@@ -95,49 +118,54 @@ namespace KK_VR.Interpreters.Extras
             GlobalMethod.GetListString(text, out var array);
             var length = array.GetLength(0);
             var length2 = array.GetLength(1);
-            for (int i = 0; i < length; i++)
+            foreach (var chara in charas)
             {
-                for (int j = 0; j < length2; j += 3)
+                if (chara == null) continue;
+                for (int i = 0; i < length; i++)
                 {
-                    var parentName = array[i, j];
-                    var assetName = array[i, j + 1];
-                    var colliderName = array[i, j + 2];
-                    if (parentName.IsNullOrEmpty() && assetName.IsNullOrEmpty() && colliderName.IsNullOrEmpty())
+                    for (int j = 0; j < length2; j += 3)
                     {
-                        break;
+                        var parentName = array[i, j];
+                        var assetName = array[i, j + 1];
+                        var colliderName = array[i, j + 2];
+                        if (parentName.IsNullOrEmpty() && assetName.IsNullOrEmpty() && colliderName.IsNullOrEmpty())
+                        {
+                            break;
+                        }
+                        var parent = chara.objBodyBone.transform.FindLoop(parentName);
+                        if (parent.transform.Find(colliderName) != null)
+                        {
+                            //VRPlugin.Logger.LogDebug($"Extras:Colliders:H:AlreadyHaveOne:{colliderName}");
+                            continue;
+                        }
+                        //else
+                        //{
+                        //    VRPlugin.Logger.LogDebug($"Extras:Colliders:H:Add:{colliderName}");
+                        //}
+                        var collider = CommonLib.LoadAsset<GameObject>(assetName, colliderName, true, string.Empty);
+                        AssetBundleManager.UnloadAssetBundle(assetName, true, null, false);
+                        var componentsInChildren = collider.GetComponentsInChildren<EliminateScale>(true);
+                        foreach (var eliminateScale in componentsInChildren)
+                        {
+                            eliminateScale.chaCtrl = chara;
+                        }
+                        if (parent != null && collider != null)
+                        {
+                            collider.transform.SetParent(parent.transform, false);
+                        }
+                        //if (!this.dicObject.ContainsKey(text4))
+                        //{
+                        //    this.dicObject.Add(text4, gameObject2);
+                        //}
+                        //else
+                        //{
+                        //    UnityEngine.Object.Destroy(this.dicObject[text4]);
+                        //    this.dicObject[text4] = gameObject2;
+                        //}
                     }
-                    var parent = chaCtrl.objBodyBone.transform.FindLoop(parentName);
-                    if (parent.transform.Find(colliderName) != null)
-                    {
-                        VRPlugin.Logger.LogDebug($"Extras:Colliders:H:AlreadyHaveOne:{colliderName}");
-                        continue;
-                    }
-                    else
-                    {
-                        VRPlugin.Logger.LogDebug($"Extras:Colliders:H:Add:{colliderName}");
-                    }
-                    var collider = CommonLib.LoadAsset<GameObject>(assetName, colliderName, true, string.Empty);
-                    AssetBundleManager.UnloadAssetBundle(assetName, true, null, false);
-                    var componentsInChildren = collider.GetComponentsInChildren<EliminateScale>(true);
-                    foreach (var eliminateScale in componentsInChildren)
-                    {
-                        eliminateScale.chaCtrl = chaCtrl;
-                    }
-                    if (parent != null && collider != null)
-                    {
-                        collider.transform.SetParent(parent.transform, false);
-                    }
-                    //if (!this.dicObject.ContainsKey(text4))
-                    //{
-                    //    this.dicObject.Add(text4, gameObject2);
-                    //}
-                    //else
-                    //{
-                    //    UnityEngine.Object.Destroy(this.dicObject[text4]);
-                    //    this.dicObject[text4] = gameObject2;
-                    //}
                 }
             }
+            
         }
 
         internal static Dictionary<int, ReactionInfo> dicNowReactions = new Dictionary<int, ReactionInfo>

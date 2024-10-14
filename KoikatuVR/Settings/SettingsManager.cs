@@ -30,9 +30,10 @@ namespace KK_VR.Settings
     {
         public const string SectionGeneral = "0. General";
         public const string SectionRoaming = "1. Roaming";
-        public const string SectionCaress = "1. Caress";
+        public const string SectionH = "1. Caress";
         public const string SectionEventScenes = "1. Event scenes";
         public const string SectionPov = "4. Pov";
+        public const string SectionIK = "5. IK";
 
 
         public static ConfigEntry<bool> EnableBoop { get; private set; }
@@ -150,19 +151,19 @@ namespace KK_VR.Settings
                 "Improve framerate and reduce stutter in H and Talk scenes inside Roaming. May cause visual glitches.");
             Tie(optimizeHInsideRoaming, v => settings.OptimizeHInsideRoaming = v);
 
-            var automaticTouching = config.Bind(SectionCaress, "Automatic touching", KoikatuSettings.SceneType.TalkScene,
+            var automaticTouching = config.Bind(SectionH, "Automatic touching", KoikatuSettings.SceneType.TalkScene,
                 "Touching the female's body with controllers triggers reaction");
             Tie(automaticTouching, v => settings.AutomaticTouching = v);
 
-            var automaticKissing = config.Bind(SectionCaress, "Automatic kissing", true,
+            var automaticKissing = config.Bind(SectionH, "Automatic kissing", true,
                 "Initiate kissing by moving your head");
             Tie(automaticKissing, v => settings.AutomaticKissing = v);
 
-            var automaticLicking = config.Bind(SectionCaress, "Automatic licking", true,
+            var automaticLicking = config.Bind(SectionH, "Automatic licking", true,
                 "Initiate licking by moving your head");
             Tie(automaticLicking, v => settings.AutomaticLicking = v);
 
-            var automaticTouchingByHmd = config.Bind(SectionCaress, "Kiss body", true,
+            var automaticTouchingByHmd = config.Bind(SectionH, "Kiss body", true,
                 "Touch the female's body by moving your head");
             Tie(automaticTouchingByHmd, v => settings.AutomaticTouchingByHeadset = v);
 
@@ -218,11 +219,11 @@ namespace KK_VR.Settings
                     new AcceptableValueRange<float>(0f, 1f)));
             Tie(rotationStartThreshold, v => settings.RotationStartThreshold = v);
 
-            var flyInH = config.Bind(SectionCaress, "Transition H", true,
+            var flyInH = config.Bind(SectionH, "Transition H", true,
                 "On position (or location) change, instead of teleportation, transition smoothly to the new location.");
             Tie(flyInH, v => settings.FlyInH = v);
 
-            var flightSpeed = config.Bind(SectionCaress, "Transition H speed", 1f,
+            var flightSpeed = config.Bind(SectionH, "Transition H speed", 1f,
                 new ConfigDescription(
                     "Speed of progressive movement of the camera.",
                     new AcceptableValueRange<float>(0.1f, 2f)));
@@ -238,8 +239,19 @@ namespace KK_VR.Settings
                     "Enable continuous rotation of camera in roaming mode instead of snap turn. Influenced by setting 'Rotation angle'.");
             Tie(contRot, v => settings.ContinuousRotation = v);
 
+            var directImpersonation = config.Bind(SectionPov, "DirectImpersonation", false,
+                    "");
+            Tie(directImpersonation, v => settings.DirectImpersonation = v);
 
-            var proximityKiss = config.Bind(SectionCaress, "Kiss proximity", 0.1f,
+            var autoShowGuideObjects = config.Bind(SectionIK, "AutoShowGuideObjects", true,
+                    "");
+            Tie(autoShowGuideObjects, v => settings.AutoShowGuideObjects = v);
+
+            var hideAibuHandOnUserInput = config.Bind(SectionH, "HideAibuHandOnUserInput", KoikatuSettings.HandType.Both,
+                    "");
+            Tie(hideAibuHandOnUserInput, v => settings.HideHandOnUserInput = v);
+
+            var proximityKiss = config.Bind(SectionH, "Kiss proximity", 0.1f,
                 new ConfigDescription(
                     "Distance between camera and partner's head during assisted kiss.",
                     new AcceptableValueRange<float>(0.05f, 0.15f)));

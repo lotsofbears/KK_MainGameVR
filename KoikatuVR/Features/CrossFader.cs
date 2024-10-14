@@ -34,6 +34,7 @@ namespace KK_VR.Features
     /// </summary>
     public static class CrossFader
     {
+        // Only H applicable, IKHandler has it's own personal for any mode.
         public static bool IsInTransition => _inTransition;
         private static bool _inTransition;
         public enum CrossFaderMode
@@ -203,7 +204,7 @@ namespace KK_VR.Features
             #endregion
 
             #region Fix cross fading not working properly because game constantly reloads the runtimeAnimatorController in ADV, resulting in the start animation being lost and replaced by some other animation
-            private static bool _talkScene;
+            //private static bool _talkScene;
             private static readonly Dictionary<RuntimeAnimatorController, string> _AnimationControllerLookup = new Dictionary<RuntimeAnimatorController, string>();
             [HarmonyPrefix]
             [HarmonyWrapSafe]
@@ -235,7 +236,7 @@ namespace KK_VR.Features
                     var newHash = __instance.bundle + "|" + __instance.asset;
                     if (newHash == hash)
                     {
-                        VRPlugin.Logger.LogDebug($"Skipping loading already loaded animator controller from [{newHash}] on [{animator.GetFullPath()}]");
+                        //VRPlugin.Logger.LogDebug($"Skipping loading already loaded animator controller from [{newHash}] on [{animator.GetFullPath()}]");
                         return false;
                     }
                     else _AnimationControllerLookup.Remove(animatorController);
@@ -256,48 +257,41 @@ namespace KK_VR.Features
                     _AnimationControllerLookup.Add(animator.runtimeAnimatorController, newHash);
                 }
             }
-            [HarmonyPostfix]
-            [HarmonyWrapSafe]
-            [HarmonyPatch(typeof(TalkScene), nameof(TalkScene.TouchFunc))]
-            public static void TalkSceneTouchFuncPostfix()
-            {
-                VRPlugin.Logger.LogDebug($"CrossFader:TalkScene:TouchFunc");
-            }
-            public static Dictionary<int, Dictionary<string, string[]>> ModDicPoseChara;
-            public static Dictionary<int, Dictionary<string, string[]>> OriginalDicPoseChara;
-            private static void SwapDic()
-            {
-                // Once setting is in, mod all charas in question.
-                // No need to revert anything then.
-                if (ModDicPoseChara.Count == 0)
-                {
-                    ModDicPoseChara = Communication.instance.dicPoseChara.DeepCopy();
-                    VRPlugin.Logger.LogDebug($"CrossFader:DicSwap:Cold");
-                }
-                else
-                {
-                    VRPlugin.Logger.LogDebug($"CrossFader:DicSwap:Hot");
-                }
-                OriginalDicPoseChara = Communication.instance.dicPoseChara;
-                var index = Object.FindObjectOfType<TalkScene>().targetHeroine.FixCharaIDOrPersonality;
-                var rand = Random.Range(0, 30).ToString();
-                if (rand.Count() == 1)
-                {
-                    rand = "0" + rand;
-                }
-                var kv = ModDicPoseChara[index].Values.ElementAt(0);
-                var kv2 = ModDicPoseChara[index].Values.ElementAt(ModDicPoseChara[index].Count - 1);
-                kv[0] = kv2[0] = "adv/motion/controller/adv/00.unity3d";
-                kv[1] = kv[4] = kv2[1] = kv2[4] = "cf_adv_00_00";
-                kv[2] = kv2[2] = "Stand_" + rand + "_00";
-                kv[3] = kv2[3] = "adv/motion/iklist/00.unity3d";
-                Communication.instance.dicPoseChara = ModDicPoseChara;
-            }
-            private static void RevertDic()
-            {
-                VRPlugin.Logger.LogDebug($"CrossFader:DicRevert");
-                Communication.instance.dicPoseChara = OriginalDicPoseChara;
-            }
+            //public static Dictionary<int, Dictionary<string, string[]>> ModDicPoseChara;
+            //public static Dictionary<int, Dictionary<string, string[]>> OriginalDicPoseChara;
+            //private static void SwapDic()
+            //{
+            //    // Once setting is in, mod all charas in question.
+            //    // No need to revert anything then.
+            //    if (ModDicPoseChara.Count == 0)
+            //    {
+            //        ModDicPoseChara = Communication.instance.dicPoseChara.DeepCopy();
+            //        VRPlugin.Logger.LogDebug($"CrossFader:DicSwap:Cold");
+            //    }
+            //    else
+            //    {
+            //        VRPlugin.Logger.LogDebug($"CrossFader:DicSwap:Hot");
+            //    }
+            //    OriginalDicPoseChara = Communication.instance.dicPoseChara;
+            //    var index = Object.FindObjectOfType<TalkScene>().targetHeroine.FixCharaIDOrPersonality;
+            //    var rand = Random.Range(0, 30).ToString();
+            //    if (rand.Count() == 1)
+            //    {
+            //        rand = "0" + rand;
+            //    }
+            //    var kv = ModDicPoseChara[index].Values.ElementAt(0);
+            //    var kv2 = ModDicPoseChara[index].Values.ElementAt(ModDicPoseChara[index].Count - 1);
+            //    kv[0] = kv2[0] = "adv/motion/controller/adv/00.unity3d";
+            //    kv[1] = kv[4] = kv2[1] = kv2[4] = "cf_adv_00_00";
+            //    kv[2] = kv2[2] = "Stand_" + rand + "_00";
+            //    kv[3] = kv2[3] = "adv/motion/iklist/00.unity3d";
+            //    Communication.instance.dicPoseChara = ModDicPoseChara;
+            //}
+            //private static void RevertDic()
+            //{
+            //    VRPlugin.Logger.LogDebug($"CrossFader:DicRevert");
+            //    Communication.instance.dicPoseChara = OriginalDicPoseChara;
+            //}
             #endregion
         }
 

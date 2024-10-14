@@ -209,32 +209,32 @@
 ////		}
 
 
-//		public enum ParentMode
-//		{
-//			PositionOnly,
-//			PositionAndAnimation,
-//			AnimationOnly
-//		}
+//public enum ParentMode
+//{
+//	PositionOnly,
+//	PositionAndAnimation,
+//	AnimationOnly
+//}
 
-//		public enum ControllerAnimMode
-//		{
-//			SetParentController,
-//			OtherController,
-//			BothControllers
-//		}
+//public enum ControllerAnimMode
+//{
+//	SetParentController,
+//	OtherController,
+//	BothControllers
+//}
 
-//		public enum BodyPart
-//		{
-//			Ass,
-//			Torso,
-//			Head
-//		}
+//public enum BodyPart
+//{
+//	Ass,
+//	Torso,
+//	Head
+//}
 
-//		public enum HideHandMode
-//		{
-//			AlwaysHide,
-//			Auto,
-//			AlwaysShow
-//		}
+//public enum HideHandMode
+//{
+//	AlwaysHide,
+//	Auto,
+//	AlwaysShow
+//}
 //	}
 //}

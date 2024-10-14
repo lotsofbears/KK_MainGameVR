@@ -20,7 +20,7 @@ namespace KK_VR
             get
             {
                 return new[] { 
-                    typeof(Controls.KoikatuMenuTool), 
+                    //typeof(Controls.KoikatuMenuTool), 
                     //typeof(Controls.KoikatuWarpTool), 
                     typeof(Controls.SchoolTool)};
             }
@@ -43,7 +43,7 @@ namespace KK_VR
             //return AddComponents(base.CreateLeftController());
 
             var controller = AddComponents(base.CreateLeftController());
-            controller.ToolIndex = 1;
+            controller.ToolIndex = 0;
             return controller;
         }
 

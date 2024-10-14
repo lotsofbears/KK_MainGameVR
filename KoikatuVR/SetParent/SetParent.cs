@@ -18,7 +18,7 @@
 //		const int SmoothBuffer = 20;
 //		private Transform cameraEye;
 
-//        public void Init(HSprite _hsprite, List<MotionIK> _lstMotionIK)
+//		public void Init(HSprite _hsprite, List<MotionIK> _lstMotionIK)
 //		{
 //			hSprite = _hsprite;
 //			lstMotionIK = _lstMotionIK;
@@ -48,7 +48,7 @@
 //			//	steamVRDevices[side] = f_device.GetValue(viveControllers[side]) as SteamVR_Controller.Device;
 //			//}
 
-//			itemHands[0] = VR.Mode.Left. Traverse.Create(controllers[Side.Left].transform.Find("Model/p_handL").GetComponent<VRHandCtrl>()).Field("dicItem").GetValue<Dictionary<int, VRHandCtrl.AibuItem>>()[0].objBody.GetComponent<SkinnedMeshRenderer>();
+//			itemHands[0] = VR.Mode.Left.Traverse.Create(controllers[Side.Left].transform.Find("Model/p_handL").GetComponent<VRHandCtrl>()).Field("dicItem").GetValue<Dictionary<int, VRHandCtrl.AibuItem>>()[0].objBody.GetComponent<SkinnedMeshRenderer>();
 //			itemHands[1] = Traverse.Create(controllers[Side.Right].transform.Find("Model/p_handR").GetComponent<VRHandCtrl>()).Field("dicItem").GetValue<Dictionary<int, VRHandCtrl.AibuItem>>()[0].objBody.GetComponent<SkinnedMeshRenderer>();
 
 //			male = HSceneInterpreter.male;
@@ -217,7 +217,6 @@
 //		public void LateUpdate()
 //		{
 //			// We'll have to handle differently, as we won't be limiting ourselves to one target.
-
 //			//if (!femaleExists)
 //			//{
 //			//	if (obj_chaF_001 == null)
@@ -230,7 +229,6 @@
 
 
 //			// VRGIN takes care of it.
-
 //			////Controllers may be inactive while game is running, the below code will attempt to find and assign left and right steamVR devices every frame if they are null
 //			//foreach (Side side in (Side[])Enum.GetValues(typeof(Side)))
 //			//{
@@ -241,7 +239,6 @@
 
 //			// I have absolute disdain for random canvases floating around in VR.
 //			// No intention to touch it.
-
 //			//Initiate canvas if it's null
 //			//if (objRightMenuCanvas == null)
 //			//	InitCanvas();
@@ -261,7 +258,6 @@
 //			//	{
 //			//		hideCount = 0f;
 //			//	}
-
 //			////Make floating menu follow and rotate around female
 //			//Vector3 point = femaleAim.transform.position - cameraEye.transform.position;
 //			//point.y = 0f;
@@ -270,12 +266,10 @@
 //			//objRightMenuCanvas.transform.forward = (objRightMenuCanvas.transform.position - cameraEye.transform.position).normalized;
 //			//objLeftMenuCanvas.transform.position = new Vector3(femaleAim.transform.position.x, cameraEye.transform.position.y, femaleAim.transform.position.z) + Quaternion.Euler(0f, -90f, 0f) * point * 0.4f;
 //			//objLeftMenuCanvas.transform.forward = (objLeftMenuCanvas.transform.position - cameraEye.transform.position).normalized;
-
 //			//When SetParent is active, display the menu regardless of being hidden when user brings controller within set distance to the headset
 //			//if (setFlag)
 //			//{
 //			//	Vector3 vector = cameraEye.transform.position - ParentSideController(oppositeSide: true).transform.position; ;
-
 //			//	if (vector.magnitude <= MenuUpProximity.Value)
 //			//	{
 //			//		objRightMenuCanvas.SetActive(true);

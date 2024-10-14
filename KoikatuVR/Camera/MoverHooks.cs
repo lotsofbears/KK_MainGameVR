@@ -11,6 +11,7 @@ using KK_VR.Settings;
 using KK_VR.Features;
 using KK_VR.Caress;
 using KK_VR.Interpreters;
+using KK_VR.Interactors;
 
 // This file is a collection of hooks to move the VR camera at appropriate
 // points of the game.
@@ -111,7 +112,9 @@ namespace KK_VR.Camera
                 VRMouth.Instance.OnPositionChange(_nextAinmInfo);
             }
             UpdateVRCamera(__instance, ___lstFemale, null);
-            HSceneInterpreter.OnPoseChange(_nextAinmInfo);
+            if (KoikatuInterpreter.SceneInterpreter is HSceneInterpreter hScene)
+                hScene.OnPoseChange(_nextAinmInfo);
+
         }
 
         //[HarmonyPatch("ChangeCategory")]

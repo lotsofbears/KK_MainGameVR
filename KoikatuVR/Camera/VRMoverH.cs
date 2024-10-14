@@ -29,14 +29,12 @@ namespace KK_VR.Camera
         private Transform _eyes;
         private Transform _torso;
         private Transform _kokan;
-        private PoV _pov;
         //private List<Coroutine> _activeCoroutines = new List<Coroutine>();
         internal KoikatuSettings _settings;
 
         public void Initialize()
         {
             Instance = this;
-            _pov = PoV.Instance;
             var chara = HSceneInterpreter.lstFemale[0];
             _chara = chara.transform;
             _eyes = chara.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz/cf_J_Eye_tz");
@@ -48,9 +46,9 @@ namespace KK_VR.Camera
         {
             //VRPlugin.Logger.LogDebug("VRMoverH:MoveToInH");
             StopAllCoroutines();
-            if (_pov != null && (_pov.Active || (_settings.AutoEnterPov && actionChange)))
+            if (PoV.Active || (_settings.AutoEnterPov && actionChange))
             {
-                _pov.DisablePov(teleport: false);
+                PoV.Instance.DisablePov(teleport: false);
                 if (mode != HFlag.EMode.aibu)
                 {
                     StartCoroutine(FlyToPov());
@@ -156,7 +154,7 @@ namespace KK_VR.Camera
             //    }
             //}
             //VRPlugin.Logger.LogDebug($"VRMoverH:FlyToPov:Done");
-            _pov.StartPov();
+            PoV.Instance.StartPov();
         }
         private IEnumerator FlyToPosition(Vector3 position, Quaternion rotation)
         {

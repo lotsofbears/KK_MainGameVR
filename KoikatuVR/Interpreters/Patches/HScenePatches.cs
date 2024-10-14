@@ -21,7 +21,8 @@ namespace KK_VR.Interpreters.Patches
         private static float _timeStamp;
         private static bool _fakeDislike;
 
-        [HarmonyPrefix, HarmonyPatch(typeof(HAibu), nameof(HAibu.SetIdleForItem))]
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(HAibu), nameof(HAibu.SetIdleForItem))]
         public static void SetIdleForItemPrefix(ref bool _setplay, HAibu __instance)
         {
             if (suppressSetIdle)
@@ -151,18 +152,5 @@ namespace KK_VR.Interpreters.Patches
                 yield return code;
             }
         }
-        //[HarmonyPrefix, HarmonyPatch(typeof(HVoiceCtrl), nameof(HVoiceCtrl.GetStateSelect))]
-        //public static bool GetStateSelectPrefix(int __result, HVoiceCtrl __instance)
-        //{
-        //    VRPlugin.Logger.LogDebug("HVoiceProc");
-        //    if (_fakeDislike && __instance.flags.nowAnimStateName.EndsWith("Dislikes",StringComparison.Ordinal))
-        //    {
-        //        VRPlugin.Logger.LogDebug("HVoiceProc:Fake");
-        //        _fakeDislike = false;
-        //        __result = 0;
-        //        return false;
-        //    }
-        //    return true;
-        //}
     }
 }

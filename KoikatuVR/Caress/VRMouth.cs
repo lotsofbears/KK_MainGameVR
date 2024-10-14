@@ -57,7 +57,7 @@ namespace KK_VR.Caress
         private ChaControl _chara;
         private KoikatuSettings _settings;
         private VRMouthColliderObject _small;//, _large;
-        private ColliderTracker _tracker;
+        //private Trackers _tracker;
         private CaressHelper _helper;
         //private readonly LongDistanceKissMachine _machine = new LongDistanceKissMachine();
 
@@ -70,7 +70,7 @@ namespace KK_VR.Caress
         private float _kissAttemptChance;
         private float _kissAttemptTimestamp;
 
-        public static bool IsAction => _kissCoShouldEnd == false || _lickCoShouldEnd == false;
+        public static bool IsActive => _kissCoShouldEnd == false || _lickCoShouldEnd == false;
         public static bool IsKiss => _kissCoShouldEnd == false;
         public static bool IsLick => _lickCoShouldEnd == false;
 
@@ -92,7 +92,7 @@ namespace KK_VR.Caress
             //var type = AccessTools.TypeByName("KK_SensibleH.Caress.MoMiController");
             _helper = this.gameObject.AddComponent<CaressHelper>();
             _helper.Initialize();
-            _tracker = new ColliderTracker();
+            //_tracker = new ColliderTracker();
 
             // Too far gone for compatibility without it.
             //if (_sensibleH)
@@ -152,6 +152,10 @@ namespace KK_VR.Caress
                 return true;
             }
             return false;
+        }
+        internal void OnControllerLock(bool isLock)
+        {
+            NoActionAllowed = isLock;
         }
         private void SetAttemptTimestamp(float modifier = 1f)
         {
@@ -244,18 +248,17 @@ namespace KK_VR.Caress
 
         private void HandleTriggerEnter(Collider other)
         {
-            if (_tracker.AddCollider(other) && !NoActionAllowed)// || _helper.IsEndKissCo))
-            {
-                var suggestedKinds = _tracker.GetSuggestedKinds();
-                if (suggestedKinds[1] != AibuColliderKind.none)
-                {
-                    StartKissLick(suggestedKinds[1]);
-                }
-                //else if (shouldReact && _settings.AutomaticTouchingByHeadset)
-                //{
-                //    handCtrl.Reaction(colliderKind[0]);
-                //}
-            }
+            //if (_tracker.AddCollider(other) && !NoActionAllowed && _tracker.colliderInfo.chara == _chara)// || _helper.IsEndKissCo))
+            //{
+            //    if (_tracker.colliderInfo.behavior.touch != AibuColliderKind.none)
+            //    {
+            //        StartKissLick(_tracker.colliderInfo.behavior.touch);
+            //    }
+            //    //else if (shouldReact && _settings.AutomaticTouchingByHeadset)
+            //    //{
+            //    //    handCtrl.Reaction(colliderKind[0]);
+            //    //}
+            //}
         }
         //private AibuColliderKind[] UpdateSelectKindTouch()
         //{
@@ -265,11 +268,11 @@ namespace KK_VR.Caress
         //}
         private void HandleTriggerExit(Collider other)
         {
-            _tracker.RemoveCollider(other);
-            //if (_tracker.RemoveCollider(other))
-            //{
-            //    UpdateSelectKindTouch();
-            //}
+            //_tracker.RemoveCollider(other);
+            ////if (_tracker.RemoveCollider(other))
+            ////{
+            ////    UpdateSelectKindTouch();
+            ////}
             
         }
         private void StartKissLick(AibuColliderKind colliderKind)

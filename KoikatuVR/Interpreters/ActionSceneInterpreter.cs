@@ -54,7 +54,7 @@ namespace KK_VR.Interpreters
             HoldCamera();
             //var height = VR.Camera.Head.position.y - actionScene.Player.chaCtrl.transform.position.y;
             //VRPlugin.Logger.LogWarning($"Interpreter:Action:Start:{height}");
-            _handlers = AddControllerComponent<ActionSceneHandler>();
+            //_handlers = AddControllerComponent<ActionSceneHandler>();
             //_modelHandler = new ModelHandler();
             //ModelHandler.SetHandColor(Game.Instance.actScene.Player.chaCtrl);
         }
@@ -96,7 +96,7 @@ namespace KK_VR.Interpreters
             UpdateCrouch();
         }
         private readonly bool[] _mouseState = new bool[3];
-        public override bool OnDirectionDown(TrackpadDirection direction, int index)
+        public override bool OnDirectionDown(int index, TrackpadDirection direction)
         {
             _lastDirection = direction;
             switch (direction)
@@ -135,7 +135,7 @@ namespace KK_VR.Interpreters
             }
             return false;
         }
-        public override bool OnDirectionUp(TrackpadDirection direction, int index)
+        public override void OnDirectionUp(int index, TrackpadDirection direction)
         {
             StopRotation();
             if (_mouseState[0])
@@ -153,10 +153,8 @@ namespace KK_VR.Interpreters
                 VR.Input.Mouse.MiddleButtonUp();
                 _mouseState[2] = false;
             }
-
-            return false;
         }
-        public override bool OnButtonDown(EVRButtonId buttonId, TrackpadDirection direction, int index)
+        public override bool OnButtonDown(int index, EVRButtonId buttonId, TrackpadDirection direction)
         {
             switch (buttonId)
             {
@@ -170,7 +168,7 @@ namespace KK_VR.Interpreters
             EvaluateModifiers();
             return false;
         }
-        public override bool OnButtonUp(EVRButtonId buttonId, TrackpadDirection direction, int index)
+        public override void OnButtonUp(int index, EVRButtonId buttonId, TrackpadDirection direction)
         {
 
             switch (buttonId)
@@ -181,7 +179,6 @@ namespace KK_VR.Interpreters
             }
             EvaluateModifiers();
             StandUp();
-            return false;
         }
         private void StartStride()
         {

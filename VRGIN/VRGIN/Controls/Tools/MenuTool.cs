@@ -35,8 +35,6 @@ namespace VRGIN.Controls.Tools
                 Gui = quad;
                 //Gui.transform.parent = transform;
                 Gui.transform.SetParent(transform, worldPositionStays: true);
-                //Gui.transform.localPosition = new Vector3(0, 0.05f, -0.06f);
-                //Gui.transform.localRotation = Quaternion.Euler(90, 0, 0);
 
                 quad.IsOwned = true;
             }
@@ -148,7 +146,7 @@ namespace VRGIN.Controls.Tools
             //    // We can only move by integral number of pixels, so accumulate them until we have an integral value
             //    _DeltaX += (diff.x * VRGUI.Width * 0.1 * factor);
             //    _DeltaY += (-diff.y * VRGUI.Height * 0.2 * factor);
-                
+
             //    int deltaX = (int)(_DeltaX > 0 ? Math.Floor(_DeltaX) : Math.Ceiling(_DeltaX));
             //    int deltaY = (int)(_DeltaY > 0 ? Math.Floor(_DeltaY) : Math.Ceiling(_DeltaY));
 
@@ -178,14 +176,14 @@ namespace VRGIN.Controls.Tools
         //        (y - virtualScreenRect.Top) * 65535.0 / (virtualScreenRect.Bottom - virtualScreenRect.Top));
         //}
 
-        public override List<HelpText> GetHelpTexts()
-        {
-            return new List<HelpText>(new HelpText[] {
-                HelpText.Create("Tap to click", FindAttachPosition("trackpad"), new Vector3(0, 0.02f, 0.05f)),
-                HelpText.Create("Slide to move cursor", FindAttachPosition("trackpad"), new Vector3(0.05f, 0.02f, 0), new Vector3(0.015f, 0, 0)),
-                HelpText.Create("Attach/Remove menu", FindAttachPosition("lgrip"), new Vector3(-0.06f, 0.0f, -0.05f))
+        //public override List<HelpText> GetHelpTexts()
+        //{
+        //    return new List<HelpText>(new HelpText[] {
+        //        HelpText.Create("Tap to click", FindAttachPosition("trackpad"), new Vector3(0, 0.02f, 0.05f)),
+        //        HelpText.Create("Slide to move cursor", FindAttachPosition("trackpad"), new Vector3(0.05f, 0.02f, 0), new Vector3(0.015f, 0, 0)),
+        //        HelpText.Create("Attach/Remove menu", FindAttachPosition("lgrip"), new Vector3(-0.06f, 0.0f, -0.05f))
 
-            });
-        }
+        //    });
+        //}
     }
 }

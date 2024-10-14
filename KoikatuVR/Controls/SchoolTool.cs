@@ -25,17 +25,17 @@ namespace KK_VR.Controls
         //private int _KeySetIndex = 0;
         private int _index;
         private Controller.Lock _lock;
+        private KoikatuMenuTool _menu;
 
         private Controller.TrackpadDirection _lastDirection;
-        //private Controller.TrackpadDirection? _lastPressDirection;
         private GrabAction _grab;
         public bool IsGrab => _grab != null;
-        public override Texture2D Image => _image;
-        private readonly Texture2D _image = new Texture2D(512, 512);
-        private readonly Texture2D _schoolTexture = UnityHelper.LoadImage("icon_school.png");
+        //public override Texture2D Image => _image;
+        //private readonly Texture2D _image = new Texture2D(512, 512);
+        //private readonly Texture2D _schoolTexture = UnityHelper.LoadImage("icon_school.png");
         //private readonly Texture2D _school1Texture = UnityHelper.LoadImage("icon_school_1.png");
         // readonly Texture2D _school2Texture = UnityHelper.LoadImage("icon_school_2.png");
-        private readonly Texture2D _handTexture = UnityHelper.LoadImage("icon_hand.png");
+        //private readonly Texture2D _handTexture = UnityHelper.LoadImage("icon_hand.png");
         //private readonly Texture2D _hand1Texture = UnityHelper.LoadImage("icon_hand_1.png");
         //private readonly Texture2D _hand2Texture = UnityHelper.LoadImage("icon_hand_2.png");
 
@@ -58,23 +58,26 @@ namespace KK_VR.Controls
         //{
         //    SetScene();
         //}
-
-
-        private void SetScene()
+        public override Texture2D Image
         {
-            //_InHScene = inHScene;
-            //var keySets = KeySets();
-            //KeySetIndex = 0;
-            //_KeySet = keySets[0];
-            UpdateIcon();
+            get;
         }
 
-        private void UpdateIcon()
-        {
-            Texture2D icon =
-                KoikatuInterpreter.CurrentScene == KoikatuInterpreter.SceneType.HScene ? _handTexture : _schoolTexture;
-            Graphics.CopyTexture(icon, _image);
-        }
+        //private void SetScene()
+        //{
+        //    //_InHScene = inHScene;
+        //    //var keySets = KeySets();
+        //    //KeySetIndex = 0;
+        //    //_KeySet = keySets[0];
+        //    //UpdateIcon();
+        //}
+
+        //private void UpdateIcon()
+        //{
+        //    Texture2D icon =
+        //        KoikatuInterpreter.CurrentScene == KoikatuInterpreter.SceneType.HScene ? _handTexture : _schoolTexture;
+        //    Graphics.CopyTexture(icon, _image);
+        //}
 
 
         protected override void OnStart()
@@ -87,10 +90,10 @@ namespace KK_VR.Controls
             // 2 - Right controller;
             // But for clarity of button interpretation, as there is no buttons on headset to interpret, we shift them to -1;
             // Headset still has it's own handler(s), so conversion when calling handlers has to be accounted for.
-
-            _index = (int)Controller.index - 1;
-            SetScene();
-
+            VRPlugin.Logger.LogDebug($"SchoolTool:Init:{(int)Tracking.index}");
+            //SetScene();
+            _index = Owner == VR.Mode.Left ? 0 : 1;
+            _menu = new KoikatuMenuTool(_index);
             //_Settings = (KoikatuSettings)VR.Context.Settings;
             //_Settings.AddListener("KeySets", (_, _1) => ResetKeys());
             //_Settings.AddListener("HKeySets", (_, _1) => ResetKeys());
@@ -98,6 +101,7 @@ namespace KK_VR.Controls
 
         protected override void OnDisable()
         {
+            //_index = (int)Tracking.index - 1;
             DestroyGrab();
             base.OnDisable();
         }
@@ -113,6 +117,7 @@ namespace KK_VR.Controls
                 if (_grab.HandleGrabbing() != GrabAction.Status.Continue)
                 {
                     DestroyGrab();
+                    KoikatuInterpreter.SceneInterpreter.OnControllerLock(_index, isLock: false);
                 }
             }
             else
@@ -146,53 +151,61 @@ namespace KK_VR.Controls
 
         private void HandleButtons()
         {
-            // Degrees are handled separately when needed by the handlers.
             var direction = Owner.GetTrackpadDirection();
 
+            if (Controller.GetPressDown(EVRButtonId.k_EButton_ApplicationMenu))
+            {
+                if (!KoikatuInterpreter.SceneInterpreter.OnButtonDown(_index, EVRButtonId.k_EButton_ApplicationMenu, direction))
+                {
+                    _menu.ToggleState();
+                }
+            }
             if (Controller.GetPressDown(ButtonMask.Trigger))
             {
-                KoikatuInterpreter.SceneInterpreter.OnButtonDown(EVRButtonId.k_EButton_SteamVR_Trigger, direction, _index);
+                KoikatuInterpreter.SceneInterpreter.OnButtonDown(_index, EVRButtonId.k_EButton_SteamVR_Trigger, direction);
             }
-
             else if (Controller.GetPressUp(ButtonMask.Trigger))
             {
-                KoikatuInterpreter.SceneInterpreter.OnButtonUp(EVRButtonId.k_EButton_SteamVR_Trigger, direction, _index);
+                KoikatuInterpreter.SceneInterpreter.OnButtonUp(_index, EVRButtonId.k_EButton_SteamVR_Trigger, direction);
             }
 
             if (Controller.GetPressDown(ButtonMask.Grip))
             {
                 // If particular interpreter doesn't want grip move right now, it will be blocked.
-                // We still want all the inputs tho, so locking controller is not an option.
-                if (!KoikatuInterpreter.SceneInterpreter.OnButtonDown(EVRButtonId.k_EButton_Grip, direction, _index))
+                if (_menu.attached)
+                {
+                    _menu.AbandonGUI();
+                }
+                else if (!KoikatuInterpreter.SceneInterpreter.OnButtonDown(_index, EVRButtonId.k_EButton_Grip, direction))
                 {
                     Owner.TryAcquireFocus(out _lock, keepTool: true);
                     _grab = new GrabAction(Owner, Controller, ButtonMask.Grip);
-                    KoikatuInterpreter.SceneInterpreter.OnControllerLock(_index);
+                    KoikatuInterpreter.SceneInterpreter.OnControllerLock(_index, isLock: true);
                 }
             }
             else if (Controller.GetPressUp(ButtonMask.Grip))
             {
-                KoikatuInterpreter.SceneInterpreter.OnButtonUp(EVRButtonId.k_EButton_SteamVR_Trigger, direction, _index);
+                KoikatuInterpreter.SceneInterpreter.OnButtonUp(_index, EVRButtonId.k_EButton_Grip, direction);
             }
 
             if (Controller.GetPressDown(ButtonMask.Touchpad))
             {
-                KoikatuInterpreter.SceneInterpreter.OnButtonDown(EVRButtonId.k_EButton_SteamVR_Touchpad, Owner.GetTrackpadDirection(), _index);
+                KoikatuInterpreter.SceneInterpreter.OnButtonDown(_index, EVRButtonId.k_EButton_SteamVR_Touchpad, direction);
             }
             else if (Controller.GetPressUp(ButtonMask.Touchpad))
             {
-                KoikatuInterpreter.SceneInterpreter.OnButtonUp(EVRButtonId.k_EButton_SteamVR_Touchpad, Owner.GetTrackpadDirection(), _index);
+                KoikatuInterpreter.SceneInterpreter.OnButtonUp(_index, EVRButtonId.k_EButton_SteamVR_Touchpad, direction);
             }
 
             if (_lastDirection != direction)
             {
                 if (_lastDirection != VRGIN.Controls.Controller.TrackpadDirection.Center)
                 {
-                    KoikatuInterpreter.SceneInterpreter.OnDirectionUp(_lastDirection, _index);
+                    KoikatuInterpreter.SceneInterpreter.OnDirectionUp(_index, _lastDirection);
                 }
                 if (direction != VRGIN.Controls.Controller.TrackpadDirection.Center)
                 {
-                    KoikatuInterpreter.SceneInterpreter.OnDirectionDown(direction, _index);
+                    KoikatuInterpreter.SceneInterpreter.OnDirectionDown(_index, direction);
                 }
                 _lastDirection = direction;
             }

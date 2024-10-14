@@ -115,7 +115,7 @@ namespace VRGIN.Controls.Tools
                 UpdateProspectedArea();
                 _Visualization.UpdatePosition();
             }
-            
+
             ArcRenderer.gameObject.SetActive(visible);
             _Visualization.gameObject.SetActive(visible);
         }
@@ -369,15 +369,15 @@ namespace VRGIN.Controls.Tools
             _Points.Clear();
         }
 
-        public override List<HelpText> GetHelpTexts()
-        {
-            return new List<HelpText>(new HelpText[] {
-                HelpText.Create("Press to teleport", FindAttachPosition("trackpad"), new Vector3(0, 0.02f, 0.05f)),
-                HelpText.Create("Circle to rotate", FindAttachPosition("trackpad"), new Vector3(0.05f, 0.02f, 0), new Vector3(0.015f, 0, 0)),
-                HelpText.Create("press & move controller", FindAttachPosition("trackpad"), new Vector3(-0.05f, 0.02f, 0), new Vector3(-0.015f, 0, 0)),
-                HelpText.Create("Warp into main char", FindAttachPosition("trigger"), new Vector3(0.06f, 0.04f, -0.05f)),
-                HelpText.Create("reset area", FindAttachPosition("lgrip"), new Vector3(-0.06f, 0.0f, -0.05f))
-            });
-        }
+        //public override List<HelpText> GetHelpTexts()
+        //{
+        //    return new List<HelpText>(new HelpText[] {
+        //        HelpText.Create("Press to teleport", FindAttachPosition("trackpad"), new Vector3(0, 0.02f, 0.05f)),
+        //        HelpText.Create("Circle to rotate", FindAttachPosition("trackpad"), new Vector3(0.05f, 0.02f, 0), new Vector3(0.015f, 0, 0)),
+        //        HelpText.Create("press & move controller", FindAttachPosition("trackpad"), new Vector3(-0.05f, 0.02f, 0), new Vector3(-0.015f, 0, 0)),
+        //        HelpText.Create("Warp into main char", FindAttachPosition("trigger"), new Vector3(0.06f, 0.04f, -0.05f)),
+        //        HelpText.Create("reset area", FindAttachPosition("lgrip"), new Vector3(-0.06f, 0.0f, -0.05f))
+        //    });
+        //}
     }
 }

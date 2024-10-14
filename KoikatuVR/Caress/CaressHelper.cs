@@ -336,7 +336,7 @@ namespace KK_VR.Caress
             VRMouth.Instance.OnDisengageStart();
             var origin = VR.Camera.Origin;
             var head = VR.Camera.Head;
-            var pov = PoV.Instance != null && PoV.Instance.Active;
+            var pov = PoV.Active;
             if (IsGripPress())
             {
                 yield return new WaitUntil(() => !IsGripPress());

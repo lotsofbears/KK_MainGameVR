@@ -24,10 +24,10 @@ namespace VRGIN.Controls.Tools
             get;
         }
 
-        public GameObject Icon
-        {
-            get; set;
-        }
+        //public GameObject Icon
+        //{
+        //    get; set;
+        //}
 
         protected override void OnStart()
         {
@@ -62,35 +62,35 @@ namespace VRGIN.Controls.Tools
 
         protected virtual void OnEnable()
         {
-            VRLog.Info("On Enable: {0}", GetType().Name);
-            if (Icon)
-            {
-                Icon.SetActive(true);
-            }
-            else
-            {
-                VRLog.Info("But no icon...");
+            //VRLog.Info("On Enable: {0}", GetType().Name);
+            //if (Icon)
+            //{
+            //    Icon.SetActive(true);
+            //}
+            //else
+            //{
+            //    VRLog.Info("But no icon...");
 
-            }
+            //}
         }
 
         protected virtual void OnDisable()
         {
-            VRLog.Info("On Disable: {0}", GetType().Name);
-            if (Icon)
-            {
-                Icon.SetActive(false);
-            }
-            else
-            {
-                VRLog.Info("But no icon...");
-            }
+            //VRLog.Info("On Disable: {0}", GetType().Name);
+            //if (Icon)
+            //{
+            //    Icon.SetActive(false);
+            //}
+            //else
+            //{
+            //    VRLog.Info("But no icon...");
+            //}
         }
 
-        public virtual List<HelpText> GetHelpTexts()
-        {
-            return new List<HelpText>();
-        }
+        //public virtual List<HelpText> GetHelpTexts()
+        //{
+        //    return new List<HelpText>();
+        //}
 
         protected Transform FindAttachPosition(params string[] names)
         {
