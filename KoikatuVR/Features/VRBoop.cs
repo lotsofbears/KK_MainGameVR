@@ -126,10 +126,9 @@ namespace KK_VR.Features
         {
             GetOrAttachCollider(gameObjectList);
         }
-        public static void RefreshDynamicBones(bool inactive)
+        public static void RefreshDynamicBones(IEnumerable<ChaControl> charas)
         {
             // Hooks don't give us BetterPenetration dynamic bones.
-            var charas = UnityEngine.Object.FindObjectsOfType<ChaControl>();
             foreach (var chara in charas)
             {
                 var colliderList = chara.GetComponentsInChildren<DynamicBone>();

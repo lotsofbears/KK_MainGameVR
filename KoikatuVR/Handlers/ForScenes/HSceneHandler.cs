@@ -122,7 +122,7 @@ namespace KK_VR.Handlers
             {
                 if (!MouthGuide.Instance.IsActive && HSceneInterpreter.handCtrl.GetUseAreaItemActive() != -1)
                 {
-                    // If VRMouth isn't active but automatic caress is going.
+                    // If VRMouth isn't active but automatic caress is going. Disable it.
                     HSceneInterpreter.MoMiOnKissEnd();
                 }
                 else
@@ -149,7 +149,7 @@ namespace KK_VR.Handlers
         }
         protected override void DoReaction(float velocity)
         {
-            VRPlugin.Logger.LogDebug($"DoReaction:{_tracker.colliderInfo.behavior.touch}:{_tracker.reactionType}:{velocity}");
+            VRPlugin.Logger.LogDebug($"DoReaction:{_tracker.colliderInfo.behavior.react}:{_tracker.colliderInfo.behavior.touch}:{_tracker.reactionType}:{velocity}");
             if (_settings.AutomaticTouching > KoikatuSettings.SceneType.TalkScene)
             {
                 if (velocity > 1.5f || (_tracker.reactionType == Tracker.ReactionType.HitReaction && !IsAibuItemPresent(out _)))

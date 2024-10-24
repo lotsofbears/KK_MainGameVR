@@ -53,7 +53,7 @@ namespace KK_VR.Handlers
             var sphere = gameObject.AddComponent<SphereCollider>();
             sphere.isTrigger = false;
             sphere.radius = Mathf.Round(1000f * (colliderTrigger.radius * 0.7f)) * 0.001f;
-            tracker = new Tracker();
+            Tracker = new Tracker();
             gameObject.SetActive(false);
         }
         private void OnEnable()
@@ -85,7 +85,7 @@ namespace KK_VR.Handlers
             else
             {
                 _target = target;
-                tracker.SetBlacklistDic(hand.Grasp.GetBlacklistDic);
+                Tracker.SetBlacklistDic(hand.Grasp.GetBlacklistDic);
                 ClearBlacks();
             }
             _bodyPart.visual.SetColor(IsBusy);
@@ -130,7 +130,7 @@ namespace KK_VR.Handlers
         //}
         protected override void OnTriggerEnter(Collider other)
         {
-            if (tracker.AddCollider(other))
+            if (Tracker.AddCollider(other))
             {
                 if (!_wasBusy)
                 {
@@ -146,7 +146,7 @@ namespace KK_VR.Handlers
 
         protected override void OnTriggerExit(Collider other)
         {
-            if (tracker.RemoveCollider(other))
+            if (Tracker.RemoveCollider(other))
             {
                 if (!IsBusy)
                 {

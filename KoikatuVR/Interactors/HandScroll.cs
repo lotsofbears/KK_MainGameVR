@@ -32,21 +32,8 @@ namespace KK_VR.Interactors
             //var newIndex = _increase ? (array[_lr, 1] + 1) % 24 : (array[_lr, 1] - 1) < 0 ? 23 : (array[_lr, 1] - 1);
             var newIndex = _increase ? (array[_lr, 1] + 1) % 24 : (array[_lr, 0] - 1) < 0 ? 23 : (array[_lr, 0] - 1);
 
-            if (_disable)
-            {
-                VRPlugin.Logger.LogDebug($"ScrollHand:Disable:array - [{array[_lr, 0]}][{array[_lr, 1]}]:new - {newIndex}");
-                if (_increase)
-                {
-                    _chara.SetShapeHandValue(_lr, 0, 0, 1f);
-                }
-                else
-                {
-                    _chara.SetShapeHandValue(_lr, 0, 0, 1f);
-                }
-                _chara.SetEnableShapeHand(_lr, false);
-                _chara = null;
-            }
-            else if (_increase)
+            
+            if (_increase)
             {
                 //if (array[_lr, 1] == 0)
                 //{
@@ -59,7 +46,21 @@ namespace KK_VR.Interactors
                 if (_chara.fileStatus.shapeHandBlendValue[_lr] < 1f)
                 {
                     _blendValue = _chara.fileStatus.shapeHandBlendValue[_lr];
-                    VRPlugin.Logger.LogDebug($"ScrollHand:Continue:array - [{array[_lr, 0]}][{array[_lr, 1]}]:new - {newIndex}:{_blendValue}");
+                    VRPlugin.Logger.LogDebug($"ScrollHand:PrematureBlendValue:array - [{array[_lr, 0]}][{array[_lr, 1]}]:new - {newIndex}:{_blendValue}");
+                }
+                else if (_disable)
+                {
+                    if (_increase)
+                    {
+                        _chara.SetShapeHandValue(_lr, 0, 0, 1f);
+                    }
+                    else
+                    {
+                        _chara.SetShapeHandValue(_lr, 0, 0, 1f);
+                    }
+                    VRPlugin.Logger.LogDebug($"ScrollHand:Disable:array - [{array[_lr, 0]}][{array[_lr, 1]}]:new - {newIndex}");
+                    _chara.SetEnableShapeHand(_lr, false);
+                    _chara = null;
                 }
                 else
                 {
@@ -81,11 +82,25 @@ namespace KK_VR.Interactors
                 if (_chara.fileStatus.shapeHandBlendValue[_lr] > 0f)
                 {
                     _blendValue = _chara.fileStatus.shapeHandBlendValue[_lr];
-                    VRPlugin.Logger.LogDebug($"ScrollHand:Continue:array - [{array[_lr, 0]}][{array[_lr, 1]}]:new - {newIndex}:{_blendValue}");
+                    VRPlugin.Logger.LogDebug($"ScrollHand:PrematureBlendValue:array - [{array[_lr, 0]}][{array[_lr, 1]}]:new - {newIndex}:{_blendValue}");
+                }
+                else if (_disable)
+                {
+                    if (_increase)
+                    {
+                        _chara.SetShapeHandValue(_lr, 0, 0, 1f);
+                    }
+                    else
+                    {
+                        _chara.SetShapeHandValue(_lr, 0, 0, 1f);
+                    }
+                    VRPlugin.Logger.LogDebug($"ScrollHand:Disable:array - [{array[_lr, 0]}][{array[_lr, 1]}]:new - {newIndex}");
+                    _chara.SetEnableShapeHand(_lr, false);
+                    _chara = null;
                 }
                 else
                 {
-                    _chara.SetShapeHandValue(_lr, array[_lr, 1], newIndex, 1f);
+                    _chara.SetShapeHandValue(_lr, newIndex, array[_lr, 0], 1f);
                     _blendValue = 1f;
                     if (newIndex == 0) _disable = true;
                     VRPlugin.Logger.LogDebug($"ScrollHand:{_increase}:array - [{array[_lr, 0]}][{array[_lr, 1]}]:new - {newIndex}:blend = {_blendValue}");

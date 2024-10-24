@@ -251,10 +251,10 @@ namespace KK_VR.Interpreters
                 MoMiOnKissStart = AccessTools.MethodDelegate<Action<AibuColliderKind>>(AccessTools.FirstMethod(type, m => m.Name.Equals("OnKissStart")));
                 MoMiOnKissEnd = AccessTools.MethodDelegate<Action>(AccessTools.FirstMethod(type, m => m.Name.Equals("OnKissEnd")));
             }
-            VRBoop.RefreshDynamicBones(true);
             var charas = new List<ChaControl>() { male };
             charas.AddRange(lstFemale);
 
+            VRBoop.RefreshDynamicBones(charas);
             TalkSceneExtras.AddTalkColliders(charas);
             TalkSceneExtras.AddHColliders(charas);
             _hands = HandHolder.GetHands();
@@ -262,12 +262,15 @@ namespace KK_VR.Interpreters
 
             //var gameObj = Util.CreatePrimitive(PrimitiveType.Sphere, new Vector3(0.1f, 0.1f, 0.1f), VR.Camera.transform, Color.magenta, 0.2f, true);
             //gameObj.transform.localPosition = new Vector3(0, -0.07f, 0.03f);
-            //var vrMouth = new GameObject("MouthGuide").transform;
-            //vrMouth.SetParent(VR.Camera.transform, false);
-            //vrMouth.localScale = new Vector3(0.1f, 0.1f, 0.1f);
-            //vrMouth.localPosition = new Vector3(0, -0.07f, 0.03f);
-            //vrMouth.gameObject.layer = 10;
-            //_mouth = vrMouth.gameObject.AddComponent<MouthGuide>();
+            var vrMouth = new GameObject("MouthGuide")
+            {
+                layer = 10
+            }.transform;
+            vrMouth.SetParent(VR.Camera.transform, false);
+            vrMouth.localScale = new Vector3(0.1f, 0.1f, 0.1f);
+            vrMouth.localPosition = new Vector3(0, -0.07f, 0.03f);
+            vrMouth.gameObject.layer = 10;
+            _mouth = vrMouth.gameObject.AddComponent<MouthGuide>();
             _pov = VR.Camera.gameObject.AddComponent<PoV>();
             _pov.Initialize();
             _vrMoverH = VR.Camera.gameObject.AddComponent<VRMoverH>();
@@ -276,7 +279,6 @@ namespace KK_VR.Interpreters
             // Init after everything.
             HitReactionInitialize(charas);
 
-            //ModelHandler.SetHandColor(male);
 
             // If disabled, camera won't know where to move.
             ((Config.EtceteraSystem)Manager.Config.Instance.xmlCtrl.datas[3]).HInitCamera = true;

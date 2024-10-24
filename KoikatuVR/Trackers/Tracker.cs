@@ -65,7 +65,7 @@ namespace KK_VR.Trackers
             foreach (var hand in HandHolder.GetHands())
             {
                 var collider = hand.GetComponent<Collider>();
-                _referenceTrackDic.Add(collider, new ColliderInfo(collider, null, null));
+                _referenceTrackDic.Add(collider, new ColliderInfo(collider, new BodyBehavior(Body.None, AibuColliderKind.none, AibuColliderKind.none), null));
             }
         }
         private static void EnableCollider(Collider collider)

@@ -51,12 +51,9 @@ namespace KK_VR.Handlers
         private Transform _shoulders;
         private bool _gripMove;
 
+        private readonly Quaternion _reverse = Quaternion.Euler(0f, 180f, 0f);
         private readonly Dictionary<ChaControl, List<Tracker.Body>> _mouthBlacklistDic = [];
 
-        internal static void SetState(bool active)
-        {
-            _instance._activeCo = active;
-        }
         private void Awake()
         {
             _instance = this;
@@ -65,22 +62,14 @@ namespace KK_VR.Handlers
             collider.isTrigger = true;
             var rigidBody = gameObject.AddComponent<Rigidbody>();
             rigidBody.isKinematic = true;
-            tracker = new Tracker();
-            //var type = AccessTools.TypeByName("KK_SensibleH.Caress.MoMiController");
-            //if (type != null)
-            //{
-            //    MoMiOnLickStart = AccessTools.MethodDelegate<Action<AibuColliderKind>>(AccessTools.FirstMethod(type, m => m.Name.Equals("OnLickStart")));
-            //    MoMiOnKissStart = AccessTools.MethodDelegate<Action<AibuColliderKind>>(AccessTools.FirstMethod(type, m => m.Name.Equals("OnKissStart")));
-            //    MoMiOnKissEnd = AccessTools.MethodDelegate<Action>(AccessTools.FirstMethod(type, m => m.Name.Equals("OnKissEnd")));
-            //}
+            Tracker = new Tracker();
 
             _eyes = HSceneInterpreter.lstFemale[0].objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz/cf_J_Eye_tz");
             _shoulders = HSceneInterpreter.lstFemale[0].objBodyBone.transform.Find("cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_backsk_00");
-            //var heroine = HSceneInterpreter.hFlag.lstHeroine[0];
-            //_kissAttemptChance = 0.1f + ((int)heroine.HExperience - 1) * 0.15f + (heroine.weakPoint == 0 ? 0.1f : 0f);
+
             _kissHelper = new KissHelper(_eyes, _shoulders);
             _aibu = HSceneInterpreter.mode == HFlag.EMode.aibu;
-            tracker.SetBlacklistDic(_mouthBlacklistDic);
+            Tracker.SetBlacklistDic(_mouthBlacklistDic);
         }
         internal void OnImpersonation(ChaControl chara)
         {
@@ -102,19 +91,6 @@ namespace KK_VR.Handlers
             }
         }
 
-        //private IEnumerator TryOnceInAwhile()
-        //{
-        //    // Having it on Update() feels awry, way too methodical/mechanical/robotic, no human lag.
-        //    while (true)
-        //    {
-        //        if (!PauseInteractions && HSceneInterpreter.mode == HFlag.EMode.aibu)
-        //        {
-        //            HandleKissing();
-        //            _kissHelper.ProactiveAttemptToKiss();
-        //        }
-        //        yield return new WaitForSeconds(0.5f);
-        //    }
-        //}
         private bool HandleKissing()
         {
             if (_settings.AutomaticKissing)
@@ -132,17 +108,19 @@ namespace KK_VR.Handlers
             }
             return false;
         }
-        private readonly Quaternion _reverse = Quaternion.Euler(0f, 180f, 0f);
         protected override void OnTriggerEnter(Collider other)
         {
             // Try to catch random null ref.
-            if (tracker.AddCollider(other))
+            VRPlugin.Logger.LogDebug($"Mouth:OnTriggerEnter");
+            VRPlugin.Logger.LogDebug($"{other}");
+            VRPlugin.Logger.LogDebug($"{other.name}");
+            if (Tracker.AddCollider(other))
             {
                 //if (tracker.reactionType > Tracker.ReactionType.None)
                 //{
                 //    DoReaction();
                 //}
-                var touch = tracker.colliderInfo.behavior.touch;
+                var touch = Tracker.colliderInfo.behavior.touch;
                 if (touch != AibuColliderKind.none && !PauseInteractions)
                 {
                     if (touch == AibuColliderKind.mouth)
@@ -158,7 +136,7 @@ namespace KK_VR.Handlers
         }
         protected override void OnTriggerExit(Collider other)
         {
-            if (tracker.AddCollider(other))
+            if (Tracker.AddCollider(other))
             {
                 if (!IsBusy)
                 {
@@ -438,6 +416,8 @@ namespace KK_VR.Handlers
             // Actual attachment point.
             var tongue = hand.useItems[2].obj.transform.Find("cf_j_tangroot");
 
+            // Currently there can be a bit of confusion with enabled/disabled item renderers. Making sure.
+            hand.useItems[2].objBody.GetComponent<Renderer>().enabled = true;
             // Reference point to update offsets on demand.
             _followAfter = tongue;
 

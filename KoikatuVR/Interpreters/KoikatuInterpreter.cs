@@ -81,11 +81,17 @@ namespace KK_VR.Interpreters
         private void CreateHands()
         {
             _hands = true;
-            var left = new GameObject("LeftHandHolder");
+            var left = new GameObject("LeftHandHolder")
+            {
+                layer = 10
+            };
             var component = left.AddComponent<HandHolder>();
             component.Init(0, left);
 
-            var right = new GameObject("RightHandHolder");
+            var right = new GameObject("RightHandHolder")
+            {
+                layer = 10
+            };
             component = right.AddComponent<HandHolder>();
             component.Init(1, right);
         }

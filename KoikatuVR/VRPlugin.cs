@@ -23,7 +23,7 @@ namespace KK_VR
     [BepInProcess("Koikatsu Party")]
     public class VRPlugin : BaseUnityPlugin
     {
-        public const string GUID = "mosirnik.kk-main-game-vr";
+        public const string GUID = "KK.VR";
         public const string PluginName = "Main Game VR";
         public const string Version = "1.2.0";
 

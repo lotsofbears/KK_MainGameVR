@@ -26,7 +26,7 @@ namespace KK_VR.Handlers
     class ItemHandler : Handler
     {
         protected ControllerTracker _tracker;
-        protected override Tracker tracker
+        protected override Tracker Tracker
         {
             get => _tracker; 
             set => _tracker = value is ControllerTracker t ? t : null;
