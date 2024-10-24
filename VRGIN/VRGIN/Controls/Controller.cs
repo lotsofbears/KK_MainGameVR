@@ -394,6 +394,7 @@ namespace VRGIN.Controls
 
         public void StartRumble(IRumbleSession session)
         {
+            VRLog.Debug($"StartRumble");
             Rumble.StartRumble(session);
         }
 

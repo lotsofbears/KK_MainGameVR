@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 
-namespace KK_VR.Interpreters.Patches
+namespace KK_VR.Patches
 {
     [HarmonyPatch]
     internal class GraspPatches

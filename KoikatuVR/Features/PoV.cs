@@ -21,6 +21,8 @@ using KK_VR.Settings;
 using KK_VR;
 using static SteamVR_Controller.ButtonMask;
 using KK_VR.Interpreters;
+using KK_VR.Handlers;
+using KK_VR.Trackers;
 
 
 
@@ -59,7 +61,6 @@ namespace KK_VR.Features
         private KoikatuSettings settings;
         //private bool buttonA;
         private bool _wasAway;
-        private List<ChaControl> _chaControls;
         private Controller _device;
         private Controller _device1;
         private float _moveSpeed;
@@ -74,6 +75,7 @@ namespace KK_VR.Features
         private float _rotStartThreshold;
         private bool _precisionPoint;
         private Vector3 _offsetVecEyes;
+        private MouthGuide _mouth = MouthGuide.Instance;
 
         private Vector3 GetEyesPosition => _targetEyes.TransformPoint(_offsetVecEyes);
         private bool IsClimax => HSceneInterpreter.hFlag.nowAnimStateName.EndsWith("_Loop", System.StringComparison.Ordinal);
@@ -224,7 +226,7 @@ namespace KK_VR.Features
         public void CameraIsFarAndBusy()
         {
             CameraIsFar();
-            VRMouth.NoActionAllowed = true;
+            _mouth.PauseInteractions = true;
         }
         public void CameraIsNear()
         {
@@ -234,12 +236,12 @@ namespace KK_VR.Features
             if (_target.sex == 1)
             {
                 GirlPoV = true;
-                VRMouth.NoActionAllowed = true;
+                _mouth.PauseInteractions = true;
             }
             else
             {
                 GirlPoV = false;
-                VRMouth.NoActionAllowed = false;
+                _mouth.PauseInteractions = false;
             }
         }
         private void MoveToHead()
@@ -416,6 +418,7 @@ namespace KK_VR.Features
             {
                 _target = charas[currentCharaIndex + 1];
             }
+            _mouth.OnImpersonation(_target);
             _targetEyes = _target.objHeadBone.transform.Find("cf_J_N_FaceRoot/cf_J_FaceRoot/cf_J_FaceBase/cf_J_FaceUp_ty/cf_J_FaceUp_tz");
             CameraIsFarAndBusy();
             UpdateSettings();
@@ -425,14 +428,14 @@ namespace KK_VR.Features
         {
             // Most likely a bad idea to kiss/lick when detached from the head but still inheriting all movements.
             CameraIsNear();
-            _offsetVecNewAttach = VR.Camera.Head.position - GetEyesPosition;
+            _offsetVecNewAttach = VR.Camera.Head.position - _targetEyes.position;
             _offsetRotNewAttach = VR.Camera.Origin.rotation;
         }
         private bool _lock;
-        internal void OnControllerLock(bool press)
+        internal void OnGripMove(bool active)
         {
-            _lock = press;
-            if (press)
+            _lock = active;
+            if (active)
             {
                 CameraIsFar();
             }
@@ -443,7 +446,7 @@ namespace KK_VR.Features
         }
         private void SetPoV()
         {
-            if (VRMouth.IsActive || !Scene.Instance.AddSceneName.Equals("HProc")) // SceneApi.GetIsOverlap()) KKS option
+            if (_mouth.IsActive || !Scene.Instance.AddSceneName.Equals("HProc")) // SceneApi.GetIsOverlap()) KKS option KK has it broken.
             {
                 // We don't want pov while kissing/licking or if config/pointmove scene pops up.
                 CameraIsFar();
@@ -482,7 +485,17 @@ namespace KK_VR.Features
             povMode = POV_Mode.Eyes;
             if (teleport) NewLookAtPoI();
             _newAttachPoint = false;
-            VRMouth.NoActionAllowed = false;
+            _mouth.PauseInteractions = false;
+            _mouth.OnUnImpersonation();
+        }
+        internal bool TryDisable(Tracker.Body part, ChaControl chara)
+        {
+            if (_active && _target == chara && part == Tracker.Body.Head)
+            {
+                DisablePov();
+                return true;
+            }
+            return false;
         }
 
         private void Update()
@@ -493,7 +506,6 @@ namespace KK_VR.Features
         private void LateUpdate()
         {
             if (_active && settings.HideHeadInPOV && _target != null) HideHead();
-            //if (_testParent.active) _testParent.UpdatePlayerIK();
         }
 
         private void HideHead()
@@ -514,7 +526,7 @@ namespace KK_VR.Features
             }
             else
             {
-                _target.fileStatus.visibleHeadAlways = VRMouth.IsKiss;
+                _target.fileStatus.visibleHeadAlways = _mouth.IsActive;
             }
         }
         internal void HandleEnable()

@@ -107,32 +107,25 @@ namespace KK_VR.Camera
         [HarmonyPostfix]
         public static void PostChangeAnimator(HSceneProc.AnimationListInfo _nextAinmInfo, bool _isForceCameraReset, HSceneProc __instance, List<ChaControl> ___lstFemale)
         {
-            if (VRMouth.Instance != null)
-            {
-                VRMouth.Instance.OnPositionChange(_nextAinmInfo);
-            }
             UpdateVRCamera(__instance, ___lstFemale, null);
             if (KoikatuInterpreter.SceneInterpreter is HSceneInterpreter hScene)
                 hScene.OnPoseChange(_nextAinmInfo);
 
         }
 
-        //[HarmonyPatch("ChangeCategory")]
-        //[HarmonyPrefix]
-        //public static void PreChangeCategory(List<ChaControl> ___lstFemale, out float __state)
-        //{
-        //    __state = ___lstFemale[0].objTop.transform.position.y;
-        //}
+        [HarmonyPatch("ChangeCategory")]
+        [HarmonyPrefix]
+        public static void PreChangeCategory()
+        {
+            if (GraspHelper.Instance != null) GraspHelper.Instance.OnSpotChangePre();
+        }
 
         [HarmonyPatch("ChangeCategory")]
         [HarmonyPostfix]
-        public static void PostChangeCategory(HSceneProc __instance, List<ChaControl> ___lstFemale, float __state)
+        public static void PostChangeCategory(HSceneProc __instance, List<ChaControl> ___lstFemale)
         {
-            if (PoV.Instance != null)
-            {
-                PoV.Instance.OnSpotChange();
-            }
-            HSceneInterpreter.OnSpotChange();
+            if (KoikatuInterpreter.SceneInterpreter is HSceneInterpreter hScene)
+                hScene.OnSpotChangePost();
             UpdateVRCamera(__instance, ___lstFemale, null);// __state);
         }
         [HarmonyPatch(nameof(HSceneProc.GotoPointMoveScene))]
@@ -144,15 +137,15 @@ namespace KK_VR.Camera
                 VRMoverH.Instance.MakeUpright();
             }
         }
-        [HarmonyPatch(nameof(HSceneProc.ReturnVisibleForHPointMove))]
-        [HarmonyPostfix]
-        public static void ReturnVisibleForHPointMovePostfix()
-        {
-            if (VRMoverH.Instance != null)
-            {
-                VRMoverH.Instance.MakeUpright();
-            }
-        }
+        //[HarmonyPatch(nameof(HSceneProc.ReturnVisibleForHPointMove))]
+        //[HarmonyPostfix]
+        //public static void ReturnVisibleForHPointMovePostfix()
+        //{
+        //    if (VRMoverH.Instance != null)
+        //    {
+        //        VRMoverH.Instance.MakeUpright();
+        //    }
+        //}
 
         /// <summary>
         /// Update the transform of the VR camera.

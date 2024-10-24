@@ -24,51 +24,49 @@ namespace KK_VR.Handlers
 {
     internal class Handler : MonoBehaviour
     {
-        protected virtual Tracker BaseTracker { get; set; }
+        protected virtual Tracker tracker { get; set; }
         /// <summary>
         /// True if something is being tracked. Track for recently blacklisted items continues, but new ones don't get added.
         /// </summary>
-        internal virtual bool IsBusy => BaseTracker.IsBusy;
+        internal virtual bool IsBusy => tracker.IsBusy;
         /// <summary>
         /// Can be true only after 'UpdateNoBlacks()' if every item in track is blacklisted.
         /// </summary>
-        internal bool InBlack => BaseTracker.colliderInfo == null;
-        internal Transform GetTrackTransform => BaseTracker.colliderInfo.collider.transform;
+        internal bool InBlack => tracker.colliderInfo == null;
+        internal Transform GetTrackTransform => tracker.colliderInfo.collider.transform;
+        internal ChaControl GetChara => tracker.colliderInfo.chara;
 
-        protected virtual void OnEnable()
-        {
-            BaseTracker = new Tracker();
-        }
 
         protected virtual void OnDisable()
         {
-            BaseTracker = null;
+            tracker.ClearTracker();
         }
 
         protected virtual void OnTriggerEnter(Collider other)
         {
-            BaseTracker.AddCollider(other);
+            tracker.AddCollider(other);
         }
 
         protected virtual void OnTriggerExit(Collider other)
         {
-            BaseTracker.RemoveCollider(other);
+            tracker.RemoveCollider(other);
         }
-        internal void FlushBlacks()
+        internal void ClearBlacks()
         {
-            BaseTracker.RemoveBlacks();
+            tracker.RemoveBlacks();
         }
-        internal void FlushTracker()
+        internal void ClearTracker()
         {
-            BaseTracker.FlushTracker();
+            tracker.ClearTracker();
         }
         internal void UpdateTrackerNoBlacks()
         {
-            BaseTracker.SetSuggestedInfoNoBlacks();
+            tracker.SetSuggestedInfoNoBlacks();
         }
         internal void UpdateTracker(ChaControl tryToAvoid = null)
         {
-            BaseTracker.SetSuggestedInfo(tryToAvoid);
+            tracker.SetSuggestedInfo(tryToAvoid);
+            tracker.DebugShowActive();
         }
 
     }

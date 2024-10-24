@@ -30,16 +30,13 @@ namespace KK_VR.Interpreters
         public static KoikatuInterpreter Instance { get; private set; }
         public static SceneType CurrentScene { get; private set; }
         public static SceneInterpreter SceneInterpreter;
-        //public static KoikatuSettings settings;
+        public static readonly KoikatuSettings settings = VR.Context.Settings as KoikatuSettings;
 
         private Mirror.Manager _mirrorManager;
         private int _kkapiCanvasHackWait;
         private Canvas _kkSubtitlesCaption;
-        private GameObject _sceneObjCache;
         private Manager.Scene _scene;
         private Manager.Game _game;
-        private bool _queue;
-        // Avoids nullref until we create hands on TitleScreen;
         private bool _hands;
         protected override void OnAwake()
         {
@@ -73,6 +70,7 @@ namespace KK_VR.Interpreters
             //VRLog.Info($"OnSceneLoaded {scene.name}");
             if (!_hands && scene.name.Equals("Title"))
             {
+                // Init too early will throw a wrench into VRGIN's init.
                 CreateHands();
             }
             foreach (var reflection in GameObject.FindObjectsOfType<MirrorReflection>())
@@ -82,6 +80,7 @@ namespace KK_VR.Interpreters
         }
         private void CreateHands()
         {
+            _hands = true;
             var left = new GameObject("LeftHandHolder");
             var component = left.AddComponent<HandHolder>();
             component.Init(0, left);

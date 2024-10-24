@@ -9,7 +9,7 @@ using UnityEngine;
 using static HandCtrl;
 using Random = UnityEngine.Random;
 
-namespace KK_VR.Interpreters.Extras
+namespace KK_VR.Interpreters
 {
     internal static class TalkSceneExtras
     {

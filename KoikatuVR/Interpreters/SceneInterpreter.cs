@@ -77,7 +77,7 @@ namespace KK_VR.Interpreters
             Half,
             Full
         }
-        public virtual void OnControllerLock(int index, bool isLock)
+        public virtual void OnGripMove(int index, bool active)
         {
 
         }
@@ -95,5 +95,18 @@ namespace KK_VR.Interpreters
         //        GameObject.Destroy(right);
         //    }
         //}
+
+        public virtual bool IsTouchpadPress(int index)
+        {
+            return false;
+        }
+        public virtual bool IsGripPress(int index)
+        {
+            return false;
+        }
+        public virtual bool IsTriggerPress(int index)
+        {
+            return false;
+        }
     }
 }

@@ -27,7 +27,7 @@ namespace KK_VR.Handlers
         {
             if (Undresser.Undress(_tracker.colliderInfo.behavior.part, chara = _tracker.colliderInfo.chara, decrease))
             {
-                HandNoises.PlaySfx(_index, 1f, HandNoises.Sfx.Undress, HandNoises.Surface.Cloth);
+                //HandNoises.PlaySfx(_index, 1f, HandNoises.Sfx.Undress, HandNoises.Surface.Cloth);
                 _controller.StartRumble(new RumbleImpulse(1000));
                 return true;
             }

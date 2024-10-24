@@ -23,35 +23,22 @@ namespace KK_VR.Interactors
             if (array == null) return false;
             foreach (var item in array)
             {
-                if (chara.IsClothes(item)) return true;
+                if (chara.IsClothes(item) && chara.fileStatus.clothesState[item] == 0) return true;
             }
             return false;
         }
         private static int[] ConvertToSlot(Body part)
         {
-            switch (part)
+            return part switch
             {
-                case Body.MuneL:
-                case Body.MuneR:
-                    return new int[] { 0, 2 };
-                case Body.UpperBody:
-                    return new int[] { 0 };
-                case Body.LowerBody:
-                    return new int[] { 1, 5 };
-                case Body.ArmL:
-                case Body.ArmR:
-                    return new int[] { 0, 4 };
-                case Body.Groin:
-                case Body.Asoko:
-                    return new int[] { 1, 3, 5 };
-                case Body.ThighL:
-                case Body.ThighR:
-                case Body.LegL:
-                case Body.LegR:
-                    return new int[] { 5, 6 };
-                default:
-                    return null;
-            }
+                Body.MuneL or Body.MuneR => [0, 2],
+                Body.UpperBody => [0],
+                Body.LowerBody => [1, 5],
+                Body.ArmL or Body.ArmR => [0, 4],
+                Body.Groin or Body.Asoko => [1, 3, 5],
+                Body.ThighL or Body.ThighR or Body.LegL or Body.LegR => [5, 6],
+                _ => null,
+            };
         }
         private static Body ConvertToUndress(Body body)
         {
@@ -155,14 +142,14 @@ namespace KK_VR.Interactors
             public int slot; 
             public int state;
         }
-        private static readonly Dictionary<Body, List<SlotState>> UndressDic = new Dictionary<Body, List<SlotState>>
+        private static readonly Dictionary<Body, List<SlotState>> UndressDic = new()
         {
             // Sequences of cloth slots and their states for each body part.
             // We check if specific cloth slot has corresponding state and toggle this slot to the next state.
             {
                 Body.Asoko, new List<SlotState>
                 {
-                    new SlotState { slot = 1, state = 0 },
+                    new() { slot = 1, state = 0 },
                     new SlotState { slot = 5, state = 0 },
                     new SlotState { slot = 3, state = 0 },
                     //new SlotState { slot = 5, state = 1 },

@@ -8,7 +8,7 @@
 //using System.Text;
 //using UnityEngine;
 
-//namespace KK_VR.Interpreters.Patches
+//namespace KK_VR.Patches
 //{
 //    [HarmonyPatch]
 //    internal class ActionScenePatches
@@ -57,7 +57,7 @@
 //                                counter = 0;
 //                            }
 //                        }
-                            
+
 
 //                    }
 //                    else

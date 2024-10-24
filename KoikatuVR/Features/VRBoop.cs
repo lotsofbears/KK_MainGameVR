@@ -5,6 +5,7 @@ using UnityEngine;
 using VRGIN.Core;
 using VRGIN.Controls;
 using System.Linq;
+using System.Collections;
 
 namespace KK_VR.Features
 {
@@ -116,11 +117,13 @@ namespace KK_VR.Features
                 }
             }
         };
-        public static void Initialize(List<GameObject> gameObjectList)
+        public static void InitPatch()
         {
-            VRLog.Debug($"VRBoop: Initialize:{gameObjectList.Count}");
             // Hooks in here don't get patched by the whole assembly PatchAll since the class has no HarmonyPatch attribute
             Harmony.CreateAndPatchAll(typeof(VRBoop), typeof(VRBoop).FullName);
+        }
+        public static void InitDB(IEnumerable<GameObject> gameObjectList)
+        {
             GetOrAttachCollider(gameObjectList);
         }
         public static void RefreshDynamicBones(bool inactive)
@@ -220,8 +223,7 @@ namespace KK_VR.Features
                 _ => throw new ArgumentException(@"Not a DynamicBone - " + dynamicBone.GetType(), nameof(dynamicBone)),
             };
         }
-        
-        private static void GetOrAttachCollider(List<GameObject> gameObjectList)
+        private static void GetOrAttachCollider(IEnumerable<GameObject> gameObjectList)
         {
             if (gameObjectList == null) throw new ArgumentNullException(nameof(gameObjectList));
 
@@ -231,13 +233,13 @@ namespace KK_VR.Features
                 var existingCollider = gameObject.GetComponentInChildren<DynamicBoneCollider>();
                 if (existingCollider == null)
                 {
-                    VRPlugin.Logger.LogDebug($"AddDynBone:{gameObject.name}");
+                    VRPlugin.Logger.LogDebug($"AddDB:{gameObject.name}");
                     var param = _colliderParams
                         .Where(kv => gameObject.name.StartsWith(kv.Key, StringComparison.Ordinal)
                         || gameObject.name.EndsWith(kv.Key, StringComparison.Ordinal))
                         .Select(kv => kv.Value)
                         .FirstOrDefault();
-                    var colliderObject = new GameObject("DynamicBoneCollider");
+                    var colliderObject = new GameObject("DBCollider");
                     var collider = colliderObject.AddComponent<DynamicBoneCollider>();
 
                     collider.m_Radius = param.m_Radius;

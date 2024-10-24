@@ -26,13 +26,13 @@ namespace KK_VR.Trackers
         /// <summary>
         /// Stores info about allowed colliders from all charas. Initiated once per scene if trackers there's a need.
         /// </summary>
-        protected static readonly Dictionary<Collider, ColliderInfo> _referenceTrackDic = new Dictionary<Collider, ColliderInfo>();
-        protected IDictionary<ChaControl, List<Body>> _blacklistDic;
-        protected readonly List<Collider> _trackList = new List<Collider>();
+        protected static readonly Dictionary<Collider, ColliderInfo> _referenceTrackDic = [];
+        protected Dictionary<ChaControl, List<Body>> _blacklistDic;
+        protected readonly List<Collider> _trackList = [];
         internal ColliderInfo colliderInfo;
-        internal Tracker()
+        internal void SetBlacklistDic(Dictionary<ChaControl, List<Body>> dic)
         {
-            _blacklistDic = GraspController.GetBlacklistDic;
+            _blacklistDic = dic;
         }
         internal class ColliderInfo
         {
@@ -71,7 +71,7 @@ namespace KK_VR.Trackers
         private static void EnableCollider(Collider collider)
         {
             // Those are rigidBodies that shall rest for now.
-            if (collider.name.EndsWith("Handler", StringComparison.Ordinal)) return;
+            if (collider.name.EndsWith("Guide", StringComparison.Ordinal)) return;
 
             collider.enabled = true;
             collider.isTrigger = false;
@@ -136,6 +136,10 @@ namespace KK_VR.Trackers
                 .OrderBy(info => info.behavior.part)
                 .First();
         }
+
+        /// <summary>
+        /// Sets the most interesting currently tracking body part in the field 'colliderInfo'.
+        /// </summary>
         internal void SetSuggestedInfo(ChaControl tryToAvoid = null)
         {
             var infoList = GetCollidersInfo();
@@ -154,9 +158,10 @@ namespace KK_VR.Trackers
 
             colliderInfo = infoList.FirstOrDefault(info => info.behavior.touch != AibuColliderKind.none) ?? infoList.First();
         }
-        internal void FlushTracker()
+        internal void ClearTracker()
         {
             colliderInfo = null;
+            _trackList.Clear();
         }
         internal void RemoveBlacks()
         {
@@ -173,17 +178,19 @@ namespace KK_VR.Trackers
             }
             SetState();
         }
+
         internal void DebugShowActive()
         {
             VRPlugin.Logger.LogDebug($"ActiveTracks.");
             foreach (var track in _trackList)
             {
-                VRPlugin.Logger.LogDebug($"{track.name}");
+                VRPlugin.Logger.LogDebug($"* {track.name}");
             }
         }
+
         protected bool IsInBlacklist(ChaControl chara, Body part)
         {
-            if (_blacklistDic.Count != 0 && _blacklistDic.ContainsKey(chara) && _blacklistDic[chara].Contains(part | Body.None))
+            if (_blacklistDic != null && _blacklistDic.ContainsKey(chara) && (_blacklistDic[chara].Contains(Body.None) || _blacklistDic[chara].Contains(part)))
             {
                 return true;
             }
@@ -192,9 +199,9 @@ namespace KK_VR.Trackers
 
         internal class BodyBehavior
         {
-            public Body part;
-            public AibuColliderKind react;
-            public AibuColliderKind touch;
+            internal Body part;
+            internal AibuColliderKind react;
+            internal AibuColliderKind touch;
             internal BodyBehavior(Body _part, AibuColliderKind _react, AibuColliderKind _touch)
             {
                 part = _part;
@@ -202,7 +209,7 @@ namespace KK_VR.Trackers
                 touch = _touch;
             }
         }
-        private static readonly Dictionary<string, BodyBehavior> _allowedColliders = new Dictionary<string, BodyBehavior>()
+        private static readonly Dictionary<string, BodyBehavior> _allowedColliders = new()
         {
             { "com_hit_head",         new BodyBehavior(Body.Head, AibuColliderKind.reac_head, AibuColliderKind.reac_head) },
             { "com_hit_cheek",        new BodyBehavior(Body.Head, AibuColliderKind.reac_head, AibuColliderKind.mouth) },
@@ -237,11 +244,10 @@ namespace KK_VR.Trackers
             //{ "cf_hit_thigh02_L",   new BodyBehavior(Body.LegL, AibuColliderKind.reac_legL, AibuColliderKind.none) },
             //{ "cf_hit_leg01_L",     new BodyBehavior(Body.LegL, AibuColliderKind.reac_legL, AibuColliderKind.none) },
 
-            { "aibu_reaction_legL",   new BodyBehavior(Body.LegL, AibuColliderKind.reac_legL, AibuColliderKind.none) },
-
             //{ "cf_hit_thigh02_R",   new BodyBehavior(Body.LegR, AibuColliderKind.reac_legR, AibuColliderKind.none) },
             //{ "cf_hit_leg01_R",     new BodyBehavior(Body.LegR, AibuColliderKind.reac_legR, AibuColliderKind.none) },
-
+            
+            { "aibu_reaction_legL",   new BodyBehavior(Body.LegL, AibuColliderKind.reac_legL, AibuColliderKind.none) },
             { "aibu_reaction_legR",   new BodyBehavior(Body.LegR, AibuColliderKind.reac_legR, AibuColliderKind.none) },
             { "aibu_reaction_thighL", new BodyBehavior(Body.LegL, AibuColliderKind.reac_legL, AibuColliderKind.none) },
             { "aibu_reaction_thighR", new BodyBehavior(Body.LegR, AibuColliderKind.reac_legR, AibuColliderKind.none) },
@@ -249,10 +255,10 @@ namespace KK_VR.Trackers
             { "cf_hit_leg02_R",       new BodyBehavior(Body.LegR, AibuColliderKind.reac_legR, AibuColliderKind.none) },
 
             // RigidBodies that move limbs.
-            { "LeftHandHandler",      new BodyBehavior(Body.HandL, AibuColliderKind.reac_armL, AibuColliderKind.reac_armL) },
-            { "RightHandHandler",     new BodyBehavior(Body.HandR, AibuColliderKind.reac_armR, AibuColliderKind.reac_armR) },
-            { "LeftFootHandler",      new BodyBehavior(Body.LegL, AibuColliderKind.reac_legL, AibuColliderKind.none) },
-            { "RightFootHandler",     new BodyBehavior(Body.LegR, AibuColliderKind.reac_legR, AibuColliderKind.none) }
+            { "L_HandGuide",          new BodyBehavior(Body.HandL, AibuColliderKind.reac_armL, AibuColliderKind.reac_armL) },
+            { "R_HandGuide",          new BodyBehavior(Body.HandR, AibuColliderKind.reac_armR, AibuColliderKind.reac_armR) },
+            { "L_FootGuide",          new BodyBehavior(Body.LegL, AibuColliderKind.reac_legL, AibuColliderKind.none) },
+            { "R_FootGuide",          new BodyBehavior(Body.LegR, AibuColliderKind.reac_legR, AibuColliderKind.none) }
         };
 
         internal enum ReactionType
@@ -261,7 +267,7 @@ namespace KK_VR.Trackers
             Laugh,
             Short,
             HitReaction
-            // Slap Reaction? after new/fixed hitReaction maybe.
+            // Slap Reaction? after new hitReaction maybe.
         }
         internal enum Body
         {

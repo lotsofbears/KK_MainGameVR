@@ -1,37 +1,228 @@
-﻿using KK_VR.Trackers;
+﻿using Illusion.Component.Correct;
+using KK_VR.Fixes;
+using KK_VR.Handlers;
+using KK_VR.Interpreters;
+using KK_VR.Settings;
+using KK_VR.Trackers;
+using RootMotion.FinalIK;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using UnityEngine;
+using VRGIN.Core;
 using static KK_VR.Interactors.GraspController;
+using static KK_VR.Interactors.HitReaction;
 
 namespace KK_VR.Interactors
 {
     internal class GraspHelper : MonoBehaviour
     {
+        internal static GraspHelper Instance => _instance;
+        private static GraspHelper _instance;
         private bool _transition;
         private bool _animChange;
-        private static GraspHelper _instance;
-        private readonly List<OffsetPlay> _transitionList = new List<OffsetPlay>();
-        private readonly Dictionary<ChaControl, string> _animChangeDic = new Dictionary<ChaControl, string>();
+        private bool _handChange;
+        private readonly List<OffsetPlay> _transitionList = [];
+        private readonly Dictionary<ChaControl, string> _animChangeDic = [];
         private static Dictionary<ChaControl, List<BodyPart>> _bodyPartsDic;
-        private List<BodyPart> _attachedBodyParts;
-        internal bool _attach;
+        private readonly List<HandScroll> _handScrollList = [];
+        private bool _baseHold;
+        private readonly List<BaseHold> _baseHoldList = [];
+        private static readonly List<OrigOrient> _origOrientList = [];
 
-        internal void Init(Dictionary<ChaControl, List<BodyPart>> bodyPartsDic)
+        private class OrigOrient
+        {
+            internal OrigOrient(ChaControl chara)
+            {
+                _chara = chara.transform;
+                _position = _chara.position;
+                _rotation = _chara.rotation;
+            }
+            private readonly Transform _chara;
+            private readonly Vector3 _position;
+            private readonly Quaternion _rotation;
+
+            internal void Restore() => _chara.SetPositionAndRotation(_position, _rotation);
+        }
+        internal void Init(IEnumerable<ChaControl> charas, Dictionary<ChaControl, List<BodyPart>> bodyPartsDic)
         {
             _instance = this;
             _bodyPartsDic = bodyPartsDic;
+            foreach (var chara in charas)
+            {
+                AddChara(chara);
+                _origOrientList.Add(new(chara));
+            }
         }
+
+        private void AddChara(ChaControl chara)
+        {
+            var ik = chara.objAnim.GetComponent<FullBodyBipedIK>();
+            if (ik == null) return;
+            _bodyPartsDic.Add(chara,
+            [
+                new(
+                    _name:       PartName.Body,
+                    _effector:   ik.solver.bodyEffector,
+                    _origTarget: ik.solver.bodyEffector.target,
+                    _targetBD:   ik.solver.bodyEffector.target.GetComponent<BaseData>(),
+                    _chain:      ik.solver.chain[0]
+                    ),
+
+                new(
+                    _name:       PartName.LeftShoulder,
+                    _effector:   ik.solver.leftShoulderEffector,
+                    _origTarget: ik.solver.leftShoulderEffector.target,
+                    _targetBD:   ik.solver.leftShoulderEffector.target.GetComponent<BaseData>()
+                    ),
+
+                new(
+                    _name:       PartName.RightShoulder,
+                    _effector:   ik.solver.rightShoulderEffector,
+                    _origTarget: ik.solver.rightShoulderEffector.target,
+                    _targetBD:   ik.solver.rightShoulderEffector.target.GetComponent<BaseData>()
+                    ),
+
+                new(
+                    _name:       PartName.LeftThigh,
+                    _effector:   ik.solver.leftThighEffector,
+                    _origTarget: ik.solver.leftThighEffector.target,
+                    _targetBD:   ik.solver.leftThighEffector.target.GetComponent<BaseData>()
+                    ),
+
+                new(
+                    _name:       PartName.RightThigh,
+                    _effector:   ik.solver.rightThighEffector,
+                    _origTarget: ik.solver.rightThighEffector.target,
+                    _targetBD:   ik.solver.rightThighEffector.target.GetComponent<BaseData>()
+                    ),
+
+                new(
+                    _name:       PartName.LeftHand,
+                    _effector:   ik.solver.leftHandEffector,
+                    _origTarget: ik.solver.leftHandEffector.target,
+                    _targetBD:   ik.solver.leftHandEffector.target.GetComponent<BaseData>(),
+                    _chain:      ik.solver.leftArmChain
+                    ),
+
+                new(
+                    _name:       PartName.RightHand,
+                    _effector:   ik.solver.rightHandEffector,
+                    _origTarget: ik.solver.rightHandEffector.target,
+                    _targetBD:   ik.solver.rightHandEffector.target.GetComponent<BaseData>(),
+                    _chain:      ik.solver.rightArmChain
+                    ),
+
+                new(
+                    _name:       PartName.LeftFoot,
+                    _effector:   ik.solver.leftFootEffector,
+                    _origTarget: ik.solver.leftFootEffector.target,
+                    _targetBD:   ik.solver.leftFootEffector.target.GetComponent<BaseData>(),
+                    _chain:      ik.solver.leftLegChain
+                    ),
+
+                new(
+                    _name:       PartName.RightFoot,
+                    _effector:   ik.solver.rightFootEffector,
+                    _origTarget: ik.solver.rightFootEffector.target,
+                    _targetBD:   ik.solver.rightFootEffector.target.GetComponent<BaseData>(),
+                    _chain:      ik.solver.rightLegChain
+                    ),
+            ]);
+            AddExtraColliders(chara);
+            foreach (var bodyPart in _bodyPartsDic[chara])
+            {
+                if (KoikatuInterpreter.settings.DebugShowIK)
+                {
+                    Util.CreatePrimitive(PrimitiveType.Sphere, new Vector3(0.12f, 0.12f, 0.12f), bodyPart.beforeIK, Color.blue, 0.4f);
+                    Util.CreatePrimitive(PrimitiveType.Sphere, new Vector3(0.12f, 0.12f, 0.12f), bodyPart.afterIK, Color.yellow, 0.4f);
+                }
+                bodyPart.guide = bodyPart.visual.gameObject.AddComponent<BodyPartGuide>();
+                bodyPart.guide.Init(bodyPart, chara);
+                if (bodyPart.name > PartName.RightThigh)
+                {
+                    bodyPart.colliders = FindColliders(chara, bodyPart.name);
+                }
+                else
+                {
+                    bodyPart.colliders = [];
+                }
+
+            }
+            SetWorkingState(chara);
+        }
+        //for (var i = 5; i < 9; i++)
+        //{
+        //    var bodyPart = _bodyPartsDic[chara][i];
+        //    var holder = new GameObject(bodyPart.name + "Handler").transform;
+        //    //holder.SetParent(chara.transform, false);
+        //    //bodyPart.handler = holder.gameObject.AddComponent<BodyPartHandler>();
+        //    bodyPart.handler.Init(bodyPart);
+
+        //}
+
+        internal void OnSpotChangePre()
+        {
+            foreach (var orient in _origOrientList)
+            {
+                orient.Restore();
+            }
+            _origOrientList.Clear();
+        }
+        internal void OnSpotChangePost()
+        {
+            VRPlugin.Logger.LogDebug($"Helper:Grasp:OnSpotChange");
+            foreach (var kv in _bodyPartsDic)
+            {
+                _origOrientList.Add(new(kv.Key));
+            }
+        }
+        private readonly List<string> _extraColliders =
+        [
+            "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_j_thigh00_L/cf_j_leg01_L/cf_j_leg03_L/cf_j_foot_L/cf_hit_leg02_L",
+            "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_j_thigh00_R/cf_j_leg01_R/cf_j_leg03_R/cf_j_foot_R/cf_hit_leg02_R",
+        ];
+
+        private void AddFeetCollider(Transform bone)
+        {
+            var collider = bone.gameObject.AddComponent<CapsuleCollider>();
+            collider.radius = 0.1f;
+            collider.height = 0.5f;
+            collider.direction = 2;
+            bone.localPosition = new Vector3(bone.localPosition.x, 0f, 0.06f);
+        }
+        private void AddExtraColliders(ChaControl chara)
+        {
+            foreach (var path in _extraColliders)
+            {
+                AddFeetCollider(chara.objBodyBone.transform.Find(path));
+            }
+        }
+        private Dictionary<Collider, bool> FindColliders(ChaControl chara, PartName partName)
+        {
+            var dic = new Dictionary<Collider, bool>();
+            foreach (var str in _limbColliders[partName])
+            {
+                var collider = chara.objBodyBone.transform.Find(str).GetComponent<Collider>();
+                if (collider != null)
+                {
+                    dic.Add(collider, collider.isTrigger);
+                }
+            }
+            return dic;
+        }
+
         internal static void SetWorkingState(ChaControl chara)
         {
             // By default only limbs are used, the rest is limited to offset play by hitReaction.
+            VRPlugin.Logger.LogDebug($"Helper:Grasp:SetWorkingState:{chara}");
             if (_bodyPartsDic != null && _bodyPartsDic.ContainsKey(chara))
             {
                 foreach (var bodyPart in _bodyPartsDic[chara])
                 {
-                    bodyPart.targetBaseData.bone = bodyPart.effector.bone;
+                    if (!bodyPart.IsLimb())
+                        bodyPart.targetBaseData.bone = bodyPart.effector.bone;
                     bodyPart.effector.target = bodyPart.anchor;
                     if (bodyPart.chain == null) continue;
                     bodyPart.chain.bendConstraint.weight = bodyPart.state == State.Default ? 1f : 0f;
@@ -41,25 +232,27 @@ namespace KK_VR.Interactors
 
         internal static void SetDefaultState(ChaControl chara, string stateName)
         {
+            VRPlugin.Logger.LogDebug($"Helper:Grasp:SetDefaultState:{chara}");
             if (_bodyPartsDic != null && _bodyPartsDic.ContainsKey(chara))
             {
                 if (stateName != null && chara.objTop.activeSelf && chara.visibleAll)
                 {
-                    _instance.AnimChangeAdd(chara, stateName);
+                    _instance.StartAnimChange(chara, stateName);
                 }
                 foreach (var bodyPart in _bodyPartsDic[chara])
                 {
-                    bodyPart.effector.target = bodyPart.origTarget;
+                    bodyPart.effector.target = bodyPart.beforeIK;
                     if (bodyPart.chain != null)
                     {
                         bodyPart.chain.bendConstraint.weight = 1f;
                     }
                 }
             }
-            
+
         }
-        private void AnimChangeAdd(ChaControl chara, string stateName)
+        private void StartAnimChange(ChaControl chara, string stateName)
         {
+            VRPlugin.Logger.LogDebug($"Helper:Grasp:StartAnimChange:{chara}");
             for (var i = 5; i < 7; i++)
             {
                 var bodyPart = _bodyPartsDic[chara][i];
@@ -72,7 +265,7 @@ namespace KK_VR.Interactors
                         _animChangeDic.Add(chara, stateName);
                         _animChange = true;
                     }
-                    bodyPart.anchor.SetParent(_bodyPartsDic[chara][(int)GetParent(bodyPart.name)].anchor, worldPositionStays: true);
+                    bodyPart.anchor.parent = _bodyPartsDic[chara][(int)GetParent(bodyPart.name)].anchor;
                 }
             }
         }
@@ -87,67 +280,91 @@ namespace KK_VR.Interactors
                 _ => PartName.Body
             };
         }
-        private void AnimChangeWait()
+        private void DoAnimChange()
         {
             foreach (var kv in _animChangeDic)
             {
                 VRPlugin.Logger.LogDebug($"AnimChangeWait:{kv.Key}:{kv.Value}");
                 if (kv.Key.animBody.GetCurrentAnimatorStateInfo(0).IsName(kv.Value))
                 {
-                    AnimChangeEnd(kv.Key);
+                    OnAnimChangeEnd(kv.Key);
                     return;
                 }
             }
         }
-        internal void AddAttach(BodyPart bodyPart)
+        //internal void AddAttach(BodyPart bodyPart, Transform attachPoint)
+        //{
+        //    _attach = true;
+        //    _attachedList.Add(new BodyPartOffset(bodyPart, attachPoint));
+        //}
+        //internal void RemoveAttach(BodyPartOffset offset)
+        //{
+        //    if (_attachedList.Remove(offset) && _attachedList.Count == 0)
+        //    {
+        //        _attach = false;
+        //    }
+        //}
+        //internal void RemoveAttach(BodyPart bodyPart)
+        //{
+        //    if (_attachedList.Count != 0)
+        //    {
+        //        var offset = _attachedList.Where(o => o.bodyPart == bodyPart).FirstOrDefault();
+        //        if (offset != null)
+        //        {
+        //            _attachedList.Remove(offset);
+        //            if (_attachedList.Count == 0)
+        //            {
+        //                _attach = false;
+        //            }
+        //        }
+        //    }
+        //}
+        internal void ScrollHand(PartName partName, ChaControl chara, bool increase)
         {
-            _attach = true;
-            _attachedBodyParts.Add(bodyPart);
+            _handChange = true;
+            _handScrollList.Add(new HandScroll(partName, chara, increase));
         }
-        internal void RemoveAttach(BodyPart bodyPart)
+        internal void StopScroll()
         {
-            if (_attachedBodyParts.Remove(bodyPart) && _attachedBodyParts.Count == 0)
-            {
-                _attach = false;
-            }
+            _handChange = false;
+            _handScrollList.Clear();
         }
         internal void OnPoseChange()
         {
-            _attach = false;
-            _attachedBodyParts.Clear();
+            VRPlugin.Logger.LogDebug($"Helper:Grasp:OnPoseChange");
             StopTransition();
+            StopAnimChange();
+            foreach (var orig in _origOrientList)
+            {
+                orig.Restore();
+            }
+            foreach (var bodyPartList in _bodyPartsDic.Values)
+            {
+                foreach (var bodyPart in bodyPartList)
+                {
+                    bodyPart.Reset();
+                }
+            }
+
         }
         private void Update()
         {
+            if (_baseHold) DoBaseHold();
             if (_transition) DoTransition();
-            if (_animChange) AnimChangeWait();
-            if (_attach)
-            {
-                foreach (var bodyPart in _attachedBodyParts)
-                {
-                    bodyPart.anchor.position = bodyPart.attachTarget.TransformPoint(bodyPart.offset);
-                }
-            }
+            if (_animChange) DoAnimChange();
+            if (_handChange) DoHandChange();
         }
-        private void AnimChangeEnd(ChaControl chara)
+        private void OnAnimChangeEnd(ChaControl chara)
         {
+            VRPlugin.Logger.LogDebug($"Helper:Grasp:OnAnimChangeEnd");
             for (var i = 5; i < 7; i++)
             {
                 var bodyPart = _bodyPartsDic[chara][i];
                 if (bodyPart.state == State.Active)
                 {
-                    bodyPart.anchor.SetParent(bodyPart.origTarget, worldPositionStays: true);
+                    bodyPart.anchor.SetParent(bodyPart.beforeIK, worldPositionStays: true);
                 }
             }
-
-            //    foreach (var bodyPart in _bodyPartsDic[chara])
-            //{
-            //    if (bodyPart.state == State.Active)
-            //    {
-            //        bodyPart.anchor.SetParent(bodyPart.origTarget, worldPositionStays: true);
-            //        //SetEffector(bodyPart.origTarget, bodyPart);
-            //    }
-            //}
             _animChangeDic.Remove(chara);
             _animChange = _animChangeDic.Count != 0;
         }
@@ -183,12 +400,87 @@ namespace KK_VR.Interactors
                 }
             }
         }
-        //private void StopTransition()
-        //{
-        //    VRPlugin.Logger.LogDebug($"Transition:Stop{_transitionList.Count}");
-        //    _transition = false;
-        //    _transitionList.Clear();
-        //}
+
+        internal class BaseHold
+        {
+            internal BaseHold(BodyPart _bodyPart, ChaControl _chara, Transform _attachPoint)
+            {
+                bodyPart = _bodyPart;
+                chara = _chara;
+                attachPoint = _attachPoint;
+                offsetPos = _attachPoint.InverseTransformDirection(_chara.transform.position - _attachPoint.position);
+                offsetRot = Quaternion.Inverse(_attachPoint.rotation) * _chara.transform.rotation;
+            }
+            internal BodyPart bodyPart;
+            internal ChaControl chara;
+            internal Transform attachPoint;
+            internal Quaternion offsetRot;
+            internal Vector3 offsetPos;
+            internal int scrollDir;
+            internal bool scrollInc;
+        }
+        internal BaseHold StartBaseHold(BodyPart bodyPart, ChaControl chara, Transform attachPoint)
+        {
+            _baseHold = true;
+            var baseHold = new BaseHold(bodyPart, chara, attachPoint);
+            _baseHoldList.Add(baseHold);
+            return baseHold;
+        }
+        private void DoBaseHold()
+        {
+            foreach (var hold in _baseHoldList)
+            {
+                if (hold.scrollDir != 0)
+                {
+                    if (hold.scrollDir == 1)
+                    {
+                        DoBaseHoldVerticalScroll(hold, hold.scrollInc);
+                    }
+                    else
+                    {
+                        DoBaseHoldHorizontalScroll(hold, hold.scrollInc);
+                    }
+                }
+                hold.chara.transform.SetPositionAndRotation(
+                    hold.attachPoint.position + hold.attachPoint.TransformDirection(hold.offsetPos),
+                    hold.attachPoint.rotation * hold.offsetRot
+                    );
+            }
+        }
+        internal void StopBaseHold(BaseHold baseHold)
+        {
+            _baseHoldList.Remove(baseHold);
+            if (_baseHoldList.Count == 0)
+            {
+                _baseHold = false;
+            }
+        }
+        private void DoHandChange()
+        {
+            foreach (var scroll in _handScrollList)
+            {
+                scroll.Scroll();
+            }
+        }
+        internal void StartBaseHoldScroll(BaseHold baseHold, int direction, bool increase)
+        {
+            baseHold.scrollDir = direction;
+            baseHold.scrollInc = increase;
+        }
+        internal void StopBaseHoldScroll(BaseHold baseHold)
+        {
+            baseHold.scrollDir = 0;
+        }
+        private void DoBaseHoldVerticalScroll(BaseHold baseHold, bool increase)
+        {
+            baseHold.offsetPos += VR.Camera.Head.forward * (Time.deltaTime * (increase ? 10f : -10f));
+        }
+        private Quaternion _left = Quaternion.Euler(0f, 1f, 0f);
+        private Quaternion _right = Quaternion.Euler(0f, -1f, 0f);
+        private void DoBaseHoldHorizontalScroll(BaseHold baseHold, bool left)
+        {
+            baseHold.offsetRot *= (left ? _left : _right);
+        }
         internal void StopTransition(BodyPart bodyPart)
         {
             VRPlugin.Logger.LogDebug($"Transition:Stop{_transitionList.Count}");
@@ -199,10 +491,136 @@ namespace KK_VR.Interactors
             if (_transitionList.Count == 0)
                 _transition = false;
         }
-        internal void StopTransition()
+        private void StopTransition()
         {
             _transition = false;
             _transitionList.Clear();
         }
+
+        private void StopAnimChange()
+        {
+            _animChange = false;
+            _animChangeDic.Clear();
+        }
+        //internal class BodyPartOffset
+        //{
+        //    internal BodyPartOffset(BodyPart _bodyPart, Transform _target)
+        //    {
+        //        bodyPart = _bodyPart;
+        //        target = _target;
+        //        offset = _target.InverseTransformPoint(_bodyPart.anchor.position);
+        //    }
+        //    internal BodyPart bodyPart;
+        //    internal Transform target;
+        //    internal Vector3 offset;
+        //}
+        private static readonly Dictionary<PartName, List<string>> _limbColliders = new()
+        {
+            {
+                PartName.LeftHand, new List<string>()
+                {
+                    "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_L/cf_j_shoulder_L/" +
+                    "cf_j_arm00_L/cf_j_forearm01_L/cf_d_forearm02_L/cf_s_forearm02_L/cf_hit_wrist_L",
+
+                    "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_L/cf_j_shoulder_L/cf_j_arm00_L/cf_j_forearm01_L/cf_j_hand_L/com_hit_hand_L",
+                }
+            },
+            {
+                PartName.RightHand, new List<string>()
+                {
+                    "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_R/cf_j_shoulder_R/" +
+                    "cf_j_arm00_R/cf_j_forearm01_R/cf_d_forearm02_R/cf_s_forearm02_R/cf_hit_wrist_R",
+
+                    "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_R/cf_j_shoulder_R/cf_j_arm00_R/cf_j_forearm01_R/cf_j_hand_R/com_hit_hand_R",
+                }
+            },
+            {
+                PartName.LeftFoot, new List<string>()
+                {
+                    "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_j_thigh00_L/cf_j_leg01_L/cf_s_leg01_L/cf_hit_leg01_L/aibu_reaction_legL",
+                    "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_j_thigh00_L/cf_j_leg01_L/cf_j_leg03_L/cf_j_foot_L/cf_hit_leg02_L",
+                }
+            },
+            {
+                PartName.RightFoot, new List<string>()
+                {
+                    "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_j_thigh00_R/cf_j_leg01_R/cf_s_leg01_R/cf_hit_leg01_R/aibu_reaction_legR",
+                    "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_j_thigh00_R/cf_j_leg01_R/cf_j_leg03_R/cf_j_foot_R/cf_hit_leg02_R",
+                }
+            }
+        };
+        //private static readonly Dictionary<PartName, List<ColliderParam>> _limbColliders = new Dictionary<PartName, List<ColliderParam>>()
+        //{
+        //    {
+        //        PartName.LeftHand, new List<ColliderParam>()
+        //        {
+        //            new ColliderParam
+        //            {
+        //                path = "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_L/cf_j_shoulder_L/" +
+        //                "cf_j_arm00_L/cf_j_forearm01_L/cf_d_forearm02_L/cf_s_forearm02_L/cf_hit_wrist_L",
+        //                normalHeight = 0.24f,
+        //                activeHeight = 0.15f
+        //            },
+        //            new ColliderParam
+        //            {
+        //                path = "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_L/cf_j_shoulder_L/cf_j_arm00_L/cf_j_forearm01_L/cf_j_hand_L/com_hit_hand_L",
+        //                activeHeight = 0f
+        //            }
+
+        //        }
+        //    },
+        //    {
+        //        PartName.RightHand, new List<ColliderParam>()
+        //        {
+        //            new ColliderParam
+        //            {
+        //                path = "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_R/cf_j_shoulder_R/" +
+        //                "cf_j_arm00_R/cf_j_forearm01_R/cf_d_forearm02_R/cf_s_forearm02_R/cf_hit_wrist_R",
+        //                normalHeight = 0.24f,
+        //                activeHeight = 0.15f
+        //            },
+        //            new ColliderParam
+        //            {
+        //                path = "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_R/cf_j_shoulder_R/cf_j_arm00_R/cf_j_forearm01_R/cf_j_hand_R/com_hit_hand_R",
+        //                activeHeight = 0f
+        //            }
+
+        //        }
+        //    },
+        //    {
+        //        PartName.LeftFoot, new List<ColliderParam>()
+        //        {
+        //            new ColliderParam
+        //            {
+        //                path = "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_j_thigh00_L/cf_j_leg01_L/cf_s_leg01_L/cf_hit_leg01_L/aibu_reaction_legL",
+        //                normalHeight = 0.4f,
+        //                activeHeight = 0.35f
+        //            },
+        //            new ColliderParam
+        //            {
+        //                path = "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_j_thigh00_L/cf_j_leg01_L/cf_j_leg03_L/cf_j_foot_L/cf_hit_leg02_L",
+        //                activeHeight = 0f
+        //            }
+
+        //        }
+        //    },
+        //    {
+        //        PartName.RightFoot, new List<ColliderParam>()
+        //        {
+        //            new ColliderParam
+        //            {
+        //                path = "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_j_thigh00_R/cf_j_leg01_R/cf_s_leg01_R/cf_hit_leg01_R/aibu_reaction_legR",
+        //                normalHeight = 0.4f,
+        //                activeHeight = 0.35f
+        //            },
+        //            new ColliderParam
+        //            {
+        //                path = "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_j_thigh00_R/cf_j_leg01_R/cf_j_leg03_R/cf_j_foot_R/cf_hit_leg02_R",
+        //                activeHeight = 0f
+        //            }
+
+        //        }
+        //    }
+        //};
     }
 }

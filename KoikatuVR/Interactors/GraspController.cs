@@ -1,96 +1,69 @@
-﻿using ActionGame.Chara;
-using ADV.Commands.Object;
-using HarmonyLib;
+﻿using ADV.Commands.Base;
 using Illusion.Component.Correct;
-using Illusion.Game.Extensions;
-using IllusionUtility.GetUtility;
-using KK_VR.Features;
 using KK_VR.Handlers;
 using KK_VR.Interpreters;
 using KK_VR.Settings;
 using KK_VR.Trackers;
-using KKAPI.Utilities;
-using MessagePack;
-using NodeCanvas.Tasks.Actions;
 using RootMotion.FinalIK;
-using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
 using UniRx;
 using Unity.Linq;
 using UnityEngine;
-using UnityEngine.Assertions.Must;
-using VRGIN.Controls;
 using VRGIN.Core;
-using static ActionGame.FixEventScheduler;
-using static HFlag;
 using static KK_VR.Interactors.GraspController;
-using static UnityEngine.UI.Image;
 
 namespace KK_VR.Interactors
 {
     // Named Grasp so there is less confusion with GrabMove. 
     internal class GraspController
     {
-        private HandHolder _hand;
+        private readonly AnimHelper _animHelper = new();
+        private readonly HandHolder _hand;
         private static GraspHelper _helper;
-        private GraspVisualizer _visual;
-        private KoikatuSettings _settings => VR.Context.Settings as KoikatuSettings;
-        private static readonly Dictionary<ChaControl, List<BodyPart>> _bodyPartsDic = new Dictionary<ChaControl, List<BodyPart>>();
+        private static readonly List<GraspController> _instances = [];
+        private static readonly Dictionary<ChaControl, List<BodyPart>> _bodyPartsDic = [];
 
-        private static readonly IDictionary<ChaControl, List<Tracker.Body>> _blackListDic = new Dictionary<ChaControl, List<Tracker.Body>>();
-        private static readonly List<List<PartName>> _jointGroupList = new List<List<PartName>>()
-        {
-            new List<PartName> { PartName.LeftShoulder, PartName.RightShoulder },
-            new List<PartName> { PartName.LeftThigh, PartName.RightThigh }
-        };
+        private readonly Dictionary<ChaControl, List<Tracker.Body>> _blackListDic = [];
+        private static readonly List<List<PartName>> _jointGroupList =
+        [
+            [PartName.LeftShoulder, PartName.RightShoulder],
+            [PartName.LeftThigh, PartName.RightThigh]
+        ];
+        // Clutch.
+        private GraspHelper.BaseHold _baseHold;
 
         private ChaControl _heldChara;
         private ChaControl _syncedChara;
 
-        private static readonly List<BodyPart> _attachedBodyParts = new List<BodyPart>();
+        //private static readonly List<BodyPart> _attachedBodyParts = new List<BodyPart>();
         //private readonly Dictionary<ChaControl, string> _animChangeDic = new Dictionary<ChaControl, string>();
         // private readonly Dictionary<BodyPart, List<bool>> _disabledCollidersDic = new Dictionary<BodyPart, List<bool>>();
         // For Grip.
-        private readonly List<BodyPart> _heldBodyParts = new List<BodyPart>();
+        private readonly List<BodyPart> _heldBodyParts = [];
         // For Trigger conditional long press. 
-        private readonly List<BodyPart> _tempHeldBodyParts = new List<BodyPart>();
+        private readonly List<BodyPart> _tempHeldBodyParts = [];
         // For Touchpad.
-        private readonly List<BodyPart> _syncedBodyParts = new List<BodyPart>();
+        private readonly List<BodyPart> _syncedBodyParts = [];
 
-        private static readonly List<Vector3> _limbPosOffsets = new List<Vector3>()
-        {
+        private static readonly List<Vector3> _limbPosOffsets =
+        [
             new Vector3(-0.005f, 0.015f, -0.04f),
             new Vector3(0.005f, 0.015f, -0.04f),
             Vector3.zero,
             Vector3.zero
-        };
-        private static readonly List<Quaternion> _limbRotOffsets = new List<Quaternion>()
-        {
+        ];
+        private static readonly List<Quaternion> _limbRotOffsets =
+        [
             Quaternion.Euler(0f, 90f, 0f),
             Quaternion.Euler(0f, -90f, 0f),
             Quaternion.identity,
             Quaternion.identity
-        };
-        
-        internal class ColliderParam
-        {
-            internal Collider collider;
-            internal string path;
-
-            // Collider.height's value, 0 for disabled state.
-            internal float activeHeight;
-            internal float normalHeight;
-        }
+        ];
 
         // Add held items too once implemented. All bodyParts have black list entries, dic is sufficient.
-        internal bool IsBusy => _blackListDic.Count != 0;
-        internal static IDictionary<ChaControl, List<Tracker.Body>> GetBlacklistDic => _blackListDic;
+        internal bool IsBusy => _blackListDic.Count != 0 || _baseHold != null;
+        internal Dictionary<ChaControl, List<Tracker.Body>> GetBlacklistDic => _blackListDic;
         internal List<BodyPart> GetFullBodyPartList(ChaControl chara) => _bodyPartsDic[chara];
         internal enum State
         {
@@ -103,48 +76,59 @@ namespace KK_VR.Interactors
             //Grounded     // Not implemented. Is attached to floor/some map item collider. 
         }
 
+
         internal class BodyPart
         {
-            internal PartName name;
-            internal Transform anchor;
-            internal IKEffector effector;
-            internal FBIKChain chain;
-            internal Transform origTarget;
-            internal BaseData targetBaseData;
+            internal readonly PartName name;
+            // Personal for each limb.
+            internal readonly Transform anchor;
+            internal readonly Transform afterIK;
+            internal readonly Transform beforeIK;
+            internal readonly IKEffector effector;
+            internal readonly FBIKChain chain;
+            internal readonly BaseData targetBaseData;
             internal State state;
-            internal List<ColliderParam> colliderParams;
-            internal LimbHandler handler;
-            internal Vector3 offset;
-            internal Transform attachTarget;
+            internal Dictionary<Collider, bool> colliders = [];
+            internal BodyPartGuide guide;
+            internal VisualObject visual;
+            internal bool IsLimb() => name > PartName.RightThigh && name < PartName.UpperBody;
 
             internal BodyPart(PartName _name, IKEffector _effector, Transform _origTarget,
-                BaseData _targetBD, FBIKChain _chain = null, IKEffector _parentJointEffector = null,
-                Transform _parentJointAnimPos = null)
+                BaseData _targetBD, FBIKChain _chain = null)
             {
                 name = _name;
                 effector = _effector;
-                origTarget = _origTarget;
+                afterIK = _effector.bone;
+                beforeIK = _origTarget;
                 targetBaseData = _targetBD;
                 chain = _chain;
+
+                anchor = new GameObject(name + "Anchor").transform;
+                anchor.SetParent(beforeIK, worldPositionStays: false);
+                effector.target = anchor;
+
+                visual = new VisualObject(this);
             }
-        }
-        internal class OffsetPlay
-        {
-            internal OffsetPlay(BodyPart _bodyPart, Vector3 _offsetVec, Quaternion _offsetRot, bool _constrain)
+            internal void Reset()
             {
-                bodyPart = _bodyPart;
-                offsetPos = _offsetVec;
-                offsetRot = _offsetRot;
-                constrain = _constrain;
-                coef = 0.35f / _offsetVec.magnitude;
-                _bodyPart.state = State.Transition;
+                anchor.parent = beforeIK; // SetParent(beforeIK, false); 
+                anchor.localPosition = Vector3.zero;
+                anchor.localRotation = Quaternion.identity;
+                //VRPlugin.Logger.LogDebug($"{name}:Reset:AnchorLocal = {anchor.localPosition},{anchor.localEulerAngles}");
+                guide.Stay();
+                state = State.Default; 
+                if (chain != null)
+                {
+                    chain.bendConstraint.weight = 1f;
+                }
             }
-            internal BodyPart bodyPart;
-            internal Vector3 offsetPos;
-            internal Quaternion offsetRot;
-            internal float coef;
-            internal float current;
-            internal bool constrain;
+            //internal void Sync()
+            //{
+            //    effector.target = null;
+            //    anchor.SetPositionAndRotation(afterIK.position, afterIK.rotation);
+            //    effector.target = anchor;
+            //}
+            
         }
         public enum PartName
         {
@@ -164,322 +148,89 @@ namespace KK_VR.Interactors
         internal GraspController(HandHolder hand)
         {
             _hand = hand;
-            _visual = GraspVisualizer.Instance;
+           // visual = GraspVisualizer.Instance;
+            _instances.Add(this);
         }
         internal static void Init(IEnumerable<ChaControl> charas)
         {
             _bodyPartsDic.Clear();
-            _blackListDic.Clear();
+            foreach (var inst in _instances)
+            {
+                inst._blackListDic.Clear();
+            }
             if (_helper == null)
             {
                 _helper = charas.First().gameObject.AddComponent<GraspHelper>();
-                _helper.Init(_bodyPartsDic, _attachedBodyParts);
-            }
-            foreach (var chara in charas)
-            {
-                AddChara(chara);
-            }
-            GraspVisualizer.Init(_bodyPartsDic);
-        }
-        private static void AddChara(ChaControl chara)
-        {
-            var ik = chara.objAnim.GetComponent<FullBodyBipedIK>();
-            if (ik == null) return;
-            _bodyPartsDic.Add(chara, new List<BodyPart>()
-            {
-                new BodyPart(
-                    _name:       PartName.Body,
-                    _effector:   ik.solver.bodyEffector,
-                    _origTarget: ik.solver.bodyEffector.target,
-                    _targetBD:   ik.solver.bodyEffector.target.GetComponent<BaseData>(),
-                    _chain:      ik.solver.chain[0]
-                    ),
-
-                new BodyPart(
-                    _name:       PartName.LeftShoulder,
-                    _effector:   ik.solver.leftShoulderEffector,
-                    _origTarget: ik.solver.leftShoulderEffector.target,
-                    _targetBD:   ik.solver.leftShoulderEffector.target.GetComponent<BaseData>()
-                    ),
-
-                new BodyPart(
-                    _name:       PartName.RightShoulder,
-                    _effector:   ik.solver.rightShoulderEffector,
-                    _origTarget: ik.solver.rightShoulderEffector.target,
-                    _targetBD:   ik.solver.rightShoulderEffector.target.GetComponent<BaseData>()
-                    ),
-
-                new BodyPart(
-                    _name:       PartName.LeftThigh,
-                    _effector:   ik.solver.leftThighEffector,
-                    _origTarget: ik.solver.leftThighEffector.target,
-                    _targetBD:   ik.solver.leftThighEffector.target.GetComponent<BaseData>()
-                    ),
-
-                new BodyPart(
-                    _name:       PartName.RightThigh,
-                    _effector:   ik.solver.rightThighEffector,
-                    _origTarget: ik.solver.rightThighEffector.target,
-                    _targetBD:   ik.solver.rightThighEffector.target.GetComponent<BaseData>()
-                    ),
-
-                new BodyPart(
-                    _name:       PartName.LeftHand,
-                    _effector:   ik.solver.leftHandEffector,
-                    _origTarget: ik.solver.leftHandEffector.target,
-                    _targetBD:   ik.solver.leftHandEffector.target.GetComponent<BaseData>(),
-                    _chain:      ik.solver.leftArmChain
-                    ),
-
-                new BodyPart(
-                    _name:       PartName.RightHand,
-                    _effector:   ik.solver.rightHandEffector,
-                    _origTarget: ik.solver.rightHandEffector.target,
-                    _targetBD:   ik.solver.rightHandEffector.target.GetComponent<BaseData>(),
-                    _chain:      ik.solver.rightArmChain
-                    ),
-
-                new BodyPart(
-                    _name:       PartName.LeftFoot,
-                    _effector:   ik.solver.leftFootEffector,
-                    _origTarget: ik.solver.leftFootEffector.target,
-                    _targetBD:   ik.solver.leftFootEffector.target.GetComponent<BaseData>(),
-                    _chain:      ik.solver.leftLegChain
-                    ),
-
-                new BodyPart(
-                    _name:       PartName.RightFoot,
-                    _effector:   ik.solver.rightFootEffector,
-                    _origTarget: ik.solver.rightFootEffector.target,
-                    _targetBD:   ik.solver.rightFootEffector.target.GetComponent<BaseData>(),
-                    _chain:      ik.solver.rightLegChain
-                    ),
-            });
-            foreach (var bodyPart in _bodyPartsDic[chara])
-            {
-                bodyPart.anchor = new GameObject(bodyPart.name + "Anchor").transform;
-                bodyPart.anchor.SetParent(bodyPart.origTarget, worldPositionStays: false);
-            }
-            GraspHelper.SetWorkingState(chara);
-            AddExtraColliders(chara);
-            for (var i = 5; i < 9; i++)
-            {
-                var bodyPart = _bodyPartsDic[chara][i];
-                var holder = new GameObject(bodyPart.name + "Handler").transform;
-                holder.SetParent(chara.transform, false);
-                bodyPart.handler = holder.gameObject.AddComponent<LimbHandler>();
-                bodyPart.handler.Init(i, bodyPart.origTarget, chara);
-                bodyPart.colliderParams = FindColliders(chara, bodyPart.name);
-
+                _helper.Init(charas, _bodyPartsDic);
             }
         }
+        
 
-        private static readonly List<string> _extraColliders = new List<string>()
+        private void UpdateGrasp(BodyPart bodyPart, ChaControl chara)
         {
-            "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_j_thigh00_L/cf_j_leg01_L/cf_j_leg03_L/cf_j_foot_L/cf_hit_leg02_L",
-            "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_j_thigh00_R/cf_j_leg01_R/cf_j_leg03_R/cf_j_foot_R/cf_hit_leg02_R",
-        };
+            _heldChara = chara;
+            _heldBodyParts.Add(bodyPart);
+        }
+        private void UpdateGrasp(IEnumerable<BodyPart> bodyPart, ChaControl chara)
+        {
+            _heldChara = chara;
+            _heldBodyParts.AddRange(bodyPart);
+        }
 
-        private static void AddFeetCollider(Transform bone)
+        private void UpdateTempGrasp(BodyPart bodyPart)
         {
-            var collider = bone.gameObject.AddComponent<CapsuleCollider>();
-            collider.radius = 0.1f;
-            collider.height = 0.5f;
-            collider.direction = 2;
-            bone.localPosition = new Vector3(bone.localPosition.x, 0f, 0.06f);
+            _tempHeldBodyParts.Add(bodyPart);
         }
-        private static void AddExtraColliders(ChaControl chara)
+        private void UpdateSync(BodyPart bodyPart, ChaControl chara)
         {
-            foreach (var path in _extraColliders)
-            {
-                AddFeetCollider(chara.objBodyBone.transform.Find(path));
-            }
-        }
-        private static List<ColliderParam> FindColliders(ChaControl chara, PartName partName)
-        {
-            var list = new List<ColliderParam>();
-            foreach (var param in _limbColliders[partName])
-            {
-                var col = chara.objBodyBone.transform.Find(param.path).GetComponent<Collider>();
-                if (col != null)
-                {
-                    list.Add(new ColliderParam
-                    {
-                        collider = col,
-                        activeHeight = param.activeHeight,
-                        normalHeight = param.normalHeight
-                    });
-                }
-            }
-            return list;
+            _syncedChara = chara;
+            _syncedBodyParts.Add(bodyPart);
         }
         private void StopGrasp()
         {
-            if (_visual.Active)
-                SetGuideObjects(false, _heldBodyParts);
-
             _heldBodyParts.Clear();
             if (_heldChara != null)
             {
                 _blackListDic.Remove(_heldChara);
                 _heldChara = null;
-                if (_tempHeldBodyParts.Count != 0)
-                {
-                    _tempHeldBodyParts.Clear();
-                }
+                _tempHeldBodyParts.Clear();
+
                 UpdateBlackList();
             }
-        }
-
-        private void UpdateGrasp(BodyPart bodyPart)
-        {
-            //if (bodyPart == null)
-            //{
-            //    if (_visual.Active) 
-            //        SetGuideObjects(false, _heldBodyParts);
-
-            //    _heldBodyParts.Clear();
-            //    if (_heldChara != null)
-            //    {
-            //        _blackListDic.Remove(_heldChara);
-            //        _heldChara = null;
-            //        if (_tempHeldBodyParts.Count != 0)
-            //        {
-            //            _tempHeldBodyParts.Clear();
-            //        }
-            //        UpdateBlackList();
-            //    }
-            //}
-            //else
-            {
-                _heldBodyParts.Add(bodyPart);
-                UpdateBlackList();
-                if (_settings.AutoShowGuideObjects) 
-                    SetGuideObjects(true, _heldBodyParts);
-            }
-        }
-        private void UpdateGrasp(IEnumerable<BodyPart> bodyPart)
-        {
-            //if (bodyPart == null)
-            //{
-            //    if (_visual.Active)
-            //        SetGuideObjects(false, _heldBodyParts);
-
-            //    _heldBodyParts.Clear();
-            //    if (_heldChara != null)
-            //    {
-            //        _blackListDic.Remove(_heldChara);
-            //        _heldChara = null;
-            //        if (_tempHeldBodyParts.Count != 0)
-            //        {
-            //            _tempHeldBodyParts.Clear();
-            //        }
-            //        UpdateBlackList();
-            //    }
-            //}
-            //else
-            {
-                _heldBodyParts.AddRange(bodyPart);
-                UpdateBlackList();
-                if (_settings.AutoShowGuideObjects)
-                    SetGuideObjects(true, _heldBodyParts);
-            }
-        }
-        private void UpdateTempGrasp(BodyPart bodyPart)
-        {
-            //if (bodyPart == null)
-            //{
-            //    if (_visual.Active) 
-            //        SetGuideObjects(false, _tempHeldBodyParts);
-
-            //    _tempHeldBodyParts.Clear();
-            //    UpdateBlackList();
-            //}
-            //else
-            {
-                _tempHeldBodyParts.Add(bodyPart);
-                UpdateBlackList();
-                if (_settings.AutoShowGuideObjects)
-                    SetGuideObjects(true, _tempHeldBodyParts);
-            }
+            _hand.OnGraspRelease();
         }
         private void StopTempGrasp()
         {
-            {
-                if (_visual.Active)
-                    SetGuideObjects(false, _tempHeldBodyParts);
-
-                _tempHeldBodyParts.Clear();
-                UpdateBlackList();
-            }
-        }
-        private void UpdateSync(BodyPart bodyPart)
-        {
-            //if (bodyPart == null)
-            //{
-            //    _syncedBodyParts.Clear();
-            //    if (_syncedChara != null)
-            //    {
-            //        _blackListDic.Remove(_syncedChara);
-            //        _syncedChara = null;
-            //        UpdateBlackList();
-            //    }
-            //}
-            //else
-            {
-                _syncedBodyParts.Add(bodyPart);
-                UpdateBlackList();
-            }
+            _tempHeldBodyParts.Clear();
+            UpdateBlackList();
         }
         private void StopSync()
         {
             _syncedBodyParts.Clear();
             if (_syncedChara != null)
             {
-                _blackListDic.Remove(_syncedChara);
                 _syncedChara = null;
                 UpdateBlackList();
             }
         }
         private PartName ConvertTrackerToIK(Tracker.Body part)
         {
-            switch (part)
+            return part switch
             {
-                case Tracker.Body.ArmL:
-                    return PartName.LeftShoulder;
-                case Tracker.Body.ArmR:
-                    return PartName.RightShoulder;
-
-                case Tracker.Body.MuneL:
-                case Tracker.Body.MuneR:
-                    return PartName.UpperBody;
-                case Tracker.Body.LowerBody:
-                    return PartName.Body;
-
-                case Tracker.Body.LegL:
-                    return PartName.LeftFoot;
-                case Tracker.Body.LegR:
-                    return PartName.RightFoot;
-                case Tracker.Body.ThighL:
-                    return PartName.LeftThigh;
-                case Tracker.Body.ThighR:
-                    return PartName.RightThigh;
-
-                case Tracker.Body.HandL:
-                case Tracker.Body.ForearmL:
-                    return PartName.LeftHand;
-
-                case Tracker.Body.HandR:
-                case Tracker.Body.ForearmR:
-                    return PartName.RightHand;
-
-                case Tracker.Body.Groin:
-                case Tracker.Body.Asoko:
-                    return PartName.LowerBody;
-
-                default: // actual UpperBody
-                    return PartName.Body;
-            }
+                Tracker.Body.ArmL => PartName.LeftShoulder,
+                Tracker.Body.ArmR => PartName.RightShoulder,
+                Tracker.Body.MuneL or Tracker.Body.MuneR => PartName.UpperBody,
+                Tracker.Body.LowerBody => PartName.Body,
+                Tracker.Body.LegL => PartName.LeftFoot,
+                Tracker.Body.LegR => PartName.RightFoot,
+                Tracker.Body.ThighL => PartName.LeftThigh,
+                Tracker.Body.ThighR => PartName.RightThigh,
+                Tracker.Body.HandL or Tracker.Body.ForearmL => PartName.LeftHand,
+                Tracker.Body.HandR or Tracker.Body.ForearmR => PartName.RightHand,
+                Tracker.Body.Groin or Tracker.Body.Asoko => PartName.LowerBody,
+                // actual UpperBody
+                _ => PartName.Body,
+            };
         }
         /*
          * Plan.
@@ -551,9 +302,24 @@ namespace KK_VR.Interactors
                     + Vector3.Distance(lstBodyPart[(int)partNames[1]].effector.bone.position, pos))
                     * 0.5f);
             }
-            return list[0] > list[1] ? PartName.LowerBody : PartName.UpperBody;
+            // 0 - Shoulders, 1 - thighs
+            return list[0] - 0.1f > list[1] ? PartName.LowerBody : PartName.UpperBody;
         }
-
+        //private List<BodyPart> FindJoints(List<BodyPart> lstBodyPart, Vector3 pos)
+        //{
+        //    // Finds joint pair that was closer to the core and returns it as abnormal index for further processing.
+        //    var list = new List<float>();
+        //    foreach (var partNames in _jointGroupList)
+        //    {
+        //        // Avg distance to both joints
+        //        list.Add(
+        //            (Vector3.Distance(lstBodyPart[(int)partNames[0]].effector.bone.position, pos)
+        //            + Vector3.Distance(lstBodyPart[(int)partNames[1]].effector.bone.position, pos))
+        //            * 0.5f);
+        //    }
+        //    // 0 - Shoulders, 1 - thighs
+        //    return FindJoint(lstBodyPart, _jointGroupList[list[0] - 0.1f > list[1] ? 1 : 0], pos);
+        //}
         private List<PartName> FindJoint(List<BodyPart> lstBodyPart, List<PartName> partNames, Vector3 pos)
         {
             // Works with abnormal index, returns closer joint or both based on the distance.
@@ -568,7 +334,7 @@ namespace KK_VR.Interactors
             else
             {
                 // Nope, they weren't.
-                return new List<PartName>() { a < b ? partNames[0] : partNames[1] };
+                return [a < b ? partNames[0] : partNames[1]];
             }
         }
 
@@ -622,16 +388,17 @@ namespace KK_VR.Interactors
 
             if (_heldChara != null)
             {
+                // First we look if it's a limb and it has tracking on something.
+                // If there is no track, then expand limbs we are holding.
                 var heldBodyParts = _heldBodyParts.Concat(_tempHeldBodyParts);
                 var bodyPartsLimbs = heldBodyParts
-                    .Where(b => b.name != PartName.Body && b.handler != null && b.handler.IsBusy);
+                    .Where(b => b.name != PartName.Body && b.guide != null && b.guide.IsBusy);
                 if (bodyPartsLimbs.Any())
                 {
-                    SetGuideObjects(false, heldBodyParts);
                     foreach (var bodyPart in bodyPartsLimbs)
                     {
-                        VRPlugin.Logger.LogDebug($"OnTrigger:Attach:Grasped:{bodyPart.name} -> {bodyPart.handler.GetTrackTransform.name}");
-                        AttachBodyPart(bodyPart, bodyPart.handler.GetTrackTransform);
+                        VRPlugin.Logger.LogDebug($"OnTrigger:Attach:Grasped:{bodyPart.name} -> {bodyPart.guide.GetTrackTransform.name}");
+                        AttachBodyPart(bodyPart, bodyPart.guide.GetTrackTransform, bodyPart.guide.GetChara);
                     }
                     ReleaseBodyParts(heldBodyParts);
                     StopGrasp();
@@ -644,13 +411,13 @@ namespace KK_VR.Interactors
             else if (_syncedChara != null)
             {
                 var bodyParts = _syncedBodyParts
-                    .Where(b => b.handler != null && b.handler.IsBusy);
+                    .Where(b => b.guide != null && b.guide.IsBusy);
                 if (bodyParts.Any())
                 {
                     foreach (var bodyPart in bodyParts)
                     {
-                        VRPlugin.Logger.LogDebug($"OnTrigger:Attach:Synced:{bodyPart.name} -> {bodyPart.handler.GetTrackTransform.name}");
-                        AttachBodyPart(bodyPart, bodyPart.handler.GetTrackTransform);
+                        VRPlugin.Logger.LogDebug($"OnTrigger:Attach:Synced:{bodyPart.name} -> {bodyPart.guide.GetTrackTransform.name}");
+                        AttachBodyPart(bodyPart, bodyPart.guide.GetTrackTransform, bodyPart.guide.GetChara);
                     }
                     ReleaseBodyParts(bodyParts);
                     StopGrasp();
@@ -666,74 +433,68 @@ namespace KK_VR.Interactors
         private bool OnTriggerExtendGrasp(bool temporarily)
         {
             // Attempts to grasp BodyPart(s) higher in hierarchy or everything if already top.
+            VRPlugin.Logger.LogDebug($"OnTriggerExtendGrasp:{_heldBodyParts.Count}:{_heldChara}");
             var bodyPartList = _bodyPartsDic[_heldChara];
             var closestToCore = _heldBodyParts
                 .OrderBy(bodyPart => bodyPart.name)
                 .First().name;
-            var parent = GetParent(closestToCore);
-            VRPlugin.Logger.LogDebug($"OnTriggerExtendGrasp:Temporarily[{temporarily}]:{closestToCore} -> {parent}");
+            var nearbyPart = GetChild(closestToCore);
+            if (nearbyPart == closestToCore || bodyPartList[(int)nearbyPart].state > State.Transition)
+            {
+                nearbyPart = GetParent(closestToCore);
+            }
+            VRPlugin.Logger.LogDebug($"OnTriggerExtendGrasp:Temporarily[{temporarily}]:{closestToCore} -> {nearbyPart}");
 
             var attachPoint = bodyPartList[(int)closestToCore].anchor;
-            if (parent != PartName.Everything)
+            if (nearbyPart != PartName.Everything)
             {
-                GraspBodyPart(bodyPartList[(int)parent], attachPoint);
                 if (temporarily)
-                    TrackOnGraspTemp(bodyPartList[(int)parent]);
+                    UpdateTempGrasp(bodyPartList[(int)nearbyPart]);
                 else
                 {
-                    TrackOnGrasp(bodyPartList[(int)parent]);
+                    UpdateGrasp(bodyPartList[(int)nearbyPart], _heldChara);
                 }
+                UpdateBlackList();
+                GraspBodyPart(bodyPartList[(int)nearbyPart], attachPoint);
             }
             else
             {
-                var success = false;
-                foreach (var bodyPart in bodyPartList)
-                {
-                    if (bodyPart.state < State.Grasped)
-                    {
-                        GraspBodyPart(bodyPart, attachPoint);
-                        if (temporarily)
-                            TrackOnGrasp(bodyPartList[(int)bodyPart.name]);
-                        else
-                        {
-                            TrackOnGraspTemp(bodyPartList[(int)bodyPart.name]);
-                        }
-                        success = true;
-                    }
-                }
-                return success;
+                ReleaseBodyParts(bodyPartList);
+                HoldChara();
+                //StopGrasp();
+                //UpdateBlackList();
             }
             _hand.Handler.DebugShowActive();
             return true;
         }
-
-        internal bool OnTriggerRelease()
+        private void HoldChara()
+        {
+            _baseHold = _helper.StartBaseHold(_bodyPartsDic[_heldChara][0], _heldChara, _hand.Anchor);
+        }
+        internal void OnTriggerRelease()
         {
             if (_tempHeldBodyParts.Count > 0)
             {
                 ReleaseBodyParts(_tempHeldBodyParts);
-                TrackOnGraspTemp(null);
+                StopTempGrasp();
+                UpdateBlackList();
                 VRPlugin.Logger.LogDebug($"OnTriggerRelease");
                 _hand.Handler.DebugShowActive();
             }
-            return true;
         }
 
         internal bool OnTouchpadResetHeld()
         {
-            if (_tempHeldBodyParts.Count > 0)
-            {
-                VRPlugin.Logger.LogDebug($"ResetHeldBodyPart[PressVersion]:[Temp]");
-                ResetBodyParts(_tempHeldBodyParts, true);
-                TrackOnGraspTemp(null);
-            }
             if (_heldBodyParts.Count > 0)
             {
-                VRPlugin.Logger.LogDebug($"ResetHeldBodyPart[PressVersion]");
+                VRPlugin.Logger.LogDebug($"ResetHeldBodyPart[PressVersion]:[Temp]");
                 ResetBodyParts(_heldBodyParts, true);
-                StopGraspTrack();
+                ResetBodyParts(_tempHeldBodyParts, true);
+                StopGrasp();
+                _hand.Handler.RemoveGuideObjects();
+                return true;
             }
-            return true;
+            return false;
         }
         internal bool OnTouchpadResetActive(Tracker.Body trackerPart, ChaControl chara)
         {
@@ -742,7 +503,7 @@ namespace KK_VR.Interactors
             VRPlugin.Logger.LogDebug($"ResetActiveBodyPart:{trackerPart}:{chara.name}:{baseName}");
             if (baseName != PartName.Body) 
             {
-                var bodyParts = GetTargetParts(_bodyPartsDic[chara], baseName, _hand.GetAnchor.position);
+                var bodyParts = GetTargetParts(_bodyPartsDic[chara], baseName, _hand.Anchor.position);
                 var result = false;
                 foreach (var bodyPart in bodyParts)
                 {
@@ -754,13 +515,13 @@ namespace KK_VR.Interactors
                 }
                 if (result)
                     VRPlugin.Logger.LogDebug($"ResetActiveBodyPart[ReleaseVersion]");
+                _hand.Handler.RemoveGuideObjects();
                 return result;
             }
             else
             {
                 return OnTouchpadResetEverything(chara, State.Synced);
             }
-            
         }
         internal bool OnTouchpadResetEverything(ChaControl chara, State upToState = State.Synced)
         {
@@ -773,88 +534,197 @@ namespace KK_VR.Interactors
                     result = true;
                 }
             }
+            _hand.Handler.RemoveGuideObjects();
             return result;
         }
         internal bool OnMenuPress()
         {
             if (_heldBodyParts.Count != 0)
             {
-                _visual.ShowAttachPoints(_heldChara, _heldBodyParts);
+
+            }
+            else
+            {
+                return false;
             }
             return true;
         }
         internal void OnGripPress(Tracker.Body trackerPart, ChaControl chara)
         {
             var bodyPartList = _bodyPartsDic[chara];
-            var controller = _hand.OnGripPress();
+            var controller = _hand.OnGraspHold();
             var bodyParts = GetTargetParts(bodyPartList, ConvertTrackerToIK(trackerPart), controller.position);
             VRPlugin.Logger.LogDebug($"OnGripPress:{trackerPart} -> {bodyParts[0].name}:totally held - {bodyParts.Count}");
+            UpdateGrasp(bodyParts, chara);
+            UpdateBlackList();
             foreach (var bodyPart in bodyParts)
             {
                 GraspBodyPart(bodyPart, controller);
             }
-            _heldChara = chara;
-            TrackOnGrasp(bodyParts);
         }
         internal void OnGripRelease()
         {
             VRPlugin.Logger.LogDebug($"OnGripPress");
-            if (_heldBodyParts.Count > 0)
+            if (_baseHold != null )
+            {
+                _helper.StopBaseHold(_baseHold);
+                SyncRoot(_baseHold.chara);
+                _baseHold = null;
+                StopGrasp();
+            }
+            else if (_heldBodyParts.Count > 0)
             {
                 ReleaseBodyParts(_heldBodyParts);
                 ReleaseBodyParts(_tempHeldBodyParts);
-                _hand.OnGripRelease();
                 StopGrasp();
             }
             _hand.Handler.DebugShowActive();
         }
-        private void SetGuideObjects(bool active, IEnumerable<BodyPart> bodyPartList)
+        private bool AttemptToScrollBodyPart(bool increase)
         {
-            if (active)
+            // Only bodyParts directly from the tracker live at 0 index, i.e. firstly interacted with.
+            var firstBodyPart = _heldBodyParts[0];
+            if (firstBodyPart.name == PartName.LeftHand || firstBodyPart.name == PartName.RightHand)
             {
-                _visual.ShowAttachPoints(_heldChara, bodyPartList);
+                _helper.ScrollHand(firstBodyPart.name, _heldChara, increase);
             }
             else
             {
-                _visual.HideAttachPoints(_heldChara, bodyPartList);
+                return false;
+            }
+            return true;
+        }
+
+
+
+        internal bool OnBusyHorizontalScroll(bool increase)
+        {
+            VRPlugin.Logger.LogDebug($"OnHorizontalScroll:Busy:");
+            if (_baseHold != null)
+            {
+                _helper.StartBaseHoldScroll(_baseHold, 2, increase);
+            }
+            else if (!AttemptToScrollBodyPart(increase))
+            {
+                return false;
+            }
+            return true;
+        }
+        internal bool OnFreeHorizontalScroll(Tracker.Body trackerPart, ChaControl chara, bool increase)
+        {
+            VRPlugin.Logger.LogDebug($"OnHorizontalScroll:Free:{trackerPart}");
+            //animHelper.DoAnimChange(chara);
+            //return true;
+            if (trackerPart == Tracker.Body.HandL || trackerPart == Tracker.Body.HandR)
+            {
+                _helper.ScrollHand((PartName)trackerPart, chara, increase);
+            }
+            else
+            {
+                return false;
+            }
+            return true;
+        }
+        internal void OnScrollRelease()
+        {
+            if (_baseHold != null)
+            {
+                _helper.StopBaseHoldScroll(_baseHold);
+            }
+            else
+            {
+                _helper.StopScroll();
             }
         }
+        internal bool OnVerticalScroll(bool increase)
+        {
+            //if (_heldChara != null)
+            //{
+            //    _animHelper.DoAnimChange(_heldChara);
+            //}
+            //else 
+            if (_baseHold != null)
+            {
+                _helper.StartBaseHoldScroll(_baseHold, 1, increase);
+            }
+            else
+            {
+                return false;
+            }
+            return true;
+        }
+
         private void ReleaseBodyParts(IEnumerable<BodyPart> bodyPartsList)
         {
             foreach (var bodyPart in bodyPartsList)
             {
-                VRPlugin.Logger.LogDebug($"ReleaseBodyPart:{bodyPart.anchor.name} -> {bodyPart.origTarget.name}");
-
                 // Attached bodyParts released one by one if they overstretch (not implemented), or by directly grabbing/resetting one.
                 if (bodyPart.state != State.Attached)
                 {
                     bodyPart.state = State.Active;
-                    if (bodyPart.handler != null)
-                    {
+                    //if (bodyPart.handler != null)
+                    //{
                         bodyPart.anchor.parent = null;
-                        bodyPart.handler.transform.SetPositionAndRotation(bodyPart.anchor.transform.position, bodyPart.origTarget.rotation);
-                        bodyPart.handler.Follow();
-                        bodyPart.anchor.SetParent(bodyPart.handler.transform, true);
-                    }
-                    else
-                    {
-                        bodyPart.anchor.SetParent(bodyPart.origTarget, worldPositionStays: true);
-                    }
+                        bodyPart.guide.Follow();
+                        bodyPart.anchor.parent = bodyPart.guide.transform;// SetParent(bodyPart.handler.transform, true);
+                    //}
+                    //else
+                    //{
+                    //    bodyPart.anchor.parent = bodyPart.beforeIK;
+                    //}
+                    bodyPart.visual.Hide();
+                    VRPlugin.Logger.LogDebug($"ReleaseBodyPart:{bodyPart.anchor.name} -> {bodyPart.beforeIK.name}");
                 }
+            }
+        }
+        private void SyncRoot(ChaControl chara)
+        {
+            // 'bodyPart.afterIK' aka 'bodyPart.effector.target.GetComponent<BaseData>().bone' aka 'cf_j_spine01' ->
+            //     bone with: updateOrient = renderOrient while following anim direction
+            //
+            // 'bodyPart.beforeIK' -> bone with: updateOrient = animOrient != renderOrient
+            //
+
+            var bodyPart = _bodyPartsDic[chara][0];
+            ReleaseAnchors(chara);
+            var targetPos = bodyPart.afterIK.position;
+            var charaToAnim = Quaternion.Inverse(bodyPart.beforeIK.rotation) * chara.transform.rotation;
+            var charaToIK = Quaternion.Inverse(bodyPart.afterIK.rotation) * chara.transform.rotation;
+            //var deltaPos = bodyPart.afterIK.position - bodyPart.beforeIK.position;
+            chara.transform.rotation *= (Quaternion.Inverse(charaToIK) * charaToAnim);
+            //chara.animBody.GetComponent<FullBodyBipedIK>().UpdateSolver();
+            chara.transform.position += targetPos - bodyPart.beforeIK.position;
+            //chara.transform.SetPositionAndRotation(chara.transform.position + (bodyPart.afterIK.position - bodyPart.beforeIK.position),
+            //    chara.transform.rotation * (Quaternion.Inverse(chara2afterIK) * chara2anim));
+            SetAnchors(chara);
+        }
+        private void ReleaseAnchors(ChaControl chara)
+        {
+            foreach (var bodyPart in _bodyPartsDic[chara])
+            {
+                bodyPart.anchor.parent = null;
+            }
+        }
+        private void SetAnchors(ChaControl chara)
+        {
+            foreach (var bodyPart in _bodyPartsDic[chara])
+            {
+                bodyPart.anchor.parent = bodyPart.beforeIK;
             }
         }
         private void ResetBodyParts(IEnumerable<BodyPart> bodyPartList, bool transition)
         {
             foreach (var bodyPart in bodyPartList)
             {
+                if (bodyPart.state == State.Default) continue;
                 ResetBodyPart(bodyPart, transition);
             }
         }
         private void ResetBodyPart(BodyPart bodyPart, bool transition)
         {
-            bodyPart.anchor.SetParent(bodyPart.origTarget, worldPositionStays: transition);
+            bodyPart.anchor.SetParent(bodyPart.beforeIK, worldPositionStays: transition);
             if (bodyPart.state == State.Attached)
-                _attachedBodyParts.Remove(bodyPart);
+                bodyPart.guide.Follow();
             if (transition)
             {
                 _helper.StartTransition(bodyPart);
@@ -867,196 +737,180 @@ namespace KK_VR.Interactors
                 if (bodyPart.chain != null) 
                     bodyPart.chain.bendConstraint.weight = 1f; 
             }
-            if (bodyPart.handler != null)
+            bodyPart.guide.Stay();
+            
+        }
+        internal static void OnPoseChange()
+        {
+            _helper.OnPoseChange();
+            foreach (var inst in _instances)
             {
-                EnableColliders(bodyPart);
-                bodyPart.handler.gameObject.SetActive(false);
-               // _hand.Handler.RemoveHandlerColliders();
+                inst.Reset();
             }
         }
-
-        
-        internal void OnPoseChange()
+        private void Reset()
         {
-            ResetBodyParts(_heldBodyParts, false);
-            ResetBodyParts(_tempHeldBodyParts, false);
-            ResetBodyParts(_syncedBodyParts, false);
-            ResetBodyParts(_attachedBodyParts, false);
-            StopGrasp();
-            StopSync();
-            _helper.OnPoseChange();
+            _hand.Handler.ClearTracker();
+            _baseHold = null;
+            _blackListDic.Clear();
+            _heldBodyParts.Clear();
+            _tempHeldBodyParts.Clear();
+            _syncedBodyParts.Clear();
+            _heldChara = null;
+            _syncedChara = null;
         }
         
         private void SyncBodyPart(BodyPart bodyPart, Transform attachPoint)
         {
             if (bodyPart.state == State.Transition)
-            {
                 _helper.StopTransition(bodyPart);
-            }
-            if (bodyPart.handler != null)
-            {
-                bodyPart.handler.gameObject.SetActive(false);
-                EnableColliders(bodyPart);
-            }
+
+            
+            bodyPart.guide.Stay();
+            bodyPart.guide.SetBodyPartCollidersToTrigger(true);
             bodyPart.state = State.Synced;
             bodyPart.anchor.SetParent(attachPoint, worldPositionStays: true); 
-            bodyPart.effector.target = bodyPart.anchor;
-            bodyPart.effector.positionWeight = 1f;
-            bodyPart.effector.rotationWeight = 1f;
             if (bodyPart.chain != null)
-            {
                 bodyPart.chain.bendConstraint.weight = 0f;
-            }
             VRPlugin.Logger.LogDebug($"SyncBodyPart:{bodyPart.anchor.name} -> {bodyPart.anchor.parent.name}");
         }
-        private void AttachBodyPart(BodyPart bodyPart, Transform attachPoint)
+        private void AttachBodyPart(BodyPart bodyPart, Transform attachPoint, ChaControl chara)
         {
-            if (bodyPart.handler != null)
-            {
-                bodyPart.handler.gameObject.SetActive(false);
-                EnableColliders(bodyPart);
-                //_hand.Handler.RemoveHandlerColliders();
-            }
-            bodyPart.state = State.Attached;
-            //bodyPart.anchor.SetParent(HSceneInterpreter.lstFemale[0].objHeadBone.transform, worldPositionStays: true);
-            bodyPart.anchor.parent = null;
-            bodyPart.attachTarget = attachPoint;
-            bodyPart.offset = attachPoint.InverseTransformPoint(bodyPart.anchor.position);
-            bodyPart.effector.target = bodyPart.anchor;
-            bodyPart.effector.positionWeight = 1f;
-            bodyPart.effector.rotationWeight = 1f;
+            bodyPart.visual.Hide();
+            //bodyPart.guide.Stay();
             if (bodyPart.chain != null)
             {
                 bodyPart.chain.bendConstraint.weight = 0f;
             }
-            _helper.Attach = true;
-            //VRPlugin.Logger.LogDebug($"AttachBodyPart:{bodyPart.anchor.name} -> {bodyPart.anchor.parent.name}");
+            bodyPart.state = State.Attached;
+            if (chara == null)
+            {
+                bodyPart.anchor.parent = attachPoint; // SetParent(attachPoint, true);
+            }
+            else
+            {
+                //bodyPart.anchor.parent = null;
+                bodyPart.guide.Attach(attachPoint);
+                bodyPart.anchor.parent = bodyPart.guide.transform;
+                //_helper.AddAttach(bodyPart, attachPoint);
+            }
+            _hand.Handler.RemoveGuideObjects();
+            VRPlugin.Logger.LogDebug($"AttachBodyPart:{bodyPart.anchor.name} -> {attachPoint.name}");
         }
+
         private void GraspBodyPart(BodyPart bodyPart, Transform attachPoint)
         {
             if (bodyPart.state == State.Transition) 
                 _helper.StopTransition(bodyPart);
-            if (bodyPart.state == State.Attached)
-                _helper.RemoveAttach(bodyPart);
-            //bodyPart.anchor.SetPositionAndRotation(bodyPart.effector.bone.position, bodyPart.effector.bone.rotation);
-            if (bodyPart.handler != null)
-            {
-                DisableColliders(bodyPart);
+            //else if (bodyPart.state == State.Attached)
+            //    _helper.RemoveAttach(bodyPart);
+            //if (bodyPart.handler != null)
+            //{
+            // In case we were parented to handler.
+            // And it has some unWinded rigidBody velocity i.e. offset.
+            //bodyPart.anchor.parent = null;
 
-                // Disabled state while assigning - source of very weird behaviors.
-                bodyPart.handler.gameObject.SetActive(true);
+            //bodyPart.handler.transform.SetPositionAndRotation(bodyPart.effector.bone.position, attachPoint.rotation);
+            //bodyPart.handler.transform.SetPositionAndRotation(bodyPart.anchor.position, bodyPart.anchor.rotation);
 
-                // In case we were parented to handler.
-                bodyPart.anchor.parent = null;
-                bodyPart.handler.transform.SetPositionAndRotation(bodyPart.effector.bone.position, attachPoint.rotation);
-                bodyPart.handler.Follow(attachPoint);
-                bodyPart.anchor.SetParent(bodyPart.handler.transform, true);
-            }
-            else
-            {
-                bodyPart.anchor.SetParent(attachPoint, worldPositionStays: true);
-            }
-            bodyPart.effector.target = bodyPart.anchor;
+            bodyPart.anchor.parent = null;
+            bodyPart.guide.Follow(attachPoint, _hand);
+            bodyPart.anchor.parent = bodyPart.guide.transform;// SetParent(bodyPart.handler.transform, worldPositionStays: true);
+           // }
+            //else
+            //{
+            //    bodyPart.anchor.SetParent(attachPoint, worldPositionStays: true);
+            //}
+            //bodyPart.effector.target = bodyPart.anchor;
             bodyPart.effector.positionWeight = 1f;
             bodyPart.effector.rotationWeight = 1f;
             if (bodyPart.chain != null)
             {
                 bodyPart.chain.bendConstraint.weight = 0f;
             }
+            if (KoikatuInterpreter.settings.ShowGuideObjects) bodyPart.visual.Show();
             bodyPart.state = State.Grasped;
             VRPlugin.Logger.LogDebug($"GraspBodyPart:{bodyPart.name} -> {bodyPart.anchor.name} -> {bodyPart.anchor.parent.name}");
         }
-        //private void GraspBodyPartEx(Transform attachPoint, BodyPart bodyPart)
-        //{
-        //    if (bodyPart.state == State.Transition) StopTransition(bodyPart);
-        //    bodyPart.anchor.SetPositionAndRotation(bodyPart.effector.bone.position, bodyPart.effector.bone.rotation);
-        //    bodyPart.effector.target = bodyPart.anchor;
-        //    bodyPart.effector.positionWeight = 1f;
-        //    bodyPart.effector.rotationWeight = 1f;
-        //    if (bodyPart.chain != null) bodyPart.chain.bendConstraint.weight = 0f;
-        //    bodyPart.anchor.SetParent(attachPoint, worldPositionStays: true);
-        //    VRPlugin.Logger.LogDebug($"GraspBodyPart:{bodyPart.name} -> {bodyPart.anchor.name} -> {bodyPart.anchor.parent.name}");
-        //    VRPlugin.Logger.LogDebug($"Distance - {Vector3.Distance(bodyPart.anchor.position, attachPoint.position)}");
-        //}
-
+        private bool IsLimb(PartName partName) => partName > PartName.RightThigh && partName < PartName.UpperBody;
         internal bool OnTouchpadSyncStart(Tracker.Body trackerPart, ChaControl chara)
         {
             var partName = ConvertTrackerToIK(trackerPart);
-            // It always 
-            if (partName > PartName.RightThigh && partName < PartName.UpperBody)
+            if (IsLimb(partName))
             {
                 VRPlugin.Logger.LogDebug($"OnTouchpadSyncLimb:{trackerPart} -> {partName}");
                 var bodyPart = _bodyPartsDic[chara][(int)partName];
-                var controller = _hand.GetEmptyAnchor();
-                SyncBodyPart(bodyPart, controller);
+                SyncBodyPart(bodyPart, _hand.GetEmptyAnchor());
                 var limbIndex = (int)partName - 5;
                 bodyPart.anchor.transform.localPosition = _limbPosOffsets[limbIndex];
                 bodyPart.anchor.transform.localRotation = _limbRotOffsets[limbIndex];
-                bodyPart.chain.pull = 0.5f;
+                bodyPart.chain.pull = 0f;
                 bodyPart.state = State.Synced;
-                DisableColliders(bodyPart);
-                _syncedChara = chara;
-                TrackOnSync(bodyPart);
+                UpdateSync(bodyPart, chara);
+                UpdateBlackList();
                 return true;
             }
             return false;
         }
+
         internal bool OnTouchpadSyncEnd()
         {
-            if (_syncedBodyParts.Count > 0)
+            if (_syncedBodyParts.Count != 0)
             {
-                foreach (var bodyPart in _syncedBodyParts)
-                {
-                    ResetBodyParts(_syncedBodyParts, true);
-                    EnableColliders(bodyPart);
-                    TrackOnSync(null);
-                    _hand.ChangeItem();
-                }
+                ResetBodyParts(_syncedBodyParts, true);
+                _hand.ChangeItem();
+
+                StopSync();
                 return true;
             }
             return false;
         }
-        private void DisableColliders(BodyPart bodyPart)
-        {
-            // We need this so that rigidBody doesn't freak.
-            // Otherwise limb is a foreign object, so we can get a GMod flashback.
 
-            foreach (var param in bodyPart.colliderParams)
-            {
-                if (param.collider == null) continue;
-                if (param.activeHeight == 0f)
-                {
-                    param.collider.enabled = false;
-                    _hand.Handler.RemoveCollider(param.collider);
-                }
-                else
-                {
-                    if (param.collider is CapsuleCollider capsule)
-                    {
-                        capsule.height = param.activeHeight;
-                    }
-                }
-                //VRPlugin.Logger.LogDebug($"DisableColliders:{param.collider.name}");
-            }
-        }
-        private void EnableColliders(BodyPart bodyPart)
-        {
-            foreach (var param in bodyPart.colliderParams)
-            {
-                if (param.collider == null) continue;
-                if (param.activeHeight == 0f)
-                {
-                    param.collider.enabled = true;
-                }
-                else
-                {
-                    if (param.collider is CapsuleCollider capsule)
-                    {
-                        capsule.height = param.normalHeight;
-                    }
-                }
-            }
-        }
+
+
+        //private void DisableColliders(BodyPart bodyPart)
+        //{
+        //    // We need this so that rigidBody doesn't freak.
+        //    // Otherwise limb is a foreign object, so we can get a GMod flashback.
+
+        //    foreach (var param in bodyPart.colliderParams)
+        //    {
+        //        param.collider.isTrigger = true;
+        //        //if (param.collider == null) continue;
+        //        //if (param.activeHeight == 0f)
+        //        //{
+        //        //    param.collider.enabled = false;
+        //        //    _hand.Handler.RemoveCollider(param.collider);
+        //        //}
+        //        //else
+        //        //{
+        //        //    if (param.collider is CapsuleCollider capsule)
+        //        //    {
+        //        //        capsule.height = param.activeHeight;
+        //        //    }
+        //        //}
+        //        //VRPlugin.Logger.LogDebug($"DisableColliders:{param.collider.name}");
+        //    }
+        //}
+        //private static void EnableColliders(BodyPart bodyPart)
+        //{
+        //    foreach (var param in bodyPart.colliderParams)
+        //    {
+        //        param.collider.isTrigger = false;
+        //        //if (param.collider == null) continue;
+        //        //if (param.activeHeight == 0f)
+        //        //{
+        //        //    param.collider.enabled = true;
+        //        //}
+        //        //else
+        //        //{
+        //        //    if (param.collider is CapsuleCollider capsule)
+        //        //    {
+        //        //        capsule.height = param.normalHeight;
+        //        //    }
+        //        //}
+        //    }
+        //}
         //private PartName ConvertToLimb(PartName partName)
         //{
         //    return partName switch
@@ -1099,7 +953,7 @@ namespace KK_VR.Interactors
 
             if (!_blackListDic.ContainsKey(chara))
             {
-                _blackListDic.Add(chara, new List<Tracker.Body>());
+                _blackListDic.Add(chara, []);
             }
             var blackList = _blackListDic[chara];
             foreach (var bodyPart in bodyPartList)
@@ -1112,105 +966,33 @@ namespace KK_VR.Interactors
             }
 
         }
-        private static readonly Dictionary<PartName, List<ColliderParam>> _limbColliders = new Dictionary<PartName, List<ColliderParam>>()
-        {
-            {
-                PartName.LeftHand, new List<ColliderParam>()
-                {
-                    new ColliderParam
-                    {
-                        path = "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_L/cf_j_shoulder_L/" +
-                        "cf_j_arm00_L/cf_j_forearm01_L/cf_d_forearm02_L/cf_s_forearm02_L/cf_hit_wrist_L",
-                        normalHeight = 0.24f,
-                        activeHeight = 0.15f
-                    },
-                    new ColliderParam
-                    {
-                        path = "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_L/cf_j_shoulder_L/cf_j_arm00_L/cf_j_forearm01_L/cf_j_hand_L/com_hit_hand_L",
-                        activeHeight = 0f
-                    }
+        
 
-                }
-            },
-            {
-                PartName.RightHand, new List<ColliderParam>()
-                {
-                    new ColliderParam
-                    {
-                        path = "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_R/cf_j_shoulder_R/" +
-                        "cf_j_arm00_R/cf_j_forearm01_R/cf_d_forearm02_R/cf_s_forearm02_R/cf_hit_wrist_R",
-                        normalHeight = 0.24f,
-                        activeHeight = 0.15f
-                    },
-                    new ColliderParam
-                    {
-                        path = "cf_n_height/cf_j_hips/cf_j_spine01/cf_j_spine02/cf_j_spine03/cf_d_shoulder_R/cf_j_shoulder_R/cf_j_arm00_R/cf_j_forearm01_R/cf_j_hand_R/com_hit_hand_R",
-                        activeHeight = 0f
-                    }
-
-                }
-            },
-            {
-                PartName.LeftFoot, new List<ColliderParam>()
-                {
-                    new ColliderParam
-                    {
-                        path = "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_j_thigh00_L/cf_j_leg01_L/cf_s_leg01_L/cf_hit_leg01_L/aibu_reaction_legL",
-                        normalHeight = 0.4f,
-                        activeHeight = 0.35f
-                    },
-                    new ColliderParam
-                    {
-                        path = "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_j_thigh00_L/cf_j_leg01_L/cf_j_leg03_L/cf_j_foot_L/cf_hit_leg02_L",
-                        activeHeight = 0f
-                    }
-
-                }
-            },
-            {
-                PartName.RightFoot, new List<ColliderParam>()
-                {
-                    new ColliderParam
-                    {
-                        path = "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_j_thigh00_R/cf_j_leg01_R/cf_s_leg01_R/cf_hit_leg01_R/aibu_reaction_legR",
-                        normalHeight = 0.4f,
-                        activeHeight = 0.35f
-                    },
-                    new ColliderParam
-                    {
-                        path = "cf_n_height/cf_j_hips/cf_j_waist01/cf_j_waist02/cf_j_thigh00_R/cf_j_leg01_R/cf_j_leg03_R/cf_j_foot_R/cf_hit_leg02_R",
-                        activeHeight = 0f
-                    }
-
-                }
-            }
-        };
-
-        private static readonly List<List<Tracker.Body>> _blackListEntries = new List<List<Tracker.Body>>()
-        {
+        private static readonly List<List<Tracker.Body>> _blackListEntries =
+        [
             // 0
-            new List<Tracker.Body>() { Tracker.Body.None }, 
+            [Tracker.Body.None], 
             // 1
-            new List<Tracker.Body>() { Tracker.Body.HandL, Tracker.Body.ForearmL, Tracker.Body.ArmL,
-                Tracker.Body.UpperBody, Tracker.Body.MuneL, Tracker.Body.MuneR },
+            [ Tracker.Body.HandL, Tracker.Body.ForearmL, Tracker.Body.ArmL,
+                Tracker.Body.UpperBody, Tracker.Body.MuneL, Tracker.Body.MuneR ],
             // 2
-            new List<Tracker.Body>() { Tracker.Body.HandR, Tracker.Body.ForearmR, Tracker.Body.ArmR,
-                Tracker.Body.UpperBody, Tracker.Body.MuneL, Tracker.Body.MuneR },
+            [ Tracker.Body.HandR, Tracker.Body.ForearmR, Tracker.Body.ArmR,
+                Tracker.Body.UpperBody, Tracker.Body.MuneL, Tracker.Body.MuneR ],
             // 3
-            new List<Tracker.Body>() { Tracker.Body.LegL, Tracker.Body.ThighL, Tracker.Body.LowerBody,
-                Tracker.Body.Asoko, Tracker.Body.Groin},
+            [ Tracker.Body.LegL, Tracker.Body.ThighL, Tracker.Body.LowerBody,
+                Tracker.Body.Asoko, Tracker.Body.Groin],
             // 4
-            new List<Tracker.Body>() { Tracker.Body.LegR, Tracker.Body.ThighR, Tracker.Body.LowerBody,
-                Tracker.Body.Asoko, Tracker.Body.Groin},
+            [ Tracker.Body.LegR, Tracker.Body.ThighR, Tracker.Body.LowerBody,
+                Tracker.Body.Asoko, Tracker.Body.Groin],
             // 5 
-            new List<Tracker.Body>() { Tracker.Body.HandL, Tracker.Body.ForearmL, Tracker.Body.ArmL },
+            [Tracker.Body.HandL, Tracker.Body.ForearmL, Tracker.Body.ArmL],
             // 6
-            new List<Tracker.Body>() { Tracker.Body.HandR, Tracker.Body.ForearmR, Tracker.Body.ArmR },
+            [Tracker.Body.HandR, Tracker.Body.ForearmR, Tracker.Body.ArmR],
             // 7
-            new List<Tracker.Body>() { Tracker.Body.LegL },
+            [Tracker.Body.LegL],
             // 8
-            new List<Tracker.Body>() { Tracker.Body.LegR },
-        };
+            [Tracker.Body.LegR],
+        ];
 
         //internal void SyncMaleHand(int index)
         //{

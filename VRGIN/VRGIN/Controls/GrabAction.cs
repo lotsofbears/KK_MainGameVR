@@ -81,15 +81,15 @@ namespace VRGIN.Controls
                 OtherController.TryAcquireFocus(out _OtherLock);
             }
 
-            if (hasOtherLock && OtherController.Input.GetPressDown(SECONDARY_SCALE_BUTTON))
-            {
-                _ScaleInitialized = false;
-            }
+            //if (hasOtherLock && OtherController.Input.GetPressDown(SECONDARY_SCALE_BUTTON))
+            //{
+            //    _ScaleInitialized = false;
+            //}
 
-            if (hasOtherLock && OtherController.Input.GetPressDown(SECONDARY_ROTATE_BUTTON))
-            {
-                _RotationInitialized = false;
-            }
+            //if (hasOtherLock && OtherController.Input.GetPressDown(SECONDARY_ROTATE_BUTTON))
+            //{
+            //    _RotationInitialized = false;
+            //}
 
             if (!Controller.GetPress(_ButtonMask))
             {
@@ -100,7 +100,7 @@ namespace VRGIN.Controls
                 return Status.DoneSlow;
             }
 
-            if (hasOtherLock && (OtherController.Input.GetPress(SECONDARY_ROTATE_BUTTON) || OtherController.Input.GetPress(SECONDARY_SCALE_BUTTON)))
+            if (hasOtherLock && OtherController.Input.GetPress(SECONDARY_ROTATE_BUTTON))
             {
                 var newFromTo = (OtherController.transform.position - transform.position).normalized;
 
@@ -112,13 +112,13 @@ namespace VRGIN.Controls
                 //    VR.Settings.IPDScale = ratio * _InitialIPD;
                 //}
 
-                if (OtherController.Input.GetPress(SECONDARY_ROTATE_BUTTON))
-                {
+                //if (OtherController.Input.GetPress(SECONDARY_ROTATE_BUTTON))
+                //{
                     InitializeRotationIfNeeded();
                     var angleDiff = Calculator.Angle(_PrevFromTo, newFromTo) * VR.Settings.RotationMultiplier;
-                    VR.Camera.SteamCam.origin.transform.RotateAround(VR.Camera.Head.position, Vector3.up, angleDiff);// Mathf.Max(1, Controller.velocity.sqrMagnitude) );
+                    VR.Camera.SteamCam.origin.transform.RotateAround(VR.Camera.Head.position, VR.Camera.SteamCam.origin.up, angleDiff);// Mathf.Max(1, Controller.velocity.sqrMagnitude) );
 
-                }
+                //}
 
                 _PrevFromTo = (OtherController.transform.position - transform.position).normalized;
             }
@@ -139,7 +139,7 @@ namespace VRGIN.Controls
                         }
                         else
                         {
-                            origin.RotateAround(transform.position, Vector3.up, invRot.eulerAngles.y);
+                            origin.RotateAround(transform.position, origin.up, invRot.eulerAngles.y);
                         }
                     }
                     origin.position -= transform.position - _PrevControllerPos;

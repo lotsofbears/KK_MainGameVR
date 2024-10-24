@@ -90,8 +90,8 @@ namespace KK_VR.Fixes
             var renderer = sphere.GetComponent<Renderer>();
             renderer.material = HandHolder.Material;
             renderer.material.color = color;
-            sphere.transform.localScale = size;
             sphere.transform.SetParent(parent, false);
+            sphere.transform.localScale = size;
             return sphere;
         }
     }

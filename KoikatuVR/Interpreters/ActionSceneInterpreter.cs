@@ -18,7 +18,6 @@ namespace KK_VR.Interpreters
 {
     class ActionSceneInterpreter : SceneInterpreter
     {
-        private KoikatuSettings _settings;
         private ActionScene actionScene;
 
         public static Transform FakeCamera;

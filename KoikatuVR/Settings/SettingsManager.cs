@@ -30,7 +30,7 @@ namespace KK_VR.Settings
     {
         public const string SectionGeneral = "0. General";
         public const string SectionRoaming = "1. Roaming";
-        public const string SectionH = "1. Caress";
+        public const string SectionH = "1. H";
         public const string SectionEventScenes = "1. Event scenes";
         public const string SectionPov = "4. Pov";
         public const string SectionIK = "5. IK";
@@ -239,13 +239,24 @@ namespace KK_VR.Settings
                     "Enable continuous rotation of camera in roaming mode instead of snap turn. Influenced by setting 'Rotation angle'.");
             Tie(contRot, v => settings.ContinuousRotation = v);
 
-            var directImpersonation = config.Bind(SectionPov, "DirectImpersonation", false,
-                    "");
+            var directImpersonation = config.Bind(SectionPov, "DirectImpersonation", false, "");
             Tie(directImpersonation, v => settings.DirectImpersonation = v);
 
-            var autoShowGuideObjects = config.Bind(SectionIK, "AutoShowGuideObjects", true,
-                    "");
-            Tie(autoShowGuideObjects, v => settings.AutoShowGuideObjects = v);
+            var showGuideObjects = config.Bind(SectionIK, "ShowGuideObjects", true, "");
+            Tie(showGuideObjects, v => settings.ShowGuideObjects = v);
+
+            var showDebugIK = config.Bind(SectionIK, "Debug", false,
+                new ConfigDescription(
+                    "Blue - animPose\n" +
+                    "Yellow - IK",
+                    null, 
+                    new ConfigurationManagerAttributes { IsAdvanced = true }
+                    )
+                );
+            Tie(showDebugIK, v => settings.DebugShowIK = v);
+
+            var followRotationDuringKiss = config.Bind(SectionH, "FollowRotationDuringKiss", false, "");
+            Tie(followRotationDuringKiss, v => settings.FollowRotationDuringKiss = v);
 
             var hideAibuHandOnUserInput = config.Bind(SectionH, "HideAibuHandOnUserInput", KoikatuSettings.HandType.Both,
                     "");
@@ -253,7 +264,7 @@ namespace KK_VR.Settings
 
             var proximityKiss = config.Bind(SectionH, "Kiss proximity", 0.1f,
                 new ConfigDescription(
-                    "Distance between camera and partner's head during assisted kiss.",
+                    "Distance between camera and partner's head during initial phase of assisted kiss.",
                     new AcceptableValueRange<float>(0.05f, 0.15f)));
             Tie(proximityKiss, v => settings.ProximityDuringKiss = v);
 

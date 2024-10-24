@@ -18,20 +18,21 @@ using Random = UnityEngine.Random;
 
 namespace KK_VR.Trackers
 {
+    // Supposed to be at disposal of component directly under controller's control.
     class ControllerTracker : Tracker
     {
-        private readonly List<Body> _reactOncePerTrack = new List<Body>();
+        private readonly List<Body> _reactOncePerTrack = [];
         private float _familiarity;
         private float _lastTrack;
         internal bool firstTrack;
-
         internal ReactionType reactionType;
 
         internal override bool AddCollider(Collider other)
         {
             if (_referenceTrackDic.TryGetValue(other, out var info))
             {
-                if (info.chara.visibleAll && !IsInBlacklist(info.chara, info.behavior.part))
+                // Temporal clutch until we can grab objects.
+                if (info.chara != null && info.chara.visibleAll && !IsInBlacklist(info.chara, info.behavior.part))
                 {
                     colliderInfo = info;
                     SetReaction();
@@ -86,17 +87,52 @@ namespace KK_VR.Trackers
                 _familiarity = 0.75f;
             }
         }
-
+        // Add mouth tracking? for starters head parts tracking at all.
+        //internal bool IsTrackingWetPart(out Body part)
+        //{
+        //    foreach (var collider in _trackList)
+        //    {
+        //        if (_referenceTrackDic[collider].behavior.part == Body.Asoko)
+        //        {
+        //            part = _referenceTrackDic[collider].behavior.part;
+        //            return true;
+        //        }
+        //    }
+        //    part = Body.None;
+        //    return false;
+        //}
+        //internal bool IsTrackingSoftPart(out Body part)
+        //{
+        //    foreach (var collider in _trackList)
+        //    {
+        //        if (IsSoftPart(_referenceTrackDic[collider].behavior.part))
+        //        {
+        //            part = _referenceTrackDic[collider].behavior.part;
+        //            return true;
+        //        }
+        //    }
+        //    part = Body.None;
+        //    return false;
+        //}
+        private bool IsSoftPart(Body part)
+        {
+            return part switch
+            {
+                Body.MuneL or Body.MuneR or Body.Groin or Body.ThighL or Body.ThighR => true,
+                _ => false
+            };
+        }
         private void SetReaction()
         {
             if (!IsBusy)
             {
                 GetFamiliarity();
                 firstTrack = true;
-                if (_lastTrack + (2f * _familiarity) > Time.time)
+                // A windows after last touch during which we go for "soft reaction".
+                if (_lastTrack + (3f * _familiarity) > Time.time)
                 {
                     // Consecutive touch within up to 2 seconds from the last touch.
-                    reactionType = Random.value < _familiarity - 0.5f ? ReactionType.Laugh : ReactionType.Short;
+                    reactionType = Random.value < _familiarity - 0.5f ? (Random.value < 0.5f ? ReactionType.Laugh : ReactionType.None) : ReactionType.Short;
                 }
                 else
                 {
@@ -109,7 +145,7 @@ namespace KK_VR.Trackers
                 if (ReactOncePerTrack(colliderInfo.behavior.part))
                 {
                     // Important part touch, once per track.
-                    reactionType = Random.value < _familiarity - 0.5f ? ReactionType.Short : ReactionType.HitReaction;
+                    reactionType = Random.value < _familiarity - 0.5f ? (Random.value < 0.5f ? ReactionType.Laugh : ReactionType.Short) : ReactionType.HitReaction;
                 }
                 else
                 {
@@ -122,15 +158,23 @@ namespace KK_VR.Trackers
             if (part < Body.HandL && !_reactOncePerTrack.Contains(part))
             {
                 _reactOncePerTrack.Add(part);
+                if (part == Body.MuneL)
+                {
+                    _reactOncePerTrack.Add(Body.MuneR);
+                }    
+                else if (part == Body.MuneR)
+                {
+                    _reactOncePerTrack.Add(Body.MuneL);
+                }
                 return true;
             }
             return false;
         }
-        internal void FlushLimbHandlers()
+        internal void RemoveGuideObjects()
         {
             for (var i = 0; i < _trackList.Count; i++)
             {
-                if (_trackList[i].name.EndsWith("Handler", StringComparison.Ordinal))
+                if (_trackList[i].name.EndsWith("Guide", StringComparison.Ordinal))
                 {
                     _trackList.RemoveAt(i);
                     i--;

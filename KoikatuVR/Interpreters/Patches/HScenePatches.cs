@@ -2,6 +2,7 @@
 using KK_VR.Camera;
 using KK_VR.Caress;
 using KK_VR.Features;
+using KK_VR.Interpreters;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,7 +12,7 @@ using System.Text;
 using UnityEngine;
 using VRGIN.Core;
 
-namespace KK_VR.Interpreters.Patches
+namespace KK_VR.Patches
 {
     [HarmonyPatch]
     internal class HScenePatches
@@ -80,7 +81,6 @@ namespace KK_VR.Interpreters.Patches
                 var result = _timeStamp > Time.time;
                 if (!result)
                 {
-                    VRPlugin.Logger.LogDebug($"KissEndCondition:Finish:{HSceneInterpreter.hAibu.backIdle}");
                     _fakeKiss = false;
 
                     // Temporal solution.
@@ -92,7 +92,7 @@ namespace KK_VR.Interpreters.Patches
                     if (hand.action == HandCtrl.HandAction.none)
                     {
                         HSceneInterpreter.SetPlay("Idle");
-                        CaressHelper.Instance.Halt(disengage: false, haltVRMouth: false);
+                        //CaressHelper.Instance.Halt(disengage: false, haltVRMouth: false);
                         if (!HSceneInterpreter.IsVoiceActive)
                         {
                             HSceneInterpreter.hFlag.voice.playVoices[0] = 100;
@@ -101,7 +101,7 @@ namespace KK_VR.Interpreters.Patches
                     }
                     else
                     {
-                        
+
                         return hand.action != HandCtrl.HandAction.none;
                     }
                 }
@@ -109,7 +109,6 @@ namespace KK_VR.Interpreters.Patches
             }
             else
             {
-                //VRPlugin.Logger.LogDebug($"KissEndCondition:Original:{hand.action != HandCtrl.HandAction.none}");
                 return hand.action != HandCtrl.HandAction.none;
             }
         }

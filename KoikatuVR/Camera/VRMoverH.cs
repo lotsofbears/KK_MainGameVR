@@ -16,6 +16,7 @@ using VRGIN.Core;
 using static RootMotion.FinalIK.InteractionTrigger;
 using static UnityEngine.UI.Image;
 using KK_VR.Interpreters;
+using KK_VR.Handlers;
 
 namespace KK_VR.Camera
 {
@@ -75,6 +76,7 @@ namespace KK_VR.Camera
         
         private IEnumerator RotateToUpright(Action method = null, params object[] args)
         {
+            // Wait for lag.
             yield return null;
             yield return new WaitUntil(() => Time.deltaTime < 0.05f);
             yield return new WaitForEndOfFrame();
@@ -164,7 +166,7 @@ namespace KK_VR.Camera
             VRLog.Debug($"VRMoverH:FlyToPosition:{position}:{rotation.eulerAngles}");
             var origin = VR.Camera.Origin;
             var head = VR.Camera.Head;
-            VRMouth.NoActionAllowed = true;
+            MouthGuide.Instance.PauseInteractions = true;
             var eyeLevel = _eyes.transform.position.y;
 
             if (eyeLevel - _chara.transform.position.y > 1f)
@@ -237,7 +239,7 @@ namespace KK_VR.Camera
                 }
                 yield return new WaitForEndOfFrame();
             }
-            VRMouth.NoActionAllowed = false;
+            MouthGuide.Instance.PauseInteractions = false;
             VRLog.Debug($"EndOfFlight");
         }
     }

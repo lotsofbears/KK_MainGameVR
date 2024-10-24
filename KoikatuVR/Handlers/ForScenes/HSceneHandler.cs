@@ -65,7 +65,7 @@ namespace KK_VR.Handlers
             _moveAibuItem = false;
         }
 
-        private bool AibuKindAllowed(AibuColliderKind kind, ChaControl chara)
+        protected bool AibuKindAllowed(AibuColliderKind kind, ChaControl chara)
         {
             var heroine = HSceneInterpreter.hFlag.lstHeroine
                 .Where(h => h.chaCtrl == chara)
@@ -88,7 +88,7 @@ namespace KK_VR.Handlers
             }
             else if (Interactors.Undresser.Undress(_tracker.colliderInfo.behavior.part, _tracker.colliderInfo.chara, decrease))
             {
-                HandNoises.PlaySfx(_index, 1f, HandNoises.Sfx.Undress, HandNoises.Surface.Cloth);
+                //HandNoises.PlaySfx(_index, 1f, HandNoises.Sfx.Undress, HandNoises.Surface.Cloth);
             }
             else
             {
@@ -115,15 +115,15 @@ namespace KK_VR.Handlers
         {
             var touch = _tracker.colliderInfo.behavior.touch;
             var chara = _tracker.colliderInfo.chara;
+            VRPlugin.Logger.LogDebug($"HSceneHandler:[{touch}][{HSceneInterpreter.handCtrl.selectKindTouch}]");
             if (touch > AibuColliderKind.mouth
                 && touch < AibuColliderKind.reac_head
                 && chara == HSceneInterpreter.lstFemale[0])
             {
-                if (!VRMouth.NoActionAllowed && HSceneInterpreter.handCtrl.GetUseAreaItemActive() != -1)
+                if (!MouthGuide.Instance.IsActive && HSceneInterpreter.handCtrl.GetUseAreaItemActive() != -1)
                 {
                     // If VRMouth isn't active but automatic caress is going.
-                    // Otherwise VRMouth has it's own hooks for trigger - halt (consolidate ? later.. maybe)
-                    CaressHelper.StopMoMiOnSensibleHSide();
+                    HSceneInterpreter.MoMiOnKissEnd();
                 }
                 else
                 {
@@ -134,7 +134,7 @@ namespace KK_VR.Handlers
             }
             else
             {
-                HSceneInterpreter.HitReactionPlay(_tracker.colliderInfo.behavior.react, chara);
+                HSceneInterpreter.HitReactionPlay(_tracker.colliderInfo.behavior.react, chara, voiceWait: false);
             }
             return true;
         }
@@ -149,20 +149,21 @@ namespace KK_VR.Handlers
         }
         protected override void DoReaction(float velocity)
         {
-            VRPlugin.Logger.LogDebug($"DoReaction:{_tracker.colliderInfo.behavior.touch}:{_tracker.reactionType}");
+            VRPlugin.Logger.LogDebug($"DoReaction:{_tracker.colliderInfo.behavior.touch}:{_tracker.reactionType}:{velocity}");
             if (_settings.AutomaticTouching > KoikatuSettings.SceneType.TalkScene)
             {
-                if (velocity > 1f || (_tracker.reactionType == ControllerTracker.ReactionType.HitReaction && !IsAibuItemPresent(out _)))
+                if (velocity > 1.5f || (_tracker.reactionType == Tracker.ReactionType.HitReaction && !IsAibuItemPresent(out _)))
                 {
-                    HSceneInterpreter.HitReactionPlay(_tracker.colliderInfo.behavior.react, _tracker.colliderInfo.chara);
+                    HSceneInterpreter.HitReactionPlay(_tracker.colliderInfo.behavior.react, _tracker.colliderInfo.chara, voiceWait: true);
                 }
-                else if (_tracker.reactionType == ControllerTracker.ReactionType.Short)
+                else if (_tracker.reactionType == Tracker.ReactionType.Short)
                 {
-                    HSceneInterpreter.PlayShort(_tracker.colliderInfo.chara, voiceWait: false);
+                    Features.LoadVoice.PlayVoice(Features.LoadVoice.VoiceType.Short, _tracker.colliderInfo.chara, voiceWait: true);
+                    //HSceneInterpreter.PlayShort(_tracker.colliderInfo.chara, voiceWait: true);
                 }
                 else //if (_tracker.reactionType == ControllerTracker.ReactionType.Laugh)
                 {
-                    Features.LoadVoice.PlayVoice(Features.LoadVoice.VoiceType.Laugh, _tracker.colliderInfo.chara, voiceWait: false);
+                    Features.LoadVoice.PlayVoice(Features.LoadVoice.VoiceType.Laugh, _tracker.colliderInfo.chara, voiceWait: true);
                 }
                 _controller.StartRumble(new RumbleImpulse(1000));
             }

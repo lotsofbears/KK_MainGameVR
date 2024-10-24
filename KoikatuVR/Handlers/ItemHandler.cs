@@ -19,43 +19,38 @@ using static HandCtrl;
 using KK_VR.Caress;
 using ADV.Commands.Game;
 using KK_VR.Trackers;
+using System.Runtime.Remoting.Messaging;
 
 namespace KK_VR.Handlers
 {
     class ItemHandler : Handler
     {
         protected ControllerTracker _tracker;
-        protected override Tracker BaseTracker
+        protected override Tracker tracker
         {
             get => _tracker; 
             set => _tracker = value is ControllerTracker t ? t : null;
         }
-        private
+        protected HandHolder _hand;
         protected KoikatuSettings _settings;
         protected Controller _controller;
         //protected ModelHandler.ItemType _item;
-        protected int _index;
         private bool _unwind;
         private float _timer;
         private Rigidbody _rigidBody;
         internal override bool IsBusy => _tracker.colliderInfo != null && _tracker.colliderInfo.chara != null;
-        internal ChaControl GetChara => _tracker.colliderInfo.chara;
 
         // Default velocity is in controller or origin local space.
         protected Vector3 GetVelocity => _controller.Input.velocity;
-        protected override void OnEnable()
+        internal void Init(HandHolder hand, Rigidbody rigidBody)
         {
-            _tracker = new ControllerTracker();
-        }
-        internal void Init(int index, Rigidbody rigidBody)
-        {
-            _index = index;
             _rigidBody = rigidBody;
-        }
-        protected virtual void Start()
-        {
+            _hand = hand;
+            _tracker = new ControllerTracker();
+            _tracker.SetBlacklistDic(_hand.Grasp.GetBlacklistDic);
+
             _settings = VR.Context.Settings as KoikatuSettings;
-            _controller = _index == 0 ? VR.Mode.Left : VR.Mode.Right;
+            _controller = _hand.Controller;
         }
         protected virtual void Update()
         {
@@ -70,16 +65,6 @@ namespace KK_VR.Handlers
             }
         }
 
-        //protected void PlayTraverseSfx()
-        //{
-        //    if (!_item.audioSource.isPlaying)
-        //    {
-        //        if (GetVelocity.sqrMagnitude > 0.1f)
-        //        {
-        //            ModelHandler.PlaySfx(_item, 1f, this.transform, ModelHandler.Sfx.Traverse, ModelHandler.Object.Skin, ModelHandler.Intensity.Soft);
-        //        }
-        //    }
-        //}
 
 
         protected override void OnTriggerEnter(Collider other)
@@ -87,35 +72,61 @@ namespace KK_VR.Handlers
             if (_tracker.AddCollider(other))
             {
                 var velocity = GetVelocity.sqrMagnitude;
-                if (velocity > 1f || _tracker.reactionType != Tracker.ReactionType.None)
+                if (velocity > 1.5f || _tracker.reactionType != Tracker.ReactionType.None)
                 {
                     DoReaction(velocity);
                 }
-                PlaySfx(velocity);
+                if (_tracker.firstTrack)
+                {
+                    DoStartSfx(velocity);
+                }
+                else if (!_hand.Noise.IsPlaying)
+                {
+                    DoSfx(velocity);
+                }
             }
         }
-        protected void PlaySfx(float velocity)
+
+        protected void DoStartSfx(float velocity)
         {
-            return;
-            var fast = velocity > 1f;
-            HandNoises.PlaySfx(
-                _index,
-                fast ? 0.4f + velocity * 0.2f : 1f,
-                fast ? HandNoises.Sfx.Slap : _tracker.firstTrack ? HandNoises.Sfx.Tap : HandNoises.Sfx.Traverse,
-                GetSurfaceType(_tracker.colliderInfo.behavior.part)
+            var fast = velocity > 1.5f;
+            _hand.Noise.PlaySfx(
+                fast ? 0.5f + velocity * 0.2f : 1f,
+                fast ? HandNoise.Sfx.Slap : HandNoise.Sfx.Tap,
+                GetSurfaceType(_tracker.colliderInfo.behavior.part),
+                GetIntensityType(_tracker.colliderInfo.behavior.part),
+                overwrite: true
                 );
         }
 
-        protected HandNoises.Surface GetSurfaceType(Tracker.Body part)
+        protected void DoSfx(float velocity)
         {
-            // Add better hair handling, not whole head is hair.
-            if (part == Tracker.Body.Head)
-                return HandNoises.Surface.Hair;
+            _tracker.SetSuggestedInfo(); 
+            _hand.Noise.PlaySfx(
+                velocity > 1.5f ? 0.5f + velocity * 0.2f : 1f,
+                velocity > 0.5f ? HandNoise.Sfx.Tap : HandNoise.Sfx.Traverse,
+                GetSurfaceType(_tracker.colliderInfo.behavior.part),
+                GetIntensityType(_tracker.colliderInfo.behavior.part),
+                overwrite: false
+                );
+        }
 
-            if (Interactors.Undresser.IsBodyPartClothed(_tracker.colliderInfo.chara, part))
-                return HandNoises.Surface.Cloth;
-
-            return HandNoises.Surface.Skin;
+        protected HandNoise.Surface GetSurfaceType(Tracker.Body part)
+        {
+            return part switch
+            {
+                Tracker.Body.Head  => HandNoise.Surface.Hair,
+                                 _ => Interactors.Undresser.IsBodyPartClothed(_tracker.colliderInfo.chara, part) ? HandNoise.Surface.Cloth : HandNoise.Surface.Skin
+            };
+        }
+        protected HandNoise.Intensity GetIntensityType(Tracker.Body part)
+        {
+            return part switch
+            {
+                Tracker.Body.Asoko => HandNoise.Intensity.Wet,
+                Tracker.Body.MuneL or Tracker.Body.MuneR or Tracker.Body.ThighL or Tracker.Body.ThighR or Tracker.Body.Groin => HandNoise.Intensity.Soft,
+                _ => HandNoise.Intensity.Rough
+            };
         }
 
         protected override void OnTriggerExit(Collider other)
@@ -133,14 +144,14 @@ namespace KK_VR.Handlers
             }
         }
 
-
+        //internal Tracker.Body GetPartName() => _tracker.colliderInfo.behavior.part;
         internal Tracker.Body GetTrackPartName(ChaControl tryToAvoidChara = null, int preferredSex = -1)
         {
             return tryToAvoidChara == null && preferredSex == -1 ? _tracker.GetGraspBodyPart() : _tracker.GetGraspBodyPart(tryToAvoidChara, preferredSex);
         }
-        internal void RemoveHandlerColliders()
+        internal void RemoveGuideObjects()
         {
-            _tracker.FlushLimbHandlers();
+            _tracker.RemoveGuideObjects();
         }
         internal void RemoveCollider(Collider other)
         {

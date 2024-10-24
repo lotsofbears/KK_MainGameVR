@@ -8,6 +8,7 @@ using System.Reflection.Emit;
 using VRGIN.Core;
 using UnityEngine;
 using System.Diagnostics;
+using KK_VR.Handlers;
 
 namespace KK_VR.Caress
 {
@@ -241,22 +242,19 @@ namespace KK_VR.Caress
         [HarmonyPostfix, HarmonyPatch(typeof(HandCtrl), nameof(HandCtrl.ForceFinish))]
         public static void ForceFinishPostfix()
         {
-            var helper = CaressHelper.Instance;
-            if (helper != null && !helper.IsEndKissCo)
-            {
-                helper.Halt(disengage: false);
-            }
+            if (MouthGuide.Instance != null) 
+                MouthGuide.Instance.Halt(disengage: false);
         }
 
-        [HarmonyPostfix, HarmonyPatch(typeof(HAibu), nameof(HAibu.GotoDislikes))]
-        public static void GotoDislikesPostfix()
-        {
-            var helper = CaressHelper.Instance;
-            if (helper != null && !helper.IsEndKissCo)
-            {
-                helper.Halt(disengage: true);
-            }
-        }
+        //[HarmonyPostfix, HarmonyPatch(typeof(HAibu), nameof(HAibu.GotoDislikes))]
+        //public static void GotoDislikesPostfix()
+        //{
+        //    var helper = CaressHelper.Instance;
+        //    if (helper != null && !helper.IsEndKissCo)
+        //    {
+        //        helper.Halt(disengage: true);
+        //    }
+        //}
 
     }
 }

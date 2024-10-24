@@ -12,6 +12,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.Networking;
 using static SaveData;
@@ -28,9 +29,9 @@ namespace KK_VR.Features
             Short
         }
         private static Func<int> _maleBreathPersonality; 
-        private static string _path = "sound/data/pcm/c**/";
-        private static readonly Dictionary<ChaControl, float> voiceCooldown = new Dictionary<ChaControl, float>();
-        private static readonly Dictionary<int, string> extraPersonalities = new Dictionary<int, string>()
+        private static readonly string _path = "sound/data/pcm/c**/";
+        private static readonly Dictionary<ChaControl, float> voiceCooldown = [];
+        private static readonly Dictionary<int, string> extraPersonalities = new()
         {
             { 30, "14" },
             { 31, "15" },
@@ -51,11 +52,11 @@ namespace KK_VR.Features
         }
         private static void Play(VoiceType type, ChaControl chara)//, bool setCooldown)
         {
+            // Copy MaleBreath method here, prettier.
             // Preload assets? First touch can get GC.
             VRPlugin.Logger.LogDebug($"Voice:Play:{type}:{chara}");
 
             var voiceList = GetVoiceList(type);
-
             if (voiceList == null)
             {
                 return;
@@ -90,7 +91,7 @@ namespace KK_VR.Features
             bundle = bundle.Remove(index + 1);
 
             var h = bundle.EndsWith("h/", StringComparison.OrdinalIgnoreCase);
-            bundle = bundle + GetBundle(personalityId, hVoice: h);
+            bundle += GetBundle(personalityId, hVoice: h);
 
             VRPlugin.Logger.LogDebug($"{bundle} + {asset}");
             var setting = new Utils.Voice.Setting
@@ -99,44 +100,70 @@ namespace KK_VR.Features
                 assetBundleName = bundle,
                 assetName = asset,
                 pitch = chara.fileParam.voicePitch,
-                voiceTrans = chara.objHead.transform
+                voiceTrans = chara.dictRefObj[ChaReference.RefObjKey.a_n_mouth].transform,
 
             };
             //chara.ChangeMouthPtn(0, true);
             chara.SetVoiceTransform(Utils.Voice.OnecePlayChara(setting));
 
-            // Graceful treatment for original HVoice?
-
-            //if (setCooldown)
-            //{
-            //    if (!voiceCooldown.ContainsKey(chara))
-            //    {
-            //        voiceCooldown.Add(chara, Time.time + 1f);
-            //    }
-            //}
-            //if (KoikatuInterpreter.CurrentScene == KoikatuInterpreter.SceneType.HScene)
-            //{
-            //    if (HSceneInterpreter.lstChaControl[0] == chara)
-            //    {
-            //        HSceneInterpreter.hVoice.nowVoices[0].state = HVoiceCtrl.VoiceKind.breathShort;
-            //        HSceneInterpreter.hVoice.nowVoices[0].notOverWrite = HSceneInterpreter.hVoice.nowVoices[0].shortInfo.notOverwrite;
-            //        HSceneInterpreter.hVoice.nowVoices[0].voiceInfo.isPlay = true;
-            //    }
-            //    else if (HSceneInterpreter.lstChaControl.Count > 1 && HSceneInterpreter.lstChaControl[1] == chara)
-            //    {
-            //        HSceneInterpreter.hVoice.nowVoices[1].state = HVoiceCtrl.VoiceKind.breathShort;
-            //        HSceneInterpreter.hVoice.nowVoices[1].notOverWrite = HSceneInterpreter.hVoice.nowVoices[1].shortInfo.notOverwrite;
-            //        HSceneInterpreter.hVoice.nowVoices[1].voiceInfo.isPlay = true;
-            //    }
-            //}
+            // We respect hScene voices.
+            if (KoikatuInterpreter.CurrentScene == KoikatuInterpreter.SceneType.HScene)
+            {
+                for (var i = 0; i < HSceneInterpreter.lstFemale.Count; i++)
+                {
+                    if (HSceneInterpreter.lstFemale[i] == chara)
+                    {
+                        // Something of this is probably unnecessary, but figuring it out is a huge pain, given 'HVoiceCtrl' structure.
+                        var voice = HSceneInterpreter.hVoice.nowVoices[i];
+                        voice.state = HVoiceCtrl.VoiceKind.breathShort;
+                        voice.notOverWrite = true;
+                        voice.shortInfo.isPlay = true;
+                        voice.link = new HVoiceCtrl.LinkInfo();
+                        voice.shortInfo.pathAsset = bundle;
+                        voice.shortInfo.nameFile = asset;
+                        HSceneInterpreter.hVoice.linkUseBreathPtn[i] = null;
+                        HSceneInterpreter.hVoice.linkUseVoicePtn[i] = null;
+                        break;
+                    }
+                }
+            }
         }
         public static void PlayVoice(VoiceType voiceType, ChaControl chara, bool voiceWait = true)
         {
-            if (!voiceWait || chara.asVoice == null || chara.asVoice.name.StartsWith("h_ko_", StringComparison.Ordinal))
+            if (!voiceWait || chara.asVoice == null || IsVoiceActive(chara))
             {
                 Play(voiceType, chara);
             }
         }
+        private static bool IsVoiceActive(ChaControl chara)
+        {
+            if (KoikatuInterpreter.CurrentScene == KoikatuInterpreter.SceneType.HScene)
+            {
+                for (var i = 0; i < HSceneInterpreter.lstFemale.Count; i++)
+                {
+                    if (HSceneInterpreter.lstFemale[i] == chara)
+                    {
+                        return HSceneInterpreter.hVoice.nowVoices[i].state != HVoiceCtrl.VoiceKind.breath || HSceneInterpreter.IsKissAnim;
+                    }
+                }
+            }
+            return chara.asVoice != null                                             
+                && !(chara.asVoice.name.StartsWith("h_ko", StringComparison.Ordinal)
+                         // Match "0**_0*" at the end for 'Short'. e.g. in "h_ko_27_00_006_04" - [006_04] = Match!
+                || (Regex.IsMatch(chara.asVoice.name, @"0..\S0.$", RegexOptions.CultureInvariant)
+                && _kissBreaths.Any(s => chara.asVoice.name.EndsWith(s, StringComparison.Ordinal))));
+        }
+        private static readonly List<string> _kissBreaths =
+            [
+            "013",
+            "014",
+            "015",
+            "016",
+            "017",
+            "018",
+            "019",
+            "020"
+        ];
         private static string GetBundle(int id, bool hVoice)
         {
             var bundle = "00";

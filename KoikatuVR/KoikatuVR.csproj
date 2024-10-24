@@ -24,7 +24,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <LangVersion>8</LangVersion>
+    <LangVersion>preview</LangVersion>
     <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -35,7 +35,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <LangVersion>8</LangVersion>
+    <LangVersion>preview</LangVersion>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="0Harmony, Version=2.9.0.0, Culture=neutral, processorArchitecture=MSIL">
@@ -81,48 +81,62 @@
     <Compile Include="Camera\ActionCameraControl.cs" />
     <Compile Include="Camera\Background.cs" />
     <Compile Include="Camera\VRMoverEx.cs" />
+    <Compile Include="Controls\GripMove.cs" />
     <Compile Include="Handlers\HandHolder.cs" />
-    <Compile Include="Handlers\HandNoises.cs" />
+    <Compile Include="Handlers\HandNoise.cs" />
+    <Compile Include="Handlers\Holder.cs" />
+    <Compile Include="Handlers\ItemLag.cs" />
+    <Compile Include="Handlers\KissHelper.cs" />
+    <Compile Include="Handlers\MouthGuide.cs" />
+    <Compile Include="Controls\GripMoveLag.cs" />
+    <Compile Include="Handlers\CameraLag.cs" />
+    <Compile Include="Handlers\TongueHolder.cs" />
+    <Compile Include="Interactors\AnimHelper.cs" />
     <Compile Include="Interactors\GraspHelper.cs" />
-    <Compile Include="Interactors\GraspVisualizer.cs" />
+    <Compile Include="Interactors\HandScroll.cs" />
+    <Compile Include="Interactors\VisualObject.cs" />
+    <Compile Include="Interactors\HitReaction.cs" />
+    <Compile Include="Interactors\[obsolete]GraspVisualizer.cs" />
     <Compile Include="Handlers\Handler.cs" />
     <Compile Include="Handlers\ItemHandler.cs" />
     <Compile Include="Handlers\[obsolete]ModelHandler.cs" />
     <Compile Include="Handlers\[obsolete]ColliderTracker.cs" />
-    <Compile Include="Interactors\LimbHandler.cs" />
+    <Compile Include="Handlers\BodyPartGuide.cs" />
     <Compile Include="Interactors\Undresser.cs" />
     <Compile Include="Features\Extras\VoiceBundles.cs" />
     <Compile Include="Features\LoadVoice.cs" />
     <Compile Include="Fixes\BepInExVrLogBackend.cs" />
     <Compile Include="Camera\VREffector.cs" />
     <Compile Include="Camera\VRMoverH.cs" />
-    <Compile Include="Caress\CaressHelper.cs" />
-    <Compile Include="Caress\Undresser.cs" />
+    <Compile Include="Caress\[obsolete]CaressHelper.cs" />
+    <Compile Include="Caress\[obsolete]Undresser.cs" />
     <Compile Include="Controls\[obsolete]ButtonsSubtool.cs" />
     <Compile Include="Camera\CameraControlControl.cs" />
-    <Compile Include="Caress\AibuColliderTracker.cs" />
+    <Compile Include="Caress\[obsolete]AibuColliderTracker.cs" />
     <Compile Include="Handlers\ForScenes\HSceneHandler.cs" />
     <Compile Include="Caress\CaressUtil.cs" />
     <Compile Include="Caress\HandCtrlHooks.cs" />
-    <Compile Include="Caress\LongDistanceKissMachine.cs" />
-    <Compile Include="Caress\VRMouth.cs" />
+    <Compile Include="Caress\[obsolete]LongDistanceKissMachine.cs" />
+    <Compile Include="Caress\[obsolete]VRMouth.cs" />
     <Compile Include="Fixes\ReduceAssetUnload.cs" />
     <Compile Include="Handlers\ForScenes\ActionSceneHandler.cs" />
     <Compile Include="Interpreters\Extras\TalkSceneExtras.cs" />
+    <Compile Include="Interpreters\HScene\AnimControl.cs" />
+    <Compile Include="Interpreters\HScene\InputControl.cs" />
     <Compile Include="Interpreters\InterpreterHooks.cs" />
     <Compile Include="Interpreters\Patches\ActionScenePatches.cs" />
     <Compile Include="Interpreters\Patches\GraspPatches.cs" />
     <Compile Include="Interpreters\Patches\HScenePatches.cs" />
     <Compile Include="Interpreters\Patches\TalkScenePatches.cs" />
     <Compile Include="Interactors\GraspController.cs" />
-    <Compile Include="SetParent\[skip]AnimSpeedController.cs" />
-    <Compile Include="SetParent\FixBodyParts.cs" />
-    <Compile Include="SetParent\Hooks.cs" />
-    <Compile Include="SetParent\KK_SetParentVR.cs" />
-    <Compile Include="SetParent\SetParent.cs" />
-    <Compile Include="SetParent\SetParentBodyParts.cs" />
-    <Compile Include="SetParent\SetParentControllerInput.cs" />
-    <Compile Include="SetParent\SetParentUI.cs" />
+    <Compile Include="[reference]SetParent\[skip]AnimSpeedController.cs" />
+    <Compile Include="[reference]SetParent\FixBodyParts.cs" />
+    <Compile Include="[reference]SetParent\Hooks.cs" />
+    <Compile Include="[reference]SetParent\KK_SetParentVR.cs" />
+    <Compile Include="[reference]SetParent\SetParent.cs" />
+    <Compile Include="[reference]SetParent\SetParentBodyParts.cs" />
+    <Compile Include="[reference]SetParent\SetParentControllerInput.cs" />
+    <Compile Include="[reference]SetParent\SetParentUI.cs" />
     <Compile Include="Trackers\Tracker.cs" />
     <Compile Include="Trackers\ControllerTracker.cs" />
     <Compile Include="Utils\Compat.cs" />

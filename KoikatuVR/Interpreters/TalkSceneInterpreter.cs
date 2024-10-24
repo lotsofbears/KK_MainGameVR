@@ -11,9 +11,8 @@ using RootMotion.FinalIK;
 using KK_VR.Fixes;
 using Valve.VR;
 using static HandCtrl;
-using static KK_VR.Interpreters.Extras.TalkSceneExtras;
+using static KK_VR.Interpreters.TalkSceneExtras;
 using static VRGIN.Controls.Controller;
-using KK_VR.Interpreters.Extras;
 using KK_VR.Handlers;
 using KK_VR.Features;
 using KK_VR.Camera;
@@ -95,7 +94,10 @@ namespace KK_VR.Interpreters
         //}
         public override void OnDisable()
         {
-            HandHolder.DestroyHandlers();
+            foreach (var hand in _hands)
+            {
+                hand.DestroyHandlers();
+            }
             TalkSceneExtras.ReturnDirLight();
             VRMale.ForceShowHead = false;
         }
@@ -191,7 +193,10 @@ namespace KK_VR.Interpreters
                 _hitReaction = (HitReaction)Util.CopyComponent(advScene.GetComponent<HitReaction>(), Game.Instance.gameObject);
             }
             ControllerTracker.Initialize(charas);
-            HandHolder.UpdateHandlers<TalkSceneHandler>();
+            foreach (var hand in _hands)
+            {
+                hand.UpdateHandlers<TalkSceneHandler>();
+            }
         }
         private void SynchronizeClothes(ChaControl chara)
         {
@@ -290,13 +295,21 @@ namespace KK_VR.Interpreters
             VRPlugin.Logger.LogDebug($"Interpreter:DirDown[{direction}]:Index[{index}]");
             var adv = IsADV;
             _lastDirection[index] = direction;
+            var handler = GetHandler(index);
             switch (direction)
             {
                 case TrackpadDirection.Up:
                 case TrackpadDirection.Down:
-                    if (_hitReaction != null && GetHandler(index).DoUndress(direction == TrackpadDirection.Down, out var chara))
+                    if (handler.IsBusy)
                     {
-                        SynchronizeClothes(chara);
+                        if (handler.DoUndress(direction == TrackpadDirection.Down, out var chara))
+                        {
+                            SynchronizeClothes(chara);
+                        }
+                        else
+                        {
+
+                        }
                     }
                     else
                     {
